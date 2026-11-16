@@ -33,6 +33,8 @@ export function NewAgentDialog() {
   const [destNode, destProject] = dest.split('|');
   const teams = (nodes[destNode]?.teams ?? []).filter((t) => t.projectId === destProject && !t.archivedAt).sort((a, b) => a.createdAt - b.createdAt);
   const projects = nodeOrder.flatMap((k) => nodes[k].projects.map((p) => ({ value: `${k}|${p.id}`, label: nodeOrder.length > 1 ? `${nodes[k].name} / ${p.name}` : p.name })));
+  // Every agent belongs to a team: the one you started from, else the project's first.
+  const team = teams.find((t) => t.id === teamId) ?? teams[0];
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -42,7 +44,7 @@ export function NewAgentDialog() {
     setError(null);
     try {
       const agent = await client(nodeKey).post<Agent>('/agents', {
-        projectId, teamId: teams.some((t) => t.id === teamId) ? teamId : undefined, name: name.trim() || undefined, role, model, task: task.trim() || undefined,
+        projectId, teamId: team?.id, name: name.trim() || undefined, role, model, task: task.trim() || undefined,
       });
       close();
       select({ nodeKey, agentId: agent.id });
@@ -73,8 +75,8 @@ export function NewAgentDialog() {
             </select>
           </Field>
           <Field label="Team">
-            <select className={inputCls} value={teamId} onChange={(e) => setTeamId(e.target.value)} disabled={teams.length === 0}>
-              <option value="">{teams.length ? 'Default team' : 'No teams yet'}</option>
+            <select className={inputCls} value={team?.id ?? ''} onChange={(e) => setTeamId(e.target.value)} disabled={teams.length === 0}>
+              {teams.length === 0 && <option value="">No teams yet</option>}
               {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </Field>

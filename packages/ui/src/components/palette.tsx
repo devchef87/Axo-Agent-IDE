@@ -58,10 +58,12 @@ function useCommands(open: boolean): Command[] {
             (alt ? s.openInSplit : s.select)({ nodeKey: k, agentId: latest.id });
           },
         });
-        out.push({
-          id: `new-in:${k}:${p.id}`, group: 'Actions', label: `New agent in ${p.name}`, detail: multiNode ? nodes[k].name : undefined, icon: Plus,
-          run: () => s.setUi({ newAgent: { nodeKey: k, projectId: p.id } }),
-        });
+        for (const t of nodes[k].teams.filter((t) => t.projectId === p.id && !t.archivedAt)) {
+          out.push({
+            id: `new-in:${k}:${t.id}`, group: 'Actions', label: `New agent in ${t.name}`, detail: multiNode ? nodes[k].name : nodes[k].projects.length > 1 ? p.name : undefined, icon: Plus,
+            run: () => s.setUi({ newAgent: { nodeKey: k, projectId: p.id, teamId: t.id } }),
+          });
+        }
       }
       for (const p of nodes[k].projects) {
         out.push({
