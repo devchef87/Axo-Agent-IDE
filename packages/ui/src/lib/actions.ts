@@ -32,5 +32,5 @@ export function focusPaneComposer(i: number): void {
 /** Is any modal-like surface open? Global shortcuts (other than ⌘K) stand down while one is. */
 export function modalOpen(): boolean {
   const ui = useAxo.getState().ui;
-  return !!ui.newAgent || !!ui.addProject || ui.palette || ui.servers;
+  return !!ui.newAgent || !!ui.addProject || ui.palette || !!ui.refresh || !!ui.fork || !!ui.context || ui.servers;
 }

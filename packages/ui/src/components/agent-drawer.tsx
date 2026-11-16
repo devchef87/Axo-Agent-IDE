@@ -1,19 +1,23 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Power, Trash2, X } from 'lucide-react';
-import type { Agent, UpdateAgentReq } from '@axo/protocol';
-import { focusedSel, useAgent, useAxo } from '../stores/store.ts';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { GitFork, Pencil, Power, RefreshCw, Trash2, X } from 'lucide-react';
+import type { Agent, StateDoc } from '@axo/protocol';
+import { diffAgent, formatAgo, toForm, type Form } from '../lib/agent-form.ts';
+import { feedKey, focusedSel, useAgent, useAxo, useRefreshing } from '../stores/store.ts';
+import { Prose } from './feed/feed.tsx';
 import { Button, cn, Field, IconButton, inputCls, STATUS_LABEL, StatusDot } from './ui.tsx';
 import { MODELS } from './dialogs.tsx';
 
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
-type Tab = 'config';
+type Tab = 'state' | 'config';
+const TABS: Tab[] = ['state', 'config'];
 
 /** Right-hand panel for the agent in the focused pane. */
 export function AgentDrawer() {
   const sel = useAxo(focusedSel);
   const agent = useAgent(sel);
+  const refreshing = useRefreshing(sel);
   const setUi = useAxo((s) => s.setUi);
-  const [tab, setTab] = useState<Tab>('config');
+  const [tab, setTab] = useState<Tab>('state');
   const close = () => setUi({ drawer: false });
 
   return (
@@ -25,11 +29,11 @@ export function AgentDrawer() {
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border-subtle px-3">
         {agent && <StatusDot status={agent.status} />}
         <span className="truncate text-[13px] font-semibold text-primary">{agent?.name ?? 'No agent'}</span>
-        {agent && <span className="text-2xs text-faint">{STATUS_LABEL[agent.status]}</span>}
+        {agent && (refreshing ? <span className="text-2xs text-rotating">refreshing…</span> : <span className="text-2xs text-faint">{STATUS_LABEL[agent.status]}</span>)}
         <IconButton title="Close (Esc)" className="ml-auto" onClick={close}><X size={14} /></IconButton>
       </div>
       <div role="tablist" className="flex shrink-0 gap-1 border-b border-border-subtle px-3">
-        {(['config'] as Tab[]).map((t) => (
+        {TABS.map((t) => (
           <button
             key={t}
             role="tab"
@@ -46,30 +50,13 @@ export function AgentDrawer() {
         {!agent || !sel ? (
           <p className="p-4 text-xs text-faint">Focus a pane with an agent to see its settings.</p>
         ) : (
-          <ConfigTab key={`${sel.nodeKey}:${agent.id}`} nodeKey={sel.nodeKey} agent={agent} />
+          tab === 'state'
+            ? <StateTab key={`${sel.nodeKey}:${agent.id}`} nodeKey={sel.nodeKey} agent={agent} />
+            : <ConfigTab key={`${sel.nodeKey}:${agent.id}`} nodeKey={sel.nodeKey} agent={agent} />
         )}
       </div>
     </aside>
   );
-}
-
-interface Form { name: string; model: string; effort: string; instructions: string; scope: string }
-
-const toForm = (a: Agent): Form => ({
-  name: a.name, model: a.model, effort: a.effort ?? '', instructions: a.instructions, scope: a.scopeGlobs.join('\n'),
-});
-
-/** Only the fields that changed, in the PATCH /agents/:id shape. */
-export function diffAgent(a: Agent, f: Form): UpdateAgentReq {
-  const out: UpdateAgentReq = {};
-  const name = f.name.trim();
-  if (name !== a.name) out.name = name;
-  if (f.model !== a.model) out.model = f.model;
-  if ((f.effort || null) !== a.effort) out.effort = f.effort || null;
-  if (f.instructions !== a.instructions) out.instructions = f.instructions;
-  const scope = f.scope.split('\n').map((s) => s.trim()).filter(Boolean);
-  if (scope.join('\n') !== a.scopeGlobs.join('\n')) out.scopeGlobs = scope;
-  return out;
 }
 
 function ConfigTab({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
@@ -108,6 +95,8 @@ function ConfigTab({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
     }
   };
 
+  const setUi = useAxo((s) => s.setUi);
+  const refreshing = useRefreshing({ nodeKey, agentId: agent.id });
   const act = async (fn: () => Promise<unknown>) => { setError(null); try { await fn(); } catch (err: any) { setError(err.message); } };
 
   const models = MODELS.some((m) => m.id === agent.model) ? MODELS : [...MODELS, { id: agent.model, label: agent.model }];
@@ -148,7 +137,7 @@ function ConfigTab({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
         />
       </Field>
       <p className="mb-3 text-2xs text-faint">
-        Model, effort and instructions apply when the process next starts. An idle agent picks them up on its next message; for a working one, stop the process once this turn ends.
+        Model, effort and instructions take effect on the next turn. If the agent is working, they apply once the current turn ends.
       </p>
       {error && <p role="alert" className="mb-3 text-xs text-danger">{error}</p>}
       <div className="flex items-center justify-end gap-2">
@@ -160,6 +149,14 @@ function ConfigTab({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
       <div className="mt-6 border-t border-border-subtle pt-4">
         <h3 className="mb-2 text-xs font-medium text-muted">Actions</h3>
         <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" disabled={refreshing} title="Fresh context, same agent, chat and working state" onClick={() => setUi({ refresh: { nodeKey, agentId: agent.id } })}>
+              <RefreshCw size={13} className={cn(refreshing && 'animate-spin [animation-duration:2s]')} /> {refreshing ? 'Refreshing…' : 'Refresh'}
+            </Button>
+            <Button type="button" title="New agent seeded with this agent's working state" onClick={() => setUi({ fork: { nodeKey, agentId: agent.id } })}>
+              <GitFork size={13} /> Fork
+            </Button>
+          </div>
           <Button
             type="button"
             disabled={!live}
@@ -186,5 +183,98 @@ function ConfigTab({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
         </dl>
       </div>
     </form>
+  );
+}
+
+/** The journalist's live working-state doc. Editable; edits apply on the agent's next turn. */
+function StateTab({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
+  const client = useAxo((s) => s.client);
+  const rev = useAxo((s) => s.journalRev[feedKey(nodeKey, agent.id)] ?? 0);
+  const [doc, setDoc] = useState<StateDoc | null>(null);
+  const [draft, setDraft] = useState<string | null>(null); // non-null = editing
+  const [incoming, setIncoming] = useState<StateDoc | null>(null); // arrived while editing
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const editing = useRef(false);
+  editing.current = draft !== null;
+
+  const load = useCallback(async () => {
+    try {
+      const d = await client(nodeKey).get<StateDoc>(`/agents/${agent.id}/state`);
+      setError(null);
+      return d;
+    } catch (e: any) {
+      setError(e.message);
+      return null;
+    }
+  }, [client, nodeKey, agent.id]);
+
+  useEffect(() => {
+    let live = true;
+    void load().then((d) => {
+      if (!live || !d) return;
+      // Don't yank the text out from under someone who is editing.
+      if (editing.current) setIncoming(d);
+      else setDoc(d);
+    });
+    return () => { live = false; };
+  }, [load, rev]);
+
+  const save = async () => {
+    if (draft === null) return;
+    setBusy(true);
+    try {
+      await client(nodeKey).post(`/agents/${agent.id}/state`, { text: draft });
+      const d = await load();
+      if (d) setDoc(d);
+      setDraft(null);
+      setIncoming(null);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (draft !== null) {
+    return (
+      <div className="flex h-full flex-col p-3" onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) { e.preventDefault(); void save(); } }}>
+        {incoming && (
+          <div className="mb-2 rounded-md bg-warning/10 px-2.5 py-1.5 text-2xs text-warning">
+            The journalist updated this while you were editing. Saving replaces its version.{' '}
+            <button className="underline cursor-pointer" onClick={() => { setDraft(incoming.text); setDoc(incoming); setIncoming(null); }}>Load theirs</button>
+          </div>
+        )}
+        <textarea
+          autoFocus
+          aria-label="Working state (markdown)"
+          className={inputCls + ' min-h-0 flex-1 resize-none font-mono text-xs leading-relaxed'}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          spellCheck={false}
+        />
+        <p className="mt-2 text-2xs text-faint">Markdown. Your edits apply on the agent's next turn. ⌘Enter to save.</p>
+        {error && <p role="alert" className="mt-1 text-xs text-danger">{error}</p>}
+        <div className="mt-2 flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={() => { setDraft(null); if (incoming) { setDoc(incoming); setIncoming(null); } }}>Cancel</Button>
+          <Button type="button" variant="primary" disabled={busy || draft === doc?.text} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4">
+      <div className="mb-3 flex items-center gap-2 text-2xs text-faint">
+        <span>{doc?.updatedAt ? `Updated ${formatAgo(doc.updatedAt)}` : doc ? 'Not written yet' : 'Loading…'}</span>
+        <Button size="sm" variant="ghost" className="ml-auto" disabled={!doc} onClick={() => setDraft(doc?.text ?? '')}>
+          <Pencil size={11} /> Edit
+        </Button>
+      </div>
+      {error && <p role="alert" className="mb-3 text-xs text-danger">{error}</p>}
+      {doc && (doc.text.trim()
+        ? <div className="text-[13px]"><Prose text={doc.text} /></div>
+        : <p className="text-xs leading-relaxed text-faint">No working state yet. The journalist writes it after meaningful turns, and you can start it yourself with Edit.</p>)}
+    </div>
   );
 }

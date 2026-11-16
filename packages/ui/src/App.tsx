@@ -7,7 +7,8 @@ import { Fleet } from './components/fleet.tsx';
 import { AgentDrawer } from './components/agent-drawer.tsx';
 import { CommandPalette } from './components/palette.tsx';
 import { focusPaneComposer, modalOpen, openNewAgent, toggleDrawer } from './lib/actions.ts';
-import { AddProjectDialog, NewAgentDialog } from './components/dialogs.tsx';
+import { AddProjectDialog, ForkDialog, NewAgentDialog, RefreshDialog } from './components/dialogs.tsx';
+import { ProjectContextDialog } from './components/project-context.tsx';
 import { cn, ConnDot, formatTokens } from './components/ui.tsx';
 import { useTheme, type ThemePref } from './lib/theme.ts';
 import { ServersPanel } from './components/servers/servers-panel.tsx';
@@ -29,6 +30,9 @@ export function App() {
       <StatusBar />
       <NewAgentDialog />
       <AddProjectDialog />
+      <RefreshDialog />
+      <ForkDialog />
+      <ProjectContextDialog />
       <CommandPalette />
       <ServersPanel />
     </div>
@@ -47,7 +51,7 @@ function useGlobalShortcuts() {
       const k = e.key.toLowerCase();
       if (k === 'k' && !e.shiftKey) {
         const s = useAxo.getState();
-        if (s.ui.newAgent || s.ui.addProject || s.ui.servers) return;
+        if (!s.ui.palette && modalOpen()) return;
         e.preventDefault();
         s.setUi({ palette: !s.ui.palette });
         return;

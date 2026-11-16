@@ -1,0 +1,9 @@
+{
+  "name": "@axo/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "axo": "./dist/axo.mjs" },
+  "scripts": { "build": "node build.mjs" },
+  "dependencies": { "@axo/protocol": "*" }
+}

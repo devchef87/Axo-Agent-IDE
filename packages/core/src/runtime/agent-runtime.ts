@@ -13,7 +13,7 @@ import type { SpawnSpec } from './claude-process.ts';
 import { ulid } from '../util/ulid.ts';
 import { HttpError } from '../util/http-error.ts';
 
-interface Queued { text: string; author: string }
+interface Queued { text: string; author: string; id?: string } // [core2] id = feed item id, reported as TurnEndEvent.messageIds
 
 interface Live {
   proc: ClaudeProcess;
@@ -51,7 +51,15 @@ export interface TurnEndEvent {
   /** Fresh tokens (input + output + cache creation) used by this turn. */
   freshTokens: number;
   startedAt: number;
+  /** [core2] Message ids (returned by deliver()) consumed by this turn. InnerChat matches replies with these. */
+  messageIds?: string[];
 }
+
+// [core2] Also emitted on the runtime: 'deliver' (DeliverEvent) and 'gone' (GoneEvent).
+export interface DeliverEvent { agentId: string; author: string; messageId: string }
+export interface GoneEvent { agentId: string; reason: 'stop' | 'delete' | 'error' }
+/** [core2] Last-moment additions to every claude spawn spec (knock --settings, PATH, per-agent token). */
+export type SpecHook = (agent: Agent, spec: SpawnSpec) => void;
 
 export type ContextProvider = (agent: Agent) => PromptExtras;
 
@@ -92,6 +100,9 @@ export class AgentRuntime extends EventEmitter {
   private readonly bus: EventBus;
   private readonly cfg: NodeConfig;
   private readonly projects: Projects;
+  /** [core2] See SpecHook. Set by the node. */
+  specHook: SpecHook | null = null;
+  private shuttingDown = false; // [core2] no new processes once shutdown() starts
 
   constructor(store: Store, bus: EventBus, cfg: NodeConfig, projects: Projects, opts: RuntimeOptions = {}) {
     super();
@@ -123,6 +134,7 @@ export class AgentRuntime extends EventEmitter {
   }
 
   async shutdown(): Promise<void> {
+    this.shuttingDown = true; // [core2]
     const waits: Promise<void>[] = [];
     for (const [id, l] of this.live) {
       l.ending = 'sleep';
@@ -223,12 +235,13 @@ export class AgentRuntime extends EventEmitter {
     this.agents.delete(id);
     this.store.deleteAgent(id);
     this.bus.publish({ type: 'agent:removed', agentId: id });
+    this.emit('gone', { agentId: id, reason: 'delete' } satisfies GoneEvent); // [core2]
   }
 
   // ── messaging ─────────────────────────────────────────────
 
   /** The single entry point for every inbound message (user, teammate, watch, axo). */
-  deliver(id: string, text: string, author = 'user'): void {
+  deliver(id: string, text: string, author = 'user'): string {
     const a = this.get(id);
     if (!text.trim()) throw new HttpError(400, 'empty message');
     if (a.status === 'stopped' || a.status === 'error') {
@@ -236,11 +249,14 @@ export class AgentRuntime extends EventEmitter {
       a.lastError = null;
       this.crashes.delete(id);
     }
-    this.addFeed(a, { kind: 'user', id: `u-${ulid()}`, ts: Date.now(), text, author });
+    const msgId = `u-${ulid()}`; // [core2] returned so callers can match the turn that consumed it
+    this.addFeed(a, { kind: 'user', id: msgId, ts: Date.now(), text, author });
     const q = this.queues.get(id) ?? [];
-    q.push({ text, author });
+    q.push({ text, author, id: msgId });
     this.queues.set(id, q);
+    this.emit('deliver', { agentId: id, author, messageId: msgId } satisfies DeliverEvent); // [core2]
     this.pump(id);
+    return msgId;
   }
 
   /** Send queued messages if the agent is at a turn boundary. */
@@ -253,6 +269,7 @@ export class AgentRuntime extends EventEmitter {
       this.emitAgent(a);
       return;
     }
+    if (!l && this.shuttingDown) return; // [core2] queued messages wait for the next node start
     const live = l ?? this.spawn(a);
     if (!live) return;
     const msgs = q.splice(0);
@@ -294,6 +311,7 @@ export class AgentRuntime extends EventEmitter {
     await this.endProcess(id, 'stop');
     const a = this.get(id);
     if (!this.live.has(id)) { a.status = 'stopped'; this.store.saveAgent(a); this.emitAgent(a); }
+    this.emit('gone', { agentId: id, reason: 'stop' } satisfies GoneEvent); // [core2]
   }
 
   // ── process management ───────────────────────────────────
@@ -327,7 +345,9 @@ export class AgentRuntime extends EventEmitter {
     env.AXO_AGENT_NAME = a.name;
     env.AXO_NODE_URL = `http://${this.cfg.host}:${this.cfg.port}`;
     env.AXO_TOKEN = this.cfg.token;
-    return { bin: this.cfg.claudeBin, args, cwd: a.workdir, env };
+    const spec: SpawnSpec = { bin: this.cfg.claudeBin, args, cwd: a.workdir, env };
+    this.specHook?.(a, spec); // [core2]
+    return spec;
   }
 
   private spawn(a: Agent): Live | null {
@@ -523,7 +543,9 @@ export class AgentRuntime extends EventEmitter {
     this.emitAgent(a);
     const ev: TurnEndEvent = {
       agentId: a.id, sessionId: a.sessionId, text: live.turnText.join('\n\n'), lastText: live.turnText.at(-1) ?? '',
-      isError: act.isError && !interrupted, interrupted, inputs, freshTokens: fresh, startedAt: live.turnStartedAt,
+      isError: act.isError && !interrupted, interrupted, inputs: inputs.map(({ text, author }) => ({ text, author })),
+      freshTokens: fresh, startedAt: live.turnStartedAt,
+      messageIds: inputs.flatMap((m) => (m.id ? [m.id] : [])), // [core2]
     };
     try { this.emit('turn-end', ev); } catch (e) { console.error('[runtime] turn-end listener failed', e); }
     this.flushIdleWaiters(a.id);
@@ -617,6 +639,7 @@ export class AgentRuntime extends EventEmitter {
     this.addFeed(a, sys('error', message));
     this.store.saveAgent(a);
     this.emitAgent(a);
+    this.emit('gone', { agentId: a.id, reason: 'error' } satisfies GoneEvent); // [core2]
   }
 
   private failRunningTools(a: Agent, live: Live, reason: string | null): void {

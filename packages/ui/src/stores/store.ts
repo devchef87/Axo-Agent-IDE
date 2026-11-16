@@ -31,11 +31,18 @@ interface AxoState {
   nodeOrder: string[];
   feeds: Record<string, FeedState>;  // key: `${nodeKey}:${agentId}`
   layout: Layout;
+  /** Refreshes in flight (rotation:started → completed/aborted), keyed by feedKey. */
+  refreshing: Record<string, { reason: string; since: number }>;
+  /** Bumped on journalist:updated so open views refetch. Keys: feedKey for agent state, `${nodeKey}:project:${id}` for map/decisions. */
+  journalRev: Record<string, number>;
   ui: {
     newAgent: { nodeKey: string; projectId: string } | null;
     addProject: string | null;
     palette: boolean;
     drawer: boolean; // agent config drawer for the focused pane
+    refresh: Selection | null;  // refresh dialog target
+    fork: Selection | null;     // fork dialog target
+    context: { nodeKey: string; projectId: string } | null; // project map + decisions
     servers: boolean; // Settings → Servers
   };
 
@@ -91,6 +98,8 @@ export const useAxo = create<AxoState>((set, get) => {
 
   const onState = (key: string, st: NodeState) => {
     patchNode(key, () => ({ hostname: st.hostname, version: st.version, projects: st.projects, teams: st.teams, agents: st.agents }));
+    // Missed events may have ended a refresh; drop this node's in-flight markers.
+    set((s) => ({ refreshing: Object.fromEntries(Object.entries(s.refreshing).filter(([k]) => !k.startsWith(key + ':'))) }));
     // Node restarted or gap too large: refetch any feeds we had loaded.
     for (const fk of Object.keys(get().feeds)) {
       if (fk.startsWith(key + ':')) void get().loadFeed(key, fk.slice(key.length + 1));
@@ -139,6 +148,23 @@ export const useAxo = create<AxoState>((set, get) => {
           if (f.items.some((i) => i.id === ev.itemId)) return {};
           return { drafts: { ...f.drafts, [ev.itemId]: (f.drafts[ev.itemId] ?? '') + ev.text } };
         });
+        break;
+      }
+      case 'rotation:started':
+        set((s) => ({ refreshing: { ...s.refreshing, [feedKey(key, ev.agentId)]: { reason: ev.reason, since: ev.ts } } }));
+        break;
+      case 'rotation:completed':
+      case 'rotation:aborted': {
+        const fk = feedKey(key, ev.agentId);
+        set((s) => {
+          const { [fk]: _, ...rest } = s.refreshing;
+          return { refreshing: rest };
+        });
+        break;
+      }
+      case 'journalist:updated': {
+        const rk = ev.doc === 'state' && ev.agentId ? feedKey(key, ev.agentId) : `${key}:project:${ev.projectId}`;
+        set((s) => ({ journalRev: { ...s.journalRev, [rk]: (s.journalRev[rk] ?? 0) + 1 } }));
         break;
       }
       default: break;
@@ -210,7 +236,9 @@ export const useAxo = create<AxoState>((set, get) => {
     nodeOrder: [],
     feeds: {},
     layout: loadLayout(),
-    ui: { newAgent: null, addProject: null, palette: false, drawer: false, servers: false },
+    refreshing: {},
+    journalRev: {},
+    ui: { newAgent: null, addProject: null, palette: false, drawer: false, refresh: null, fork: null, context: null, servers: false },
 
     async init() {
       bridge?.onNodesChanged(syncNodes);
@@ -258,4 +286,9 @@ export const useAxo = create<AxoState>((set, get) => {
 
 export function useAgent(sel: Selection | null): Agent | null {
   return useAxo((s) => (sel ? s.nodes[sel.nodeKey]?.agents.find((a) => a.id === sel.agentId) ?? null : null));
+}
+
+/** Is a context refresh in flight for this agent (the whole rotation, not just the final swap)? */
+export function useRefreshing(sel: Selection | null): boolean {
+  return useAxo((s) => !!sel && (!!s.refreshing[feedKey(sel.nodeKey, sel.agentId)] || s.nodes[sel.nodeKey]?.agents.find((a) => a.id === sel.agentId)?.status === 'rotating'));
 }

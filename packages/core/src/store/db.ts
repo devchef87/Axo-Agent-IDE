@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import type { Agent, AgentStatus, FeedItem, Project, Team, TeamMode } from '@axo/protocol';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const MIGRATIONS: string[] = [
   /* v1 */ `
@@ -49,6 +49,27 @@ const MIGRATIONS: string[] = [
   CREATE INDEX usage_agent_ts ON usage(agent_id, ts);
   CREATE INDEX usage_ts ON usage(ts);
   `,
+  /* v2 (core2): watches + InnerChat threads. Queried from watches/ and innerchat/. */ `
+  CREATE TABLE watches (
+    id TEXT PRIMARY KEY, agent_id TEXT, team_id TEXT, label TEXT NOT NULL, mode TEXT NOT NULL,
+    command TEXT NOT NULL DEFAULT '', until_cmd TEXT NOT NULL DEFAULT '', cwd TEXT NOT NULL,
+    poll_ms INTEGER NOT NULL, timeout_ms INTEGER NOT NULL, status TEXT NOT NULL,
+    pid INTEGER, result TEXT, created_at INTEGER NOT NULL, finished_at INTEGER
+  );
+  CREATE INDEX watches_status ON watches(status, created_at);
+  CREATE TABLE ic_threads (
+    id TEXT PRIMARY KEY, project_id TEXT NOT NULL, a_id TEXT NOT NULL, a_name TEXT NOT NULL,
+    b_id TEXT NOT NULL, b_name TEXT NOT NULL, status TEXT NOT NULL, exchanges INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX ic_threads_pair ON ic_threads(a_id, b_id, updated_at);
+  CREATE TABLE ic_turns (
+    id TEXT PRIMARY KEY, thread_id TEXT NOT NULL REFERENCES ic_threads(id) ON DELETE CASCADE,
+    from_id TEXT NOT NULL, from_name TEXT NOT NULL, to_id TEXT NOT NULL, to_name TEXT NOT NULL,
+    kind TEXT NOT NULL, text TEXT NOT NULL, ts INTEGER NOT NULL
+  );
+  CREATE INDEX ic_turns_thread ON ic_turns(thread_id, ts);
+  `,
 ];
 
 const FEED_KEEP_PER_AGENT = 5000;
@@ -94,6 +115,10 @@ export class Store {
     this.db.prepare(`INSERT INTO projects (id,name,path,is_git,base_branch,setup_cmd,created_at) VALUES (?,?,?,?,?,?,?)`)
       .run(p.id, p.name, p.path, p.isGit ? 1 : 0, p.baseBranch, p.setupCmd, p.createdAt);
   }
+  saveProject(p: Project): void {
+    this.db.prepare('UPDATE projects SET name = ?, base_branch = ?, setup_cmd = ? WHERE id = ?')
+      .run(p.name, p.baseBranch, p.setupCmd, p.id);
+  }
   deleteProject(id: string): void { this.db.prepare('DELETE FROM projects WHERE id = ?').run(id); }
 
   // ── teams ─────────────────────────────────────────────────
@@ -108,6 +133,9 @@ export class Store {
   insertTeam(t: Team): void {
     this.db.prepare(`INSERT INTO teams (id,project_id,name,mode,branch,worktree_path,created_at,archived_at) VALUES (?,?,?,?,?,?,?,?)`)
       .run(t.id, t.projectId, t.name, t.mode, t.branch, t.worktreePath, t.createdAt, t.archivedAt);
+  }
+  saveTeam(t: Team): void {
+    this.db.prepare('UPDATE teams SET name = ?, archived_at = ? WHERE id = ?').run(t.name, t.archivedAt, t.id);
   }
 
   // ── agents ────────────────────────────────────────────────

@@ -49,6 +49,12 @@ export const STATUS_LABEL: Record<AgentStatus, string> = {
   asleep: 'asleep', stopped: 'stopped', error: 'error',
 };
 
+/** Why a context refresh happened (rotation reason from the node). */
+export const REFRESH_REASON: Record<string, string> = {
+  manual: 'refreshed by you', context: 'context was filling up', ceiling: 'session hit its token ceiling',
+  velocity: 'context was growing fast', degraded: 'responses were degrading', requested: 'the agent asked for it',
+};
+
 export function StatusDot({ status, className }: { status: AgentStatus; className?: string }) {
   const live = status === 'working' || status === 'starting' || status === 'rotating';
   return <span className={cn('inline-block h-2 w-2 shrink-0 rounded-full', STATUS_COLOR[status], live && 'animate-pulse-dot', className)} />;
