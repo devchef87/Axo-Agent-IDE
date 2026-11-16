@@ -1,5 +1,6 @@
 // App-level actions shared by keyboard shortcuts and the command palette.
 import { focusedSel, useAxo } from '../stores/store.ts';
+import { useEditor } from '../stores/editor.ts';
 
 /** ⌘N: new agent in the focused agent's project, else the first project on an online node. */
 export function openNewAgent(): void {
@@ -32,5 +33,18 @@ export function focusPaneComposer(i: number): void {
 /** Is any modal-like surface open? Global shortcuts (other than ⌘K) stand down while one is. */
 export function modalOpen(): boolean {
   const ui = useAxo.getState().ui;
+  if (useEditor.getState().quickOpen) return true;
   return !!ui.newAgent || !!ui.addProject || ui.palette || !!ui.refresh || !!ui.fork || !!ui.context;
+}
+
+/** ⌘E: switch between Fleet and Editor. */
+export function toggleView(): void {
+  const s = useAxo.getState();
+  s.setView(s.view === 'editor' ? 'fleet' : 'editor');
+}
+
+/** ⌘P: go to file (switches to the editor). */
+export function openQuickOpen(): void {
+  useAxo.getState().setView('editor');
+  useEditor.getState().setQuickOpen(true);
 }

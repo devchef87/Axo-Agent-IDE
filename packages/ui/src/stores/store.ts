@@ -35,6 +35,9 @@ interface AxoState {
   refreshing: Record<string, { reason: string; since: number }>;
   /** Bumped on journalist:updated so open views refetch. Keys: feedKey for agent state, `${nodeKey}:project:${id}` for map/decisions. */
   journalRev: Record<string, number>;
+  /** Main area view. Persisted. */
+  view: 'fleet' | 'editor';
+  setView(view: 'fleet' | 'editor'): void;
   ui: {
     newAgent: { nodeKey: string; projectId: string } | null;
     addProject: string | null;
@@ -63,6 +66,14 @@ export const feedKey = (nodeKey: string, agentId: string) => `${nodeKey}:${agent
 const emptyFeed = (): FeedState => ({ items: [], hasMore: false, loaded: false, drafts: {} });
 
 const clients = new Map<string, NodeClient>();
+
+type FilesListener = (nodeKey: string, ev: Extract<EventEnvelope, { type: 'files:changed' }>) => void;
+const filesListeners = new Set<FilesListener>();
+/** Subscribe to files:changed from any node. Returns an unsubscribe function. */
+export function onFilesChanged(fn: FilesListener): () => void {
+  filesListeners.add(fn);
+  return () => { filesListeners.delete(fn); };
+}
 const LAYOUT_KEY = 'axo.layout';
 
 function loadLayout(): Layout {
@@ -162,6 +173,9 @@ export const useAxo = create<AxoState>((set, get) => {
         set((s) => ({ journalRev: { ...s.journalRev, [rk]: (s.journalRev[rk] ?? 0) + 1 } }));
         break;
       }
+      case 'files:changed':
+        for (const fn of filesListeners) fn(key, ev);
+        break;
       default: break;
     }
   };
@@ -197,6 +211,8 @@ export const useAxo = create<AxoState>((set, get) => {
     layout: loadLayout(),
     refreshing: {},
     journalRev: {},
+    view: localStorage.getItem('axo.view') === 'editor' ? 'editor' : 'fleet',
+    setView(view) { localStorage.setItem('axo.view', view); set({ view }); },
     ui: { newAgent: null, addProject: null, palette: false, drawer: false, refresh: null, fork: null, context: null },
 
     async init() {

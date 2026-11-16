@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { BookOpen, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Search, Sun, X, type LucideIcon } from 'lucide-react';
+import { BookOpen, Code2, FileSearch, Users, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Search, Sun, X, type LucideIcon } from 'lucide-react';
 import type { AgentStatus } from '@axo/protocol';
 import { focusedSel, useAxo } from '../stores/store.ts';
 import { useTheme, type ThemePref } from '../lib/theme.ts';
 import { fuzzyFilter } from '../lib/fuzzy.ts';
-import { openNewAgent, toggleDrawer } from '../lib/actions.ts';
+import { openNewAgent, openQuickOpen, toggleDrawer, toggleView } from '../lib/actions.ts';
 import { cn, Kbd, StatusDot, useModalFocus } from './ui.tsx';
 
 interface Command {
@@ -69,6 +69,10 @@ function useCommands(open: boolean): Command[] {
       out.push({ id: `add-project:${k}`, group: 'Actions', label: `Add project on ${nodes[k].name}`, icon: FolderPlus, run: () => s.setUi({ addProject: k }) });
     }
 
+    out.unshift(s.view === 'editor'
+      ? { id: 'view', group: 'Actions', label: 'Back to Fleet', icon: Users, shortcut: '⌘E', run: () => toggleView() }
+      : { id: 'view', group: 'Actions', label: 'Open editor', icon: Code2, shortcut: '⌘E', run: () => toggleView() });
+    out.splice(1, 0, { id: 'go-to-file', group: 'Actions', label: 'Go to file…', icon: FileSearch, shortcut: '⌘P', run: () => openQuickOpen() });
     out.unshift({ id: 'new-agent', group: 'Actions', label: 'New agent…', icon: Plus, shortcut: '⌘N', run: () => openNewAgent() });
     const next: Record<ThemePref, ThemePref> = { system: 'light', light: 'dark', dark: 'system' };
     out.push({
