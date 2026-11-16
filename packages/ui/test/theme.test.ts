@@ -26,7 +26,7 @@ export function contrast(a: string, b: string): number {
 }
 
 const THEMES = { dark: tokens('[data-theme="dark"]'), light: tokens('[data-theme="light"]') };
-const SURFACES = ['bg', 'panel', 'elevated', 'inset', 'hover'];
+const SURFACES = ['bg', 'panel', 'elevated', 'inset', 'hover', 'terminal'];
 const TEXT = ['text-primary', 'text-secondary', 'text-muted', 'text-faint',
   'success', 'warning', 'danger', 'info', 'rotating', 'innerchat',
   'syn-keyword', 'syn-string', 'syn-number', 'syn-comment', 'syn-function', 'syn-type', 'syn-property', 'syn-tag'];
