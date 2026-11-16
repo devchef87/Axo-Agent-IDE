@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent } from 'react';
-import { BookOpen, ChevronDown, ChevronRight, FolderPlus, Plus, RefreshCw, Server, Trash2 } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, FolderPlus, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import type { Agent, Project } from '@axo/protocol';
 import { focusedSel, useAxo, useRefreshing, type NodeView } from '../stores/store.ts';
 import { sameSel } from '../lib/layout.ts';
@@ -32,8 +32,8 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-border-subtle bg-panel">
-      <div ref={list} id="axo-sidebar" aria-label="Servers, projects and agents" onKeyDown={onKeyDown} className="flex-1 overflow-y-auto py-2">
+    <aside className="flex h-full w-[232px] shrink-0 flex-col border-r border-border-subtle bg-panel">
+      <div ref={list} id="axo-sidebar" aria-label="Servers, projects and agents" onKeyDown={onKeyDown} className="flex-1 overflow-y-auto py-1.5">
         {nodeOrder.map((k) => <NodeSection key={k} node={nodes[k]} />)}
       </div>
       <ServersSidebarEntry />
@@ -45,30 +45,30 @@ function NodeSection({ node }: { node: NodeView }) {
   const [open, setOpen] = useState(true);
   const setUi = useAxo((s) => s.setUi);
   return (
-    <div className="mb-1">
-      <div className="group flex h-7 items-center gap-1.5 px-2 text-xs font-semibold uppercase tracking-wide text-faint">
-        <button data-nav data-level={1} data-label={node.name} aria-expanded={open} className="flex flex-1 items-center gap-1.5 rounded outline-none focus-visible:bg-hover cursor-pointer" onClick={() => setOpen(!open)}>
-          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          <Server size={12} />
-          <span className="truncate">{node.name}</span>
+    <div className="mb-2">
+      <div className="group flex h-8 items-center gap-1 pl-3 pr-1.5">
+        <button data-nav data-level={1} data-label={node.name} aria-expanded={open} className="label flex min-w-0 flex-1 items-center gap-2 rounded-sm outline-none hover:!text-secondary focus-visible:bg-hover cursor-pointer" onClick={() => setOpen(!open)}>
           <ConnDot status={node.status} />
+          <span className="truncate">{node.name}</span>
+          {!open && <ChevronRight size={10} />}
         </button>
+        <span className="font-mono text-2xs text-faint" title={`${node.agents.length} agents`}>{node.agents.length || ''}</span>
         <IconButton title="Add project" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setUi({ addProject: node.key })}>
-          <FolderPlus size={13} />
+          <FolderPlus size={13} strokeWidth={1.75} />
         </IconButton>
       </div>
       {open && (
         <div>
-          {node.status === 'unauthorized' && <p className="px-6 py-1 text-xs text-danger">Bad token for this node.</p>}
-          {node.status === 'offline' && node.projects.length === 0 && <p className="px-6 py-1 text-xs text-faint">Offline — retrying…</p>}
+          {node.status === 'unauthorized' && <p className="px-3 py-1 text-xs text-danger">Bad token for this node.</p>}
+          {node.status === 'offline' && node.projects.length === 0 && <p className="px-3 py-1 text-xs text-faint">Offline · retrying</p>}
           {node.projects.map((p) => <ProjectSection key={p.id} node={node} project={p} />)}
           {node.status === 'online' && node.projects.length === 0 && (
             <button
               data-nav data-level={2} data-label="Add a project"
-              className="mx-3 mt-1 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-xs text-faint hover:border-accent/60 hover:text-secondary cursor-pointer"
+              className="flex h-7 w-full items-center gap-2 px-3 text-xs text-faint outline-none hover:bg-hover hover:text-secondary focus-visible:bg-hover cursor-pointer"
               onClick={() => setUi({ addProject: node.key })}
             >
-              <FolderPlus size={13} /> Add a project
+              <Plus size={12} /> Add project
             </button>
           )}
         </div>
@@ -90,10 +90,10 @@ function ProjectSection({ node, project }: { node: NodeView; project: Project })
 
   return (
     <div>
-      <div className="group flex h-7 items-center gap-1 pl-4 pr-2 text-[13px] text-secondary hover:bg-hover">
-        <button data-nav data-level={2} data-label={project.name} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-1.5 rounded outline-none focus-visible:bg-hover cursor-pointer" onClick={() => setOpen(!open)} title={project.path}>
-          {open ? <ChevronDown size={12} className="text-faint" /> : <ChevronRight size={12} className="text-faint" />}
-          <span className="truncate font-medium">{project.name}</span>
+      <div className="group flex h-7 items-center gap-0.5 pl-1.5 pr-1.5 text-[13px] text-secondary hover:bg-hover">
+        <button data-nav data-level={2} data-label={project.name} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-1 rounded-sm outline-none focus-visible:bg-hover cursor-pointer" onClick={() => setOpen(!open)} title={project.path}>
+          {open ? <ChevronDown size={12} className="shrink-0 text-faint" /> : <ChevronRight size={12} className="shrink-0 text-faint" />}
+          <span className="truncate">{project.name}</span>
         </button>
         <IconButton title="Project map and decisions" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setUi({ context: { nodeKey: node.key, projectId: project.id } })}>
           <BookOpen size={12} />
@@ -107,7 +107,7 @@ function ProjectSection({ node, project }: { node: NodeView; project: Project })
       {open && agents.length === 0 && (
         <button
           data-nav data-level={3} data-label="New agent"
-          className="flex h-7 w-full items-center gap-1.5 pl-9 text-xs text-faint outline-none hover:text-secondary focus-visible:bg-hover cursor-pointer"
+          className="flex h-7 w-full items-center gap-2 pl-[26px] text-xs text-faint outline-none hover:bg-hover hover:text-secondary focus-visible:bg-hover cursor-pointer"
           onClick={() => setUi({ newAgent: { nodeKey: node.key, projectId: project.id } })}
         >
           <Plus size={12} /> New agent
@@ -136,15 +136,15 @@ function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
       title="Click or Enter to open · ⌘-click or ⌘Enter to open in a split · drag into a pane"
       aria-current={focused ? 'true' : undefined}
       className={cn(
-        'relative flex h-7 w-full items-center gap-2 pl-9 pr-3 text-left text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent cursor-pointer',
-        focused ? 'bg-accent/12 text-primary' : visible ? 'bg-hover text-secondary' : 'text-muted hover:bg-hover hover:text-secondary',
+        'relative flex h-7 w-full items-center gap-2.5 pl-[28px] pr-3 text-left text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent cursor-pointer',
+        focused ? 'bg-control text-primary' : visible ? 'bg-hover text-secondary' : 'text-muted hover:bg-hover hover:text-secondary',
       )}
     >
-      {focused && <span className="absolute inset-y-1 left-0 w-0.5 rounded-r bg-accent" aria-hidden />}
+      {focused && <span className="absolute inset-y-0 left-0 w-px bg-accent" aria-hidden />}
       <StatusDot status={agent.status} />
       <span className="truncate">{agent.name}</span>
       {refreshing && <RefreshCw size={10} className="shrink-0 animate-spin text-rotating [animation-duration:2s]" aria-label="refreshing" />}
-      {agent.queued > 0 && <span className="ml-auto rounded bg-control px-1 text-2xs text-secondary" title={`${agent.queued} queued`}>{agent.queued}</span>}
+      {agent.queued > 0 && <span className="ml-auto font-mono text-2xs text-faint" title={`${agent.queued} queued`}>{agent.queued}</span>}
     </button>
   );
 }

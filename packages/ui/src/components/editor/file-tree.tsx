@@ -193,7 +193,7 @@ export function FileTree({ target, label }: { target: EditorTarget; label: strin
       onDrop={onDrop('')}
     >
       <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border-subtle pl-3 pr-1.5">
-        <span className="min-w-0 flex-1 truncate text-2xs font-semibold uppercase tracking-wide text-faint" title={label}>{label}</span>
+        <span className="label min-w-0 flex-1 truncate" title={label}>Files</span>
         <IconButton title="New file" onClick={() => setPending({ kind: 'file', parent: '' })}><FilePlus size={13} /></IconButton>
         <IconButton title="New folder" onClick={() => setPending({ kind: 'dir', parent: '' })}><FolderPlus size={13} /></IconButton>
         <IconButton title="Refresh" onClick={bump}><RefreshCw size={12} /></IconButton>
@@ -308,7 +308,7 @@ function NameInput({ depth, dir, initial, onDone }: { depth: number; dir: boolea
           if (e.key === 'Escape') { e.stopPropagation(); finish(''); }
         }}
         onBlur={(e) => finish(e.currentTarget.value === initial ? '' : e.currentTarget.value)}
-        className="h-5 min-w-0 flex-1 rounded border border-accent bg-bg px-1 text-xs text-primary outline-none"
+        className="h-5 min-w-0 flex-1 rounded border border-ring bg-bg px-1 text-xs text-primary outline-none"
       />
     </div>
   );

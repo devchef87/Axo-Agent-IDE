@@ -52,7 +52,7 @@ export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; a
   return (
     <FeedContext.Provider value={ctx}>
     <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto">
-      <div className="px-6 py-5">
+      <div className="px-6 py-6">
         {feed.hasMore && <div className="mb-3 text-center text-2xs text-faint">Scroll up for earlier messages</div>}
         {!feed.loaded && <div className="py-10 text-center text-xs text-faint">Loading…</div>}
         {feed.loaded && blocks.length === 0 && (
@@ -86,14 +86,11 @@ const BlockView = memo(function BlockView({ block, live }: { block: Block; live:
 function UserMessage({ item }: { item: Extract<FeedItem, { kind: 'user' }> }) {
   const fromUser = item.author === 'user';
   return (
-    <div className={cn('animate-fade-in my-4 flex', fromUser ? 'justify-end' : 'justify-start')}>
-      <div
-        className={cn(
-          'max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-3.5 py-2 text-[13px] leading-relaxed',
-          fromUser ? 'bg-control text-primary' : 'border border-innerchat/40 bg-innerchat/8 text-secondary',
-        )}
-      >
-        {!fromUser && <div className="mb-0.5 text-2xs font-medium text-innerchat">{item.author}</div>}
+    // Left-aligned with a rule, so it reads at full width: you in the accent, other agents in grey.
+    <div className="animate-fade-in mb-3 mt-6 first:mt-0">
+      <div className="label mb-1">{fromUser ? 'You' : item.author}</div>
+      <div className={cn('whitespace-pre-wrap break-words border-l pl-3 text-[13px] leading-relaxed',
+        fromUser ? 'border-accent text-primary' : 'border-border-strong text-secondary')}>
         <Collapsible as="div" text={item.text} />
       </div>
     </div>
@@ -102,7 +99,7 @@ function UserMessage({ item }: { item: Extract<FeedItem, { kind: 'user' }> }) {
 
 export const Prose = memo(function Prose({ text }: { text: string }) {
   return (
-    <div className="md my-2 text-[13.5px]">
+    <div className="md my-2 text-[13.5px] leading-[1.65]">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
     </div>
   );
@@ -126,9 +123,10 @@ function SystemLine({ item }: { item: Extract<FeedItem, { kind: 'system' }> }) {
   return (
     <div
       className={cn(
-        'my-2 flex gap-2 rounded-md px-3 py-1.5 text-xs',
-        item.level === 'error' && 'bg-danger/10 text-danger',
-        item.level === 'warn' && 'bg-warning/10 text-warning',
+        'my-2 flex gap-2 border-l px-3 py-1 text-xs',
+        item.level === 'error' && 'border-danger text-danger',
+        item.level === 'warn' && 'border-warning text-warning',
+        item.level === 'info' && 'border-transparent',
         item.level === 'info' && 'text-faint',
       )}
     >
@@ -140,7 +138,7 @@ function SystemLine({ item }: { item: Extract<FeedItem, { kind: 'system' }> }) {
 
 function TurnFooter({ item }: { item: Extract<FeedItem, { kind: 'turn' }> }) {
   return (
-    <div className="mb-4 mt-1 flex items-center gap-2 text-2xs text-faint">
+    <div className="mb-4 mt-1.5 flex items-center gap-2 font-mono text-2xs text-faint">
       <span>{formatDuration(item.durationMs)}</span>
       {item.costUsd > 0 && <span>· ${item.costUsd.toFixed(2)}</span>}
       {item.interrupted && <span className="text-warning">· interrupted</span>}
