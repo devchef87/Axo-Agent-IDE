@@ -258,7 +258,7 @@ All triggers are checked **only at turn boundaries**, so no turn is ever killed 
 
 ## 9. InnerChat
 
-Ported from Groove: blocking `ask`, async `tell`, 12-exchange cap per thread, deadlock guard.
+Ported from Groove: blocking `ask`, async `tell`, rate-based loop breaker (a pair sending >20 messages in 10 min with no user message is paused and the user notified; no lifetime cap), deadlock guard.
 
 Changes from Groove:
 - **Threads are stored on disk**, so they survive restarts.

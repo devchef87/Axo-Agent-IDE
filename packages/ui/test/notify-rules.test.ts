@@ -98,3 +98,12 @@ test('lastQuestion only fires on a trailing question', () => {
   assert.equal(lastQuestion('Use `foo()`?'), 'Use `foo()`?');
   assert.equal(lastQuestion(''), null);
 });
+
+test('InnerChat loop pause → notification pointing at the sending agent', () => {
+  const h = harness();
+  const n = h.feed({ kind: 'system', level: 'warn', text: 'InnerChat paused: alice and bob exchanged 20 messages in 10 minutes without you.' } as any)!;
+  assert.equal(n.title, 'Agents paused in a loop');
+  assert.match(n.body, /^alice and bob/);
+  assert.equal(n.agentId, 'a1');
+  assert.equal(h.feed({ kind: 'system', level: 'warn', text: 'some other warning' } as any), null);
+});

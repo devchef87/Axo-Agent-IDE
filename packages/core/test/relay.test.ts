@@ -62,7 +62,7 @@ describe('cross-server innerchat (app relay)', () => {
     assert.match(res.reply!, /which port/);
     assert.ok(users(server, bob.id).some((u) => u.author === 'alice@laptop'));
     assert.ok(users(laptop, alice.id).some((u) => u.author === 'bob@prod-1' && u.text === res.reply));
-    // Both sides keep a thread with the remote party, so the exchange cap applies across servers too.
+    // Both sides keep a thread with the remote party, so the loop breaker applies across servers too.
     const local = laptop.node.innerchat.threads(alice.id)[0];
     assert.deepEqual(laptop.node.innerchat.turns(local.id).map((x) => x.kind), ['ask', 'answer']);
     assert.ok(local.participants.some((p) => p.name === 'bob@prod-1'));

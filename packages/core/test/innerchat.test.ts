@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import type { FeedItem } from '@axo/protocol';
 import { makeNode, call, type TestNode } from './helpers.ts';
 import { agentToken } from '../src/util/agent-token.ts';
-import { MAX_EXCHANGES } from '../src/innerchat/innerchat.ts';
+import { LOOP_LIMIT, LOOP_PAUSE_PREFIX, LOOP_WINDOW_MS, MAX_EXCHANGES } from '../src/innerchat/innerchat.ts';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { verifyAgentToken } from '../src/util/agent-token.ts';
@@ -107,13 +107,27 @@ describe('innerchat', () => {
     await Promise.all([ab, bc]);
   });
 
-  it('caps a thread at 12 exchanges; a user message to either agent resets it', async () => {
+  it('never caps normal coordination; pauses only a rapid unattended loop, and the user clears it', async () => {
     t = await makeNode();
     const { a } = await pair(t);
-    for (let i = 0; i < MAX_EXCHANGES; i++) t.node.innerchat.tell(a.id, 'bob', `m${i}`);
-    assert.throws(() => t.node.innerchat.tell(a.id, 'bob', 'one more'), /12-exchange limit/);
+    for (let i = 0; i < LOOP_LIMIT; i++) t.node.innerchat.tell(a.id, 'bob', `m${i}`);
+    assert.throws(() => t.node.innerchat.tell(a.id, 'bob', 'one more'), /looks like a loop/);
+    assert.throws(() => t.node.innerchat.tell(a.id, 'bob', 'and another'), /looks like a loop/);
+    // The user is told once per pause, in the sender's feed (the UI turns it into a notification).
+    const pauses = t.feed(a.id).filter((f) => f.kind === 'system' && f.text.startsWith(LOOP_PAUSE_PREFIX));
+    assert.equal(pauses.length, 1);
     t.node.runtime.deliver(a.id, 'keep going', 'user');
-    assert.equal(t.node.innerchat.tell(a.id, 'bob', 'fresh').exchangesRemaining, MAX_EXCHANGES - 1);
+    assert.equal(t.node.innerchat.tell(a.id, 'bob', 'fresh').exchangesRemaining, LOOP_LIMIT - 1);
+  });
+
+  it('old messages outside the loop window do not count', async () => {
+    t = await makeNode();
+    const { a } = await pair(t);
+    for (let i = 0; i < LOOP_LIMIT; i++) t.node.innerchat.tell(a.id, 'bob', `m${i}`);
+    // Age every message past the window: a long-running pair keeps talking indefinitely.
+    t.node.store.db.prepare('UPDATE ic_turns SET ts = ts - ?').run(LOOP_WINDOW_MS + 1000);
+    for (let i = 0; i < 5; i++) t.node.innerchat.tell(a.id, 'bob', `later${i}`);
+    assert.equal(t.node.innerchat.tell(a.id, 'bob', 'still fine').exchangesRemaining, LOOP_LIMIT - 6);
   });
 
   it('fails a blocked ask when the target is stopped or ends its turn silently', async () => {
