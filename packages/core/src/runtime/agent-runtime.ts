@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import { execFileSync } from 'node:child_process';
 import type { Agent, CreateAgentReq, FeedItem, UpdateAgentReq } from '@axo/protocol';
 import type { Store } from '../store/db.ts';
@@ -11,7 +12,7 @@ import { buildSystemPrompt } from './system-prompt.ts';
 import { ulid } from '../util/ulid.ts';
 import { HttpError } from '../util/http-error.ts';
 
-interface Queued { text: string; author: string }
+interface Queued { text: string; author: string; id?: string } // [core2] id = feed item id, reported in 'turn-end'
 
 interface Live {
   proc: ClaudeProcess;
@@ -26,7 +27,14 @@ interface Live {
   toolStarts: Map<string, number>;
   /** Messages sent for the current turn; re-queued if the process dies before Claude starts. */
   inflight: Queued[];
+  lastText: string; // [core2] latest assistant text this turn, reported in 'turn-end'
 }
+
+// [core2] Hooks for teams/innerchat/watches. Listeners must not throw.
+export interface TurnEndHook { agentId: string; messageIds: string[]; text: string; isError: boolean; interrupted: boolean }
+export interface DeliverHook { agentId: string; author: string; messageId: string }
+export interface GoneHook { agentId: string; reason: 'stop' | 'delete' | 'error' }
+export type SpawnHook = (agent: Agent, args: string[], env: NodeJS.ProcessEnv) => void;
 
 export interface RuntimeOptions {
   interruptGraceMs?: number;   // wait for control_request interrupt before SIGINT
@@ -49,6 +57,11 @@ export class AgentRuntime {
   private readonly bus: EventBus;
   private readonly cfg: NodeConfig;
   private readonly projects: Projects;
+  /** [core2] Emits 'turn-end' (TurnEndHook), 'deliver' (DeliverHook), 'gone' (GoneHook). */
+  readonly hooks = new EventEmitter();
+  /** [core2] Last-moment additions to a claude spawn (knock --settings, PATH, per-agent token). */
+  spawnHook: SpawnHook | null = null;
+  private shuttingDown = false; // [core2] no new processes once shutdown() starts
 
   constructor(store: Store, bus: EventBus, cfg: NodeConfig, projects: Projects, opts: RuntimeOptions = {}) {
     this.store = store;
@@ -78,6 +91,7 @@ export class AgentRuntime {
   }
 
   async shutdown(): Promise<void> {
+    this.shuttingDown = true; // [core2]
     const waits: Promise<void>[] = [];
     for (const [id, l] of this.live) {
       l.ending = 'sleep';
@@ -166,12 +180,13 @@ export class AgentRuntime {
     this.agents.delete(id);
     this.store.deleteAgent(id);
     this.bus.publish({ type: 'agent:removed', agentId: id });
+    this.hooks.emit('gone', { agentId: id, reason: 'delete' } satisfies GoneHook); // [core2]
   }
 
   // ── messaging ─────────────────────────────────────────────
 
   /** The single entry point for every inbound message (user, teammate, watch, axo). */
-  deliver(id: string, text: string, author = 'user'): void {
+  deliver(id: string, text: string, author = 'user'): string {
     const a = this.get(id);
     if (!text.trim()) throw new HttpError(400, 'empty message');
     if (a.status === 'stopped' || a.status === 'error') {
@@ -179,11 +194,19 @@ export class AgentRuntime {
       a.lastError = null;
       this.crashes.delete(id);
     }
-    this.addFeed(a, { kind: 'user', id: `u-${ulid()}`, ts: Date.now(), text, author });
+    const msgId = `u-${ulid()}`; // [core2] returned so callers can match the turn that consumed it
+    this.addFeed(a, { kind: 'user', id: msgId, ts: Date.now(), text, author });
     const q = this.queues.get(id) ?? [];
-    q.push({ text, author });
+    q.push({ text, author, id: msgId });
     this.queues.set(id, q);
+    this.hooks.emit('deliver', { agentId: id, author, messageId: msgId } satisfies DeliverHook); // [core2]
     this.pump(id);
+    return msgId;
+  }
+
+  /** [core2] Display-only feed item (e.g. the asker's side of an InnerChat exchange). Never reaches claude. */
+  appendFeed(id: string, item: FeedItem): void {
+    this.addFeed(this.get(id), item);
   }
 
   /** Send queued messages if the agent is at a turn boundary. */
@@ -196,6 +219,7 @@ export class AgentRuntime {
       this.emitAgent(a);
       return;
     }
+    if (!l && this.shuttingDown) return; // [core2] queued messages wait for the next node start
     const live = l ?? this.spawn(a);
     if (!live) return;
     const msgs = q.splice(0);
@@ -203,6 +227,7 @@ export class AgentRuntime {
     if (!ok) { q.unshift(...msgs); return; }
     this.clearIdle(id);
     live.inflight = msgs;
+    live.lastText = ''; // [core2]
     live.turnActive = true;
     live.turnStartedAt = Date.now();
     live.interruptRequested = false;
@@ -236,6 +261,7 @@ export class AgentRuntime {
     await this.endProcess(id, 'stop');
     const a = this.get(id);
     if (!this.live.has(id)) { a.status = 'stopped'; this.store.saveAgent(a); this.emitAgent(a); }
+    this.hooks.emit('gone', { agentId: id, reason: 'stop' } satisfies GoneHook); // [core2]
   }
 
   // ── process management ───────────────────────────────────
@@ -279,11 +305,13 @@ export class AgentRuntime {
     env.AXO_AGENT_NAME = a.name;
     env.AXO_NODE_URL = `http://${this.cfg.host}:${this.cfg.port}`;
     env.AXO_TOKEN = this.cfg.token;
+    this.spawnHook?.(a, args, env); // [core2]
 
     const proc = new ClaudeProcess({ bin: this.cfg.claudeBin, args, cwd: a.workdir, env });
     const live: Live = {
       proc, ctx: new ParseContext(a.workdir), turnActive: false, turnStartedAt: 0, sawInit: false,
       interruptRequested: false, interruptTimers: [], ending: null, toolStarts: new Map(), inflight: [],
+      lastText: '', // [core2]
     };
     this.live.set(a.id, live);
     proc.on('line', (line: string) => this.onLine(a.id, live, line));
@@ -325,6 +353,7 @@ export class AgentRuntime {
 
       case 'feed':
         if (act.item.kind === 'tool') live.toolStarts.set(act.item.id, act.item.ts);
+        if (act.item.kind === 'text' && live.turnActive) live.lastText = act.item.text; // [core2]
         this.addFeed(a, act.item);
         break;
 
@@ -369,6 +398,7 @@ export class AgentRuntime {
   private onTurnEnd(a: Agent, live: Live, act: Extract<Action, { type: 'turn-end' }>): void {
     if (!live.turnActive) return; // spurious result (e.g. emitted on --resume with no turn)
     live.turnActive = false;
+    const consumed = live.inflight; // [core2]
     live.inflight = [];
     for (const t of live.interruptTimers) clearTimeout(t);
     live.interruptTimers = [];
@@ -387,11 +417,16 @@ export class AgentRuntime {
       durationMs: act.durationMs, costUsd: u.costUsd, numTurns: act.numTurns,
       interrupted: live.interruptRequested || undefined,
     });
+    const interrupted = live.interruptRequested; // [core2]
     live.interruptRequested = false;
     a.status = 'idle';
     this.store.saveAgent(a);
     this.store.pruneFeed(a.id);
     this.emitAgent(a);
+    this.hooks.emit('turn-end', { // [core2]
+      agentId: a.id, messageIds: consumed.flatMap((m) => (m.id ? [m.id] : [])), text: live.lastText,
+      isError: act.isError, interrupted,
+    } satisfies TurnEndHook);
     this.pump(a.id);
     if (!live.turnActive) this.armIdle(a.id);
   }
@@ -469,6 +504,7 @@ export class AgentRuntime {
     this.addFeed(a, sys('error', message));
     this.store.saveAgent(a);
     this.emitAgent(a);
+    this.hooks.emit('gone', { agentId: a.id, reason: 'error' } satisfies GoneHook); // [core2]
   }
 
   private failRunningTools(a: Agent, live: Live, reason: string | null): void {

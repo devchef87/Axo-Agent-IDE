@@ -101,7 +101,8 @@ export type NodeEvent =
   | { type: 'agent:removed'; agentId: string }
   | { type: 'agent:feed'; agentId: string; item: FeedItem } // upsert by item.id
   | { type: 'agent:text-delta'; agentId: string; itemId: string; text: string }
-  | { type: 'rate-limit'; info: Record<string, unknown> };
+  | { type: 'rate-limit'; info: Record<string, unknown> }
+  | CoordinationEvent; // phase 2, defined below
 
 export type EventEnvelope = NodeEvent & { seq: number; ts: number; nodeId: string };
 
@@ -134,3 +135,100 @@ export interface MessageReq { text: string; author?: string }
 export interface FeedPage { items: FeedItem[]; hasMore: boolean }
 export interface EventsPage { events: EventEnvelope[]; reset: boolean; seq: number; epoch: number }
 export interface FsEntry { name: string; path: string; dir: boolean }
+
+// ── Phase 2: teams, knock, InnerChat, watches, CLI (core2) ──
+// Event types for this area are in `CoordinationEvent` (included in `NodeEvent`).
+
+export interface CreateTeamReq {
+  projectId: string;
+  name: string;
+  mode?: TeamMode;          // default: worktree for git projects, direct otherwise
+  base?: string;            // worktree base ref; default project.baseBranch
+}
+export interface UpdateTeamReq { name?: string }
+export interface ArchiveTeamReq { removeWorktree?: boolean }
+export interface UpdateProjectReq { name?: string; baseBranch?: string | null; setupCmd?: string | null }
+
+/** Body the knock hook forwards: Claude's PreToolUse payload, unchanged. */
+export interface KnockReq { tool_name?: string; tool_input?: Record<string, unknown>; cwd?: string }
+export interface KnockRes { allow: boolean; reason?: string; owner?: string; path?: string }
+
+export type ChatTurnKind = 'ask' | 'tell' | 'answer';
+export interface ChatTurn {
+  id: string;
+  threadId: string;
+  fromId: string;
+  fromName: string;
+  toId: string;
+  toName: string;
+  kind: ChatTurnKind;
+  text: string;
+  ts: number;
+}
+export interface ChatThread {
+  id: string;
+  projectId: string;
+  participants: { id: string; name: string }[];
+  exchanges: number;        // ask + tell turns used (cap: maxExchanges)
+  maxExchanges: number;
+  status: 'open' | 'awaiting' | 'closed';
+  createdAt: number;
+  updatedAt: number;
+}
+export interface AskReq { to: string; message: string; timeoutMs?: number }
+export interface AskRes {
+  reply: string | null;     // null when timedOut
+  timedOut: boolean;
+  note?: string;
+  threadId: string;
+  exchangesRemaining: number;
+}
+export interface TellReq { to: string; message: string }
+export interface TellRes { delivered: true; threadId: string; exchangesRemaining: number }
+export interface WhoEntry { id: string; name: string; role: string; team: string; status: AgentStatus; scope: string[]; you: boolean }
+export interface WhoRes { you: string | null; agents: WhoEntry[] }
+
+export type WatchMode = 'command' | 'until';
+export type WatchStatus = 'active' | 'delivered' | 'undeliverable' | 'cancelled';
+export interface WatchResult {
+  outcome: 'success' | 'failure' | 'timeout' | 'error';
+  exitCode: number | null;
+  summary: string;
+  output: string;           // last 4KB
+}
+export interface Watch {
+  id: string;
+  agentId: string | null;   // null for team-level watches (worktree setup)
+  agentName: string | null;
+  teamId: string | null;
+  label: string;
+  mode: WatchMode;
+  command: string;
+  until: string;
+  cwd: string;
+  timeoutMs: number;
+  status: WatchStatus;
+  createdAt: number;
+  finishedAt: number | null;
+  result: WatchResult | null;
+}
+export interface CreateWatchReq {
+  agentId?: string;         // required with the node token; implied by an agent token
+  command?: string;
+  until?: string;
+  label?: string;
+  timeoutMs?: number;       // default 30m, max 24h
+  intervalMs?: number;      // until-mode poll interval
+}
+export interface CreateWatchRes { watch: Watch; reattached: boolean }
+
+export interface RotateReq { note?: string }
+
+/** `GET /api/me` (agent token): what `axo status` prints. */
+export interface MeRes { agent: Agent; team: Team; project: Project; watches: Watch[]; teammates: WhoEntry[] }
+
+export type CoordinationEvent =
+  | { type: 'knock:denied'; agentId: string; agentName: string; tool: string; path: string; owner: string | null; reason: string }
+  | { type: 'innerchat:turn'; thread: ChatThread; turn: ChatTurn }
+  | { type: 'watch:upsert'; watch: Watch }
+  | { type: 'watch:removed'; watchId: string };

@@ -5,6 +5,7 @@
 //   STUCK  → takes 30s and ignores interrupts
 //   CRASH  → exits(1) mid-turn
 //   RECALL → replies with the number of prior user messages in this session
+//   SILENT → ends the turn without any assistant text
 // Sessions persist in $FAKE_CLAUDE_DIR/<session>.json so --resume works across processes.
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,7 +14,8 @@ import { createInterface } from 'node:readline';
 const dir = process.env.FAKE_CLAUDE_DIR;
 const args = process.argv.slice(2);
 const flag = (n) => { const i = args.indexOf(n); return i === -1 ? null : args[i + 1]; };
-appendFileSync(join(dir, 'spawns.log'), JSON.stringify({ args, pid: process.pid, env: { AXO_AGENT_ID: process.env.AXO_AGENT_ID } }) + '\n');
+const { AXO_AGENT_ID, AXO_TOKEN, AXO_NODE_URL, PATH } = process.env;
+appendFileSync(join(dir, 'spawns.log'), JSON.stringify({ args, pid: process.pid, cwd: process.cwd(), env: { AXO_AGENT_ID, AXO_TOKEN, AXO_NODE_URL, PATH } }) + '\n');
 
 const resume = flag('--resume');
 const sessionId = resume ?? flag('--session-id');
@@ -76,6 +78,10 @@ async function turn(text) {
     return;
   }
 
+  if (/SILENT/.test(text)) {
+    out({ type: 'result', subtype: 'success', is_error: false, duration_ms: 5, duration_api_ms: 1, num_turns: 1, session_id: sessionId, total_cost_usd: 0, usage });
+    return;
+  }
   const reply = /RECALL/.test(text) ? `prior=${prior}` : `echo: ${text}`;
   out({ type: 'stream_event', event: { type: 'message_start', message: { id: `${id}b` } } });
   out({ type: 'stream_event', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: reply } } });

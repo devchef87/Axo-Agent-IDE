@@ -7,8 +7,21 @@ import type { EventEnvelope } from '@axo/protocol';
 import type { NodeConfig } from '../config.ts';
 import type { EventBus } from '../events.ts';
 import { HttpError } from '../util/http-error.ts';
+import { verifyAgentToken } from '../util/agent-token.ts';
 
-export type Handler = (ctx: { req: IncomingMessage; params: Record<string, string>; query: URLSearchParams; body: any }) => unknown | Promise<unknown>;
+/** Who is calling: the node token (app/user, full access) or one agent's token (agentId set). */
+export interface Caller { agentId: string | null }
+
+export type Handler = (ctx: { req: IncomingMessage; params: Record<string, string>; query: URLSearchParams; body: any; caller: Caller }) => unknown | Promise<unknown>;
+
+/** Return this from a handler to send text/plain instead of JSON (the curl knock hook reads it). */
+export class TextResponse {
+  readonly text: string;
+  constructor(text: string) { this.text = text; }
+}
+
+/** Routes an agent token may call. Everything else needs the node token. */
+const AGENT_ROUTES = /^\/(version|me|knock|innerchat\/.+|watches(\/.*)?|agents\/([a-z0-9]+)\/rotate)$/;
 
 interface Route { method: string; re: RegExp; keys: string[]; handler: Handler }
 
@@ -41,11 +54,22 @@ const MIME: Record<string, string> = {
 
 export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHello: () => EventEnvelope): Promise<Server> {
   const tokenBuf = Buffer.from(cfg.token);
-  const authed = (req: IncomingMessage, url: URL): boolean => {
+  const given = (req: IncomingMessage, url: URL): string => {
     const h = req.headers.authorization;
-    const given = h?.startsWith('Bearer ') ? h.slice(7) : url.searchParams.get('token') ?? '';
-    const b = Buffer.from(given);
+    return h?.startsWith('Bearer ') ? h.slice(7) : url.searchParams.get('token') ?? '';
+  };
+  const authed = (req: IncomingMessage, url: URL): boolean => {
+    const b = Buffer.from(given(req, url));
     return b.length === tokenBuf.length && timingSafeEqual(b, tokenBuf);
+  };
+  /** Caller for an /api request, or null if unauthorized. */
+  const callerFor = (req: IncomingMessage, url: URL, route: string): Caller | null => {
+    if (authed(req, url)) return { agentId: null };
+    const agentId = verifyAgentToken(cfg.token, given(req, url));
+    if (!agentId) return null;
+    const m = AGENT_ROUTES.exec(route);
+    if (!m || (m[3] && m[3] !== agentId)) return null;
+    return { agentId };
   };
 
   const server = createServer(async (req, res) => {
@@ -56,12 +80,18 @@ export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHe
     if (url.pathname === '/api/health') return json(res, 200, { ok: true });
 
     if (url.pathname.startsWith('/api/')) {
-      if (!authed(req, url)) return json(res, 401, { error: 'unauthorized' });
-      const m = router.match(req.method ?? 'GET', url.pathname.slice(4));
+      const route = url.pathname.slice(4);
+      const caller = callerFor(req, url, route);
+      if (!caller) return json(res, 401, { error: 'unauthorized' });
+      const m = router.match(req.method ?? 'GET', route);
       if (!m) return json(res, 404, { error: 'not found' });
       try {
         const body = req.method === 'POST' || req.method === 'PATCH' ? await readJson(req) : undefined;
-        const out = await m.handler({ req, params: m.params, query: url.searchParams, body });
+        const out = await m.handler({ req, params: m.params, query: url.searchParams, body, caller });
+        if (out instanceof TextResponse) {
+          res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+          return void res.end(out.text);
+        }
         return json(res, 200, out ?? { ok: true });
       } catch (e: any) {
         const status = e instanceof HttpError ? e.status : 500;
