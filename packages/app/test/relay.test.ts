@@ -9,6 +9,7 @@ interface StubNode {
   outbox: { id: string; toServer: string; text: string }[];
   inbox: { envelope: any; fromServer: string }[];
   acks: { id: string; ok: boolean; error?: string }[];
+  peers: { id: string; name: string; connected: boolean }[][];
   relayInStatus: number;  // what relay-in answers
   ackStatus: number;
   outboxStatus: number;
@@ -19,7 +20,7 @@ const servers: Server[] = [];
 after(() => { for (const s of servers) s.close(); });
 
 async function stub(id: string, name: string, connected = true): Promise<StubNode> {
-  const n = { outbox: [], inbox: [], acks: [], relayInStatus: 200, ackStatus: 200, outboxStatus: 200 } as unknown as StubNode;
+  const n = { outbox: [], inbox: [], acks: [], peers: [], relayInStatus: 200, ackStatus: 200, outboxStatus: 200 } as unknown as StubNode;
   n.server = createServer((req, res) => {
     let body = '';
     req.on('data', (d) => { body += d; });
@@ -28,6 +29,7 @@ async function stub(id: string, name: string, connected = true): Promise<StubNod
       if (req.headers.authorization !== `Bearer tok-${id}`) { res.statusCode = 403; return res.end('{"error":"forbidden"}'); }
       const send = (status: number, obj: unknown) => { res.statusCode = status; res.end(JSON.stringify(obj)); };
       if (req.method === 'GET' && req.url === '/api/innerchat/outbox') return send(n.outboxStatus, n.outboxStatus === 200 ? n.outbox : { error: 'not found' });
+      if (req.method === 'PUT' && req.url === '/api/innerchat/peers') { n.peers.push(JSON.parse(body).servers); return send(200, { ok: true }); }
       if (req.method === 'POST' && req.url === '/api/innerchat/relay-in') {
         if (n.relayInStatus !== 200) return send(n.relayInStatus, { error: n.relayInStatus === 404 ? 'no agent named zed; agents: bob' : 'boom' });
         n.inbox.push(JSON.parse(body));
@@ -139,5 +141,22 @@ describe('InnerChatRelay', () => {
     const relay = new InnerChatRelay(() => [old.ep, local.ep]);
     await relay.runOnce();
     assert.equal(local.inbox.length, 0);
+  });
+
+  test('pushes the peers list to every connected node on change and after a reconnect', async () => {
+    const local = await stub('local', 'Local');
+    const prod = await stub('prod-1', 'Production');
+    const relay = new InnerChatRelay(() => [local.ep, prod.ep]);
+    await relay.runOnce();
+    await relay.runOnce();
+    assert.equal(local.peers.length, 1); // unchanged list: not re-sent
+    assert.deepEqual(prod.peers[0], [{ id: 'local', name: 'Local', connected: true }, { id: 'prod-1', name: 'Production', connected: true }]);
+    prod.ep.connected = false;
+    await relay.runOnce();
+    assert.equal(local.peers.length, 2);
+    assert.equal(local.peers[1][1].connected, false);
+    prod.ep.connected = true;
+    await relay.runOnce();
+    assert.equal(prod.peers.length, 2); // re-sent after its reconnect
   });
 });

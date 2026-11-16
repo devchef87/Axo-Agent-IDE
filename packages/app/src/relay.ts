@@ -15,6 +15,8 @@ export interface RelayEndpoint {
   connected: boolean;
 }
 
+const PEERS_REFRESH_MS = 60_000;
+
 type Resolved = { target: RelayEndpoint } | { wait: true } | { error: string };
 
 /** toServer → endpoint: ids first, then display names, case-insensitive. */
@@ -29,9 +31,9 @@ export function resolveServer(alias: string, all: RelayEndpoint[]): Resolved {
   return t.connected ? { target: t } : { wait: true }; // known but offline: keep it in the outbox
 }
 
-async function req(e: RelayEndpoint, path: string, body?: unknown): Promise<{ status: number; body: any }> {
+async function req(e: RelayEndpoint, path: string, body?: unknown, method?: string): Promise<{ status: number; body: any }> {
   const r = await fetch(`${e.baseUrl}/api${path}`, {
-    method: body === undefined ? 'GET' : 'POST',
+    method: method ?? (body === undefined ? 'GET' : 'POST'),
     headers: { Authorization: `Bearer ${e.token}`, 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(8000),
@@ -44,6 +46,9 @@ export class InnerChatRelay {
   private running = false;
   /** Delivered (or definitively rejected) but not yet acked: retry the ack, never the delivery. */
   private readonly pendingAcks = new Map<string, Ack>();
+  /** Per node: the peers list last pushed and when. Re-pushed on change, on reconnect, and every minute
+   *  (a node restarted behind a live tunnel forgets its list). */
+  private readonly pushed = new Map<string, { sig: string; at: number }>();
   private readonly endpoints: () => RelayEndpoint[];
   private readonly log: (m: string) => void;
 
@@ -69,6 +74,7 @@ export class InnerChatRelay {
     this.running = true;
     try {
       const all = this.endpoints();
+      await this.pushPeers(all);
       for (const origin of all) {
         if (!origin.connected) continue;
         let outbox: Envelope[];
@@ -83,6 +89,22 @@ export class InnerChatRelay {
       if (this.pendingAcks.size > 1000) this.pendingAcks.clear();
     } finally {
       this.running = false;
+    }
+  }
+
+  /** PUT /innerchat/peers so agents can see servers in `axo who` and bad @names fail fast. */
+  private async pushPeers(all: RelayEndpoint[]): Promise<void> {
+    const servers = all.map(({ id, name, connected }) => ({ id, name, connected }));
+    const sig = JSON.stringify(servers);
+    const now = Date.now();
+    for (const e of all) {
+      if (!e.connected) { this.pushed.delete(e.id); continue; } // forces a push after it reconnects
+      const last = this.pushed.get(e.id);
+      if (last && last.sig === sig && now - last.at < PEERS_REFRESH_MS) continue;
+      try {
+        const r = await req(e, '/innerchat/peers', { servers }, 'PUT');
+        if (r.status < 500) this.pushed.set(e.id, { sig, at: now }); // 404: older node without the route; don't hammer it
+      } catch { /* unreachable; next round */ }
     }
   }
 
