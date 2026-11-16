@@ -63,16 +63,29 @@ for (const [name, t] of Object.entries(THEMES)) {
   });
 }
 
-describe('accent is brand only', () => {
-  it('is not reused as a status or InnerChat colour', () => {
-    for (const t of Object.values(THEMES)) {
-      for (const k of ['success', 'warning', 'danger', 'info', 'working', 'rotating', 'innerchat']) assert.notEqual(t[k], t.accent, k);
+const chroma = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return Math.max(r, g, b) - Math.min(r, g, b);
+};
+
+describe('monochrome', () => {
+  it('accent and every surface/text token are neutral grey', () => {
+    const neutral = ['accent', 'accent-hover', 'accent-fg', 'bg', 'panel', 'elevated', 'inset', 'hover', 'control', 'border', 'border-strong',
+      'text-primary', 'text-secondary', 'text-muted', 'text-faint', 'working', 'rotating', 'innerchat', 'info'];
+    for (const [name, t] of Object.entries(THEMES)) {
+      for (const k of neutral) assert.ok(chroma(t[k]) <= 6, `${name} ${k} ${t[k]} should be grey`);
     }
   });
 
-  it('components do not use the accent for status', () => {
+  it('accent is white-ish on dark and black-ish on light', () => {
+    assert.ok(luminance(THEMES.dark.accent) > 0.8);
+    assert.ok(luminance(THEMES.light.accent) < 0.02);
+  });
+
+  it('status dots use shade, not hue (red only for errors)', () => {
     const ui = readFileSync(new URL('../src/components/ui.tsx', import.meta.url), 'utf8');
     const block = ui.slice(ui.indexOf('STATUS_COLOR'), ui.indexOf('};', ui.indexOf('STATUS_COLOR')));
-    assert.doesNotMatch(block, /accent/);
+    assert.doesNotMatch(block, /success|warning|info|innerchat/);
+    assert.equal((block.match(/danger/g) ?? []).length, 1);
   });
 });

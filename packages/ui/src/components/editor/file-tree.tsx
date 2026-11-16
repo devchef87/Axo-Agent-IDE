@@ -9,7 +9,8 @@ import { useAxo } from '../../stores/store.ts';
 import { cn, IconButton, useDismiss } from '../ui.tsx';
 
 const STATUS_CLS: Record<GitFileStatus, string> = {
-  M: 'text-warning', A: 'text-success', '?': 'text-success', D: 'text-danger', R: 'text-info', U: 'text-danger',
+  // Changed files read brighter; only deletions and conflicts get colour.
+  M: 'text-primary', A: 'text-primary', '?': 'text-primary', D: 'text-danger', R: 'text-primary', U: 'text-danger',
 };
 const STATUS_LABEL: Record<GitFileStatus, string> = { M: 'modified', A: 'added', '?': 'untracked', D: 'deleted', R: 'renamed', U: 'conflict' };
 
@@ -275,7 +276,7 @@ function Row({ entry, depth, open, active, status, drop, ...handlers }: {
       {entry.dir ? (open ? <ChevronDown size={12} className="shrink-0 text-faint" /> : <ChevronRight size={12} className="shrink-0 text-faint" />) : <span className="w-3 shrink-0" />}
       <Icon size={13} className={cn('shrink-0', entry.dir ? 'text-muted' : 'text-faint')} />
       <span className={cn('min-w-0 flex-1 truncate', status && status !== 'dot' && STATUS_CLS[status])}>{entry.name}</span>
-      {status === 'dot' && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-warning" aria-label="contains changes" />}
+      {status === 'dot' && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted" aria-label="contains changes" />}
       {status && status !== 'dot' && (
         <span className={cn('shrink-0 font-mono text-2xs', STATUS_CLS[status])} title={STATUS_LABEL[status]}>{status === '?' ? 'U' : status}</span>
       )}

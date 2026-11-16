@@ -141,7 +141,7 @@ function ConfigTab({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
       </p>
       {error && <p role="alert" className="mb-3 text-xs text-danger">{error}</p>}
       <div className="flex items-center justify-end gap-2">
-        {saved && !dirty && <span className="mr-auto text-xs text-success">Saved</span>}
+        {saved && !dirty && <span className="mr-auto text-xs text-muted">Saved</span>}
         <Button type="button" variant="ghost" disabled={!dirty || busy} onClick={() => { setForm(toForm(agent)); setError(null); }}>Revert</Button>
         <Button type="submit" variant="primary" disabled={!dirty || busy}>{busy ? 'Saving…' : 'Save'}</Button>
       </div>

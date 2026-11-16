@@ -52,7 +52,7 @@ export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; a
   return (
     <FeedContext.Provider value={ctx}>
     <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-3xl px-6 py-5">
+      <div className="px-6 py-5">
         {feed.hasMore && <div className="mb-3 text-center text-2xs text-faint">Scroll up for earlier messages</div>}
         {!feed.loaded && <div className="py-10 text-center text-xs text-faint">Loading…</div>}
         {feed.loaded && blocks.length === 0 && (

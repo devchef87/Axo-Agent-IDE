@@ -73,7 +73,7 @@ manager.on('server-lost', (cfg: { name: string }, message: string) => {
 type ThemePref = 'system' | 'light' | 'dark';
 interface WindowTheme { pref: ThemePref; background: string }
 const THEME_FILE = join(app.getPath('userData'), 'window-theme.json');
-const DEFAULT_BG = { dark: '#1b1d22', light: '#faf8f4' };
+const DEFAULT_BG = { dark: '#161616', light: '#fafafa' };
 
 function loadTheme(): WindowTheme {
   try {

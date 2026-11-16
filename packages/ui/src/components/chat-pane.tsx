@@ -178,7 +178,7 @@ function Composer({ agent, sel, autoFocus }: { agent: Agent; sel: Selection; aut
 
   return (
     <div className="shrink-0 px-6 pb-4">
-      <div className="mx-auto max-w-3xl">
+      <div>
         {error && <div className="mb-1.5 text-xs text-danger">{error}</div>}
         <div className="rounded-lg border border-border bg-elevated focus-within:border-accent/60">
           <textarea

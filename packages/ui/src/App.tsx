@@ -143,7 +143,7 @@ function TitleStrip() {
   return (
     <div className="drag relative flex h-8 shrink-0 select-none items-center border-b border-border-subtle bg-panel pl-20 pr-3">
       <span className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-primary">
-        <span className="h-2 w-2 rounded-full bg-accent" aria-hidden /> Axo
+        Axo
       </span>
       {crumbs && <span className="absolute inset-x-48 truncate text-center text-xs text-muted">{crumbs}</span>}
     </div>

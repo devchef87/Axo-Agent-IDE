@@ -78,7 +78,7 @@ function WatchIcon({ w }: { w: Watch }) {
   if (w.status === 'active') return <Loader2 size={14} className="shrink-0 animate-spin text-working" aria-label="running" />;
   if (w.status === 'cancelled') return <Ban size={14} className="shrink-0 text-faint" aria-label="cancelled" />;
   const o = w.result?.outcome;
-  if (o === 'success') return <CheckCircle2 size={14} className="shrink-0 text-success" aria-label="succeeded" />;
+  if (o === 'success') return <CheckCircle2 size={14} className="shrink-0 text-muted" aria-label="succeeded" />;
   if (o === 'timeout') return <Clock size={14} className="shrink-0 text-warning" aria-label="timed out" />;
   return <XCircle size={14} className="shrink-0 text-danger" aria-label={o ?? w.status} />;
 }

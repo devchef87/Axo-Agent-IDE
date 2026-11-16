@@ -208,7 +208,7 @@ function Review({ nodeKey, team, agent, onBackToTeam }: { nodeKey: string; team:
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl space-y-3 px-5 py-4">
           {merged && (
-            <div role="status" className="flex items-center gap-2 rounded-md bg-success/10 px-3 py-2 text-xs text-success">
+            <div role="status" className="flex items-center gap-2 rounded-md bg-control px-3 py-2 text-xs text-primary">
               <Check size={13} /> {merged.strategy === 'squash' ? 'Squash-merged' : 'Merged'} {merged.branch} into {merged.base} as <span className="font-mono">{merged.commit.slice(0, 8)}</span>.
             </div>
           )}

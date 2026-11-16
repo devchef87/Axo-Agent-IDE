@@ -39,9 +39,9 @@ const STATUS_COLOR: Record<AgentStatus, string> = {
   working: 'bg-working',
   starting: 'bg-working',
   rotating: 'bg-rotating',
-  idle: 'bg-success',
-  asleep: 'bg-faint',
-  stopped: 'bg-faint',
+  idle: 'bg-muted',
+  asleep: 'border border-faint',  // hollow: no process
+  stopped: 'border border-faint',
   error: 'bg-danger',
 };
 export const STATUS_LABEL: Record<AgentStatus, string> = {
@@ -65,7 +65,7 @@ export function ConnDot({ status }: { status: ConnStatus }) {
     <span
       title={status}
       className={cn('inline-block h-1.5 w-1.5 shrink-0 rounded-full',
-        status === 'online' ? 'bg-success' : status === 'connecting' ? 'bg-warning animate-pulse-dot' : 'bg-danger')}
+        status === 'online' ? 'bg-muted' : status === 'connecting' ? 'bg-warning animate-pulse-dot' : 'bg-danger')}
     />
   );
 }
