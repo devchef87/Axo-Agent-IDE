@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Columns2, FolderOpen, FolderPlus, Monitor, Moon, PanelRight, Plus, Search, Sun, X, type LucideIcon } from 'lucide-react';
+import { BookOpen, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Search, Sun, X, type LucideIcon } from 'lucide-react';
 import type { AgentStatus } from '@axo/protocol';
 import { focusedSel, useAxo } from '../stores/store.ts';
 import { useTheme, type ThemePref } from '../lib/theme.ts';
@@ -60,6 +60,12 @@ function useCommands(open: boolean): Command[] {
           run: () => s.setUi({ newAgent: { nodeKey: k, projectId: p.id } }),
         });
       }
+      for (const p of nodes[k].projects) {
+        out.push({
+          id: `context:${k}:${p.id}`, group: 'Actions', label: `Project map & decisions: ${p.name}`, detail: multiNode ? nodes[k].name : undefined, icon: BookOpen,
+          run: () => s.setUi({ context: { nodeKey: k, projectId: p.id } }),
+        });
+      }
       out.push({ id: `add-project:${k}`, group: 'Actions', label: `Add project on ${nodes[k].name}`, icon: FolderPlus, run: () => s.setUi({ addProject: k }) });
     }
 
@@ -72,7 +78,13 @@ function useCommands(open: boolean): Command[] {
     for (const p of ['system', 'light', 'dark'] as ThemePref[]) {
       if (p !== pref) out.push({ id: `theme:${p}`, group: 'Actions', label: `Theme: ${p[0].toUpperCase()}${p.slice(1)}`, icon: THEME_ICON[p], run: () => useTheme.getState().setPref(p) });
     }
-    if (focusedSel(s)) out.push({ id: 'drawer', group: 'Actions', label: 'Agent settings', icon: PanelRight, shortcut: '⌘I', run: () => toggleDrawer() });
+    const f = focusedSel(s);
+    const fa = f ? nodes[f.nodeKey]?.agents.find((a) => a.id === f.agentId) : undefined;
+    if (f && fa) {
+      out.push({ id: 'drawer', group: 'Actions', label: 'Agent settings', icon: PanelRight, shortcut: '⌘I', run: () => toggleDrawer() });
+      out.push({ id: 'refresh', group: 'Actions', label: `Refresh ${fa.name}'s context…`, icon: RefreshCw, run: () => s.setUi({ refresh: f }) });
+      out.push({ id: 'fork', group: 'Actions', label: `Fork ${fa.name}…`, icon: GitFork, run: () => s.setUi({ fork: f }) });
+    }
     if (layout.panes.length > 1) {
       out.push({ id: 'close-pane', group: 'Actions', label: 'Close pane', icon: X, run: () => s.closePane(layout.focused) });
       out.push({ id: 'reset-panes', group: 'Actions', label: 'Reset pane sizes', icon: Columns2, run: () => s.resetPaneSizes() });
@@ -98,7 +110,7 @@ export function CommandPalette() {
     if (!query.trim()) {
       // No query: a short, useful default rather than everything.
       const by = (g: Command['group'], n: number) => commands.filter((c) => c.group === g).slice(0, n);
-      return [...by('Agents', 8), ...commands.filter((c) => c.group === 'Actions' && !c.id.startsWith('new-in:') && !c.id.startsWith('add-project:') && !c.id.startsWith('theme:'))];
+      return [...by('Agents', 8), ...commands.filter((c) => c.group === 'Actions' && !c.id.startsWith('new-in:') && !c.id.startsWith('add-project:') && !c.id.startsWith('theme:') && !c.id.startsWith('context:'))];
     }
     const ranked = fuzzyFilter(commands, query, (c) => `${c.label} ${c.detail ?? ''}`);
     // Keep the ranking but group by kind, so the list doesn't jump between kinds.

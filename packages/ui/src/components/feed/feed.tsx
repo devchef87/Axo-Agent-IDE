@@ -5,7 +5,7 @@ import { AlertTriangle, Info, OctagonAlert } from 'lucide-react';
 import type { Agent, FeedItem } from '@axo/protocol';
 import type { FeedState } from '../../stores/store.ts';
 import { ToolGroup, useTick } from './tool-group.tsx';
-import { cn, formatDuration } from '../ui.tsx';
+import { cn, formatDuration, REFRESH_REASON } from '../ui.tsx';
 
 type ToolItem = Extract<FeedItem, { kind: 'tool' }>;
 type Block =
@@ -73,6 +73,7 @@ const BlockView = memo(function BlockView({ block, live }: { block: Block; live:
     case 'text': return <Prose text={item.text} />;
     case 'system': return <SystemLine item={item} />;
     case 'turn': return <TurnFooter item={item} />;
+    case 'rotation': return <RotationDivider item={item} />;
     default: return null;
   }
 });
@@ -94,13 +95,26 @@ function UserMessage({ item }: { item: Extract<FeedItem, { kind: 'user' }> }) {
   );
 }
 
-const Prose = memo(function Prose({ text }: { text: string }) {
+export const Prose = memo(function Prose({ text }: { text: string }) {
   return (
     <div className="md my-2 text-[13.5px]">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
     </div>
   );
 });
+
+/** Context refresh. Deliberately quiet: rotations should feel invisible. */
+function RotationDivider({ item }: { item: Extract<FeedItem, { kind: 'rotation' }> }) {
+  const why = REFRESH_REASON[item.reason] ?? item.reason;
+  const title = [`Context refreshed (${why})`, item.note].filter(Boolean).join('\n\n');
+  return (
+    <div className="my-5 flex items-center gap-3 text-2xs text-faint" title={title}>
+      <span className="h-px flex-1 bg-border-subtle" />
+      <span className="cursor-default select-none">context refreshed · gen {item.generation}</span>
+      <span className="h-px flex-1 bg-border-subtle" />
+    </div>
+  );
+}
 
 function SystemLine({ item }: { item: Extract<FeedItem, { kind: 'system' }> }) {
   const Icon = item.level === 'error' ? OctagonAlert : item.level === 'warn' ? AlertTriangle : Info;

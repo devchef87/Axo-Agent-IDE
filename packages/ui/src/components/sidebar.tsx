@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, FolderPlus, Plus, Server, Trash2 } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, FolderPlus, Plus, RefreshCw, Server, Trash2 } from 'lucide-react';
 import type { Agent, Project } from '@axo/protocol';
-import { focusedSel, useAxo, type NodeView } from '../stores/store.ts';
+import { focusedSel, useAxo, useRefreshing, type NodeView } from '../stores/store.ts';
 import { sameSel } from '../lib/layout.ts';
 import { endAgentDrag, startAgentDrag } from '../lib/dnd.ts';
 import { cn, ConnDot, IconButton, StatusDot } from './ui.tsx';
@@ -71,6 +71,9 @@ function ProjectSection({ node, project }: { node: NodeView; project: Project })
           {open ? <ChevronDown size={12} className="text-faint" /> : <ChevronRight size={12} className="text-faint" />}
           <span className="truncate font-medium">{project.name}</span>
         </button>
+        <IconButton title="Project map and decisions" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setUi({ context: { nodeKey: node.key, projectId: project.id } })}>
+          <BookOpen size={12} />
+        </IconButton>
         <IconButton title="Remove project" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={remove}><Trash2 size={12} /></IconButton>
         <IconButton title="New agent" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setUi({ newAgent: { nodeKey: node.key, projectId: project.id } })}>
           <Plus size={13} />
@@ -96,6 +99,7 @@ function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
   const visible = useAxo((s) => s.layout.panes.some((p) => sameSel(p, sel)));
   const select = useAxo((s) => s.select);
   const openInSplit = useAxo((s) => s.openInSplit);
+  const refreshing = useRefreshing(sel);
   return (
     <button
       draggable
@@ -112,6 +116,7 @@ function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
       {focused && <span className="absolute inset-y-1 left-0 w-0.5 rounded-r bg-accent" aria-hidden />}
       <StatusDot status={agent.status} />
       <span className="truncate">{agent.name}</span>
+      {refreshing && <RefreshCw size={10} className="shrink-0 animate-spin text-rotating [animation-duration:2s]" aria-label="refreshing" />}
       {agent.queued > 0 && <span className="ml-auto rounded bg-control px-1 text-2xs text-secondary" title={`${agent.queued} queued`}>{agent.queued}</span>}
     </button>
   );
