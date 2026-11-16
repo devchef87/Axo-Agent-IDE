@@ -1,5 +1,5 @@
 import type {
-  ArchiveTeamReq, AskReq, MergeReq, RelayAckReq, RelayInReq, CreateTeamReq, CreateWatchReq, KnockReq, KnockRes, MeRes, TellReq, UpdateProjectReq, UpdateTeamReq,
+  ArchiveTeamReq, AskReq, MergeReq, PeersReq, RelayAckReq, RelayInReq, CreateTeamReq, CreateWatchReq, KnockReq, KnockRes, MeRes, TellReq, UpdateProjectReq, UpdateTeamReq,
 } from '@axo/protocol';
 import { TextResponse, type Caller, type Router } from './server.ts';
 import type { Node } from '../node.ts';
@@ -80,6 +80,10 @@ export function addCoordinationRoutes(r: Router, node: Node): void {
     appOnly(caller);
     const b = (body ?? {}) as RelayAckReq;
     innerchat.ack(params.id, !!b.ok, b.error);
+  });
+  r.put('/innerchat/peers', ({ body, caller }) => {
+    appOnly(caller);
+    innerchat.setPeers(((body ?? {}) as PeersReq).servers);
   });
   r.post('/innerchat/relay-in', ({ body, caller }) => {
     appOnly(caller);

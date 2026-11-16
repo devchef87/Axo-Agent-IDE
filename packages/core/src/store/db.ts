@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import type { Agent, AgentStatus, FeedItem, Project, Team, TeamMode } from '@axo/protocol';
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 const MIGRATIONS: string[] = [
   /* v1 */ `
@@ -77,6 +77,12 @@ const MIGRATIONS: string[] = [
     status TEXT NOT NULL, fail_reason TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
   );
   CREATE INDEX ic_outbox_status ON ic_outbox(status, created_at);
+  `,
+  /* v4 (core2): relayed envelopes already received, so a retried relay-in is a no-op. */ `
+  CREATE TABLE ic_inbox (
+    from_server TEXT NOT NULL, envelope_id TEXT NOT NULL, received_at INTEGER NOT NULL,
+    PRIMARY KEY (from_server, envelope_id)
+  );
   `,
 ];
 

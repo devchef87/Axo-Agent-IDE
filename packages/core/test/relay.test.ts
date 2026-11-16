@@ -143,4 +143,35 @@ describe('cross-server innerchat (app relay)', () => {
     laptop.node.innerchat.tell(alice.id, 'dave@ops', 'local');
     assert.equal((await call(laptop, '/innerchat/outbox')).body.length, 0, 'team address is not relayed');
   });
+
+  it('relay-in is idempotent: a retried envelope is delivered once', async () => {
+    const { laptop, server, alice, bob } = await twoNodes();
+    laptop.node.innerchat.tell(alice.id, 'bob@prod-1', 'only once please');
+    const [env] = (await call(laptop, '/innerchat/outbox')).body as RelayEnvelope[];
+    const body = JSON.stringify({ envelope: env, fromServer: 'laptop' });
+    assert.equal((await call(server, '/innerchat/relay-in', { method: 'POST', body })).status, 200);
+    assert.equal((await call(server, '/innerchat/relay-in', { method: 'POST', body })).status, 200, 'duplicate is ok');
+    assert.equal(users(server, bob.id).filter((u) => u.text.includes('only once please')).length, 1);
+  });
+
+  it('peers pushed by the app: name@server resolves to the server id, unknown servers fail at once, who lists servers', async () => {
+    const { laptop, alice } = await twoNodes();
+    const tok = agentToken(laptop.node.cfg.token, alice.id);
+    const servers = { servers: [{ id: 'local', name: 'This Mac', connected: true }, { id: 'prod-1', name: 'Prod', connected: false }] };
+    assert.equal((await call(laptop, '/innerchat/peers', { method: 'PUT', body: JSON.stringify(servers) }, tok)).status, 403);
+    assert.equal((await call(laptop, '/innerchat/peers', { method: 'PUT', body: JSON.stringify(servers) })).status, 200);
+
+    const bad = await call(laptop, '/innerchat/tell', { method: 'POST', body: JSON.stringify({ to: 'bob@staging', message: 'hi' }) }, tok);
+    assert.equal(bad.status, 404);
+    assert.match(bad.body.error, /no team or server named "staging"\. Servers: local, prod-1/);
+    assert.equal((await call(laptop, '/innerchat/outbox')).body.length, 0, 'nothing queued for an unknown server');
+
+    // By display name; queued even while that server is disconnected.
+    laptop.node.innerchat.tell(alice.id, 'bob@prod', 'via display name');
+    const [env] = (await call(laptop, '/innerchat/outbox')).body as RelayEnvelope[];
+    assert.equal(env.toServer, 'prod-1');
+
+    const who = await call(laptop, '/innerchat/who', {}, tok);
+    assert.deepEqual(who.body.servers.map((x: any) => x.id), ['local', 'prod-1']);
+  });
 });
