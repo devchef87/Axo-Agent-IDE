@@ -21,6 +21,8 @@ export interface RuleContext {
 const BUSY: AgentStatus[] = ['working', 'starting', 'rotating'];
 /** Replayed events older than this (e.g. after the Mac slept) don't notify. */
 export const STALE_MS = 5 * 60_000;
+/** Mirrors core's innerchat LOOP_PAUSE_PREFIX (the UI doesn't import core). */
+export const LOOP_PAUSE_PREFIX = 'InnerChat paused:';
 
 interface AgentMemo {
   lastText: string;         // last assistant prose of the current turn
@@ -58,6 +60,9 @@ export class NotifyRules {
         if (it.kind === 'user') { m.promptAuthor = it.author; m.lastText = ''; m.interrupted = false; m.isError = false; }
         else if (it.kind === 'text') m.lastText = it.text;
         else if (it.kind === 'turn') { m.interrupted = !!it.interrupted; m.isError = it.isError; }
+        else if (it.kind === 'system' && it.text.startsWith(LOOP_PAUSE_PREFIX) && fresh) {
+          return { key: `loop:${nodeKey}:${it.id}`, title: 'Agents paused in a loop', body: snippet(it.text.slice(LOOP_PAUSE_PREFIX.length)), nodeKey, agentId: ev.agentId };
+        }
         return null;
       }
       case 'agent:removed':

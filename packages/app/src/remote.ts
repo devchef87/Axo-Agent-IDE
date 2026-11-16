@@ -27,9 +27,17 @@ for d in "$HOME/.local/bin" "$HOME/.npm-global/bin" "$HOME/.volta/bin" "$HOME/.b
   [ -n "$d" ] && [ -d "$d" ] && case ":$PATH:" in *":$d:"*) ;; *) PATH="$PATH:$d" ;; esac
 done
 export PATH
-kv path "$PATH"
 NODE=$(command -v node 2>/dev/null)
+# The default node may be too old for Axo (node:sqlite needs 22.5+) while a newer one sits beside it
+# (e.g. nvm default 20, plus 22 installed for Axo). Prefer PATH's node if new enough, else the newest that is.
+okv() { "$1" -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=5)?0:1)' 2>/dev/null; }
+if [ -z "$NODE" ] || ! okv "$NODE"; then
+  for n in $(ls -d "$HOME"/.nvm/versions/node/v*/bin/node "$HOME"/.volta/bin/node /usr/local/bin/node /usr/bin/node 2>/dev/null | sort -rV); do
+    if [ -x "$n" ] && okv "$n"; then NODE="$n"; PATH="$(dirname "$n"):$PATH"; export PATH; break; fi
+  done
+fi
 kv node "$NODE"
+kv path "$PATH"
 [ -n "$NODE" ] && kv node_version "$("$NODE" --version 2>&1)"
 CL=$(command -v claude 2>/dev/null)
 kv claude "$CL"
@@ -40,6 +48,7 @@ fi
 G=$(command -v git 2>/dev/null)
 kv git "$G"
 [ -n "$G" ] && kv git_version "$(git --version 2>&1)"
+command -v python3 >/dev/null 2>&1 && kv python3 "$(python3 -c 'import pty,sys; print(sys.version.split()[0])' 2>/dev/null)"
 kv disk_kb "$(df -Pk "$HOME" 2>/dev/null | awk 'NR==2{print $4}')"
 if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then kv systemd 1; fi
 command -v loginctl >/dev/null 2>&1 && kv linger "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null)"
@@ -105,6 +114,9 @@ export function evaluatePreflight(kv: Record<string, string>, remotePort: number
 
   if (!kv.git) add('git', 'git', 'warn', 'git not found. Worktree teams need git.');
   else add('git', 'git', 'pass', (kv.git_version ?? '').replace(/^git version /, 'v'));
+
+  if (kv.python3) add('python3', 'python3', 'pass', `v${kv.python3} (terminals)`);
+  else add('python3', 'python3', 'warn', 'python3 not found. Agents work, but the terminal panel needs python3 on the server.');
 
   const kb = Number(kv.disk_kb);
   if (!Number.isFinite(kb) || !kv.disk_kb) add('disk', 'Free disk', 'warn', 'unknown');

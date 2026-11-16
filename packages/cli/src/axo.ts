@@ -148,7 +148,7 @@ async function ask(a: Args): Promise<void> {
   } else {
     console.log(`[no answer] ${res.note ?? ''}`.trim());
   }
-  process.stderr.write(`axo: ${res.exchangesRemaining} exchange(s) left in this conversation\n`);
+  if (res.exchangesRemaining <= 5) process.stderr.write(`axo: rapid back-and-forth detected; ${res.exchangesRemaining} more quick message(s) before this pair is paused as a loop\n`);
 }
 
 async function tell(a: Args): Promise<void> {
@@ -156,7 +156,7 @@ async function tell(a: Args): Promise<void> {
   const to = need(a._[1], usage);
   const message = need(a._.slice(2).join(' '), usage);
   const res = await api<TellRes>('POST', '/innerchat/tell', { to, message });
-  console.log(`Delivered to ${to}. Their reply, if any, will arrive as a message; you don't need to wait. (${res.exchangesRemaining} exchange(s) left)`);
+  console.log(`Delivered to ${to}. Their reply, if any, will arrive as a message; you don't need to wait.${res.exchangesRemaining <= 5 ? ` (rapid back-and-forth: ${res.exchangesRemaining} more before a loop pause)` : ''}`);
 }
 
 function fmtWatch(w: Watch): string {

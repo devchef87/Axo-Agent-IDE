@@ -5,7 +5,17 @@ import type { AgentRuntime, DeliverEvent, GoneEvent, TurnEndEvent } from '../run
 import { ulid } from '../util/ulid.ts';
 import { HttpError } from '../util/http-error.ts';
 
-export const MAX_EXCHANGES = 12;
+/**
+ * Loop breaker, not a quota: every message is delivered unless a pair exchanges more than
+ * LOOP_LIMIT messages within LOOP_WINDOW_MS with no user message to either agent. That pattern
+ * is two agents ping-ponging unattended; the pair is paused until the user steps in or it goes quiet.
+ */
+export const LOOP_LIMIT = 20;
+export const LOOP_WINDOW_MS = 10 * 60_000;
+/** @deprecated kept for callers/tests; the limit is now rate-based (see LOOP_LIMIT). */
+export const MAX_EXCHANGES = LOOP_LIMIT;
+/** Feed text prefix the UI keys its "pair paused" notification on. */
+export const LOOP_PAUSE_PREFIX = 'InnerChat paused:';
 /** `axo ask` runs inside Claude's Bash tool (default timeout 2 min), so stay under it by default. */
 export const DEFAULT_ASK_TIMEOUT_MS = 110_000;
 /** Bash allows up to 10 min with an explicit timeout. */
@@ -49,7 +59,8 @@ interface RemotePending {
  * - exact reply matching: the runtime reports which message ids a turn consumed, so an answer is
  *   the final text of the turn that read the question (no counting results to skip);
  * - threads persisted in SQLite; a thread closes after 30 min idle or when the user messages
- *   either agent, so the 12-exchange cap limits autonomous loops without locking a pair out forever;
+ *   either agent; a rate-based loop breaker (LOOP_LIMIT per LOOP_WINDOW_MS) pauses runaway pairs
+ *   instead of a lifetime cap, so normal coordination is never blocked;
  * - sender identity from the caller's agent token, never from the request body;
  * - deadlock guard that follows the whole blocked-on chain (A→B→C→A), not just direct pairs.
  */
@@ -60,6 +71,7 @@ export class InnerChat {
   private readonly pending = new Map<string, Pending[]>(); // by targetId
   private readonly blockedOn = new Map<string, string>();  // askerId → targetId
   private readonly remotePending = new Map<string, RemotePending>(); // by envelope id
+  private readonly pausedNotified = new Set<string>();     // thread ids whose loop pause was already surfaced
   private stopped = false;
   /** Servers the app knows (PUT /innerchat/peers). null until the app has told us: then any @server is queued. */
   private peers: PeerServer[] | null = null;
@@ -129,7 +141,7 @@ export class InnerChat {
     this.checkDeadlock(from, to);
     const thread = this.openThread(from, to);
     const msgId = this.send(thread, from, to, text, 'ask');
-    const remaining = MAX_EXCHANGES - thread.exchanges;
+    const remaining = this.remaining(thread);
     const wait = Math.min(Math.max(Number(timeoutMs) || DEFAULT_ASK_TIMEOUT_MS, 1000), MAX_ASK_TIMEOUT_MS);
 
     return new Promise<AskRes>((resolve) => {
@@ -182,7 +194,7 @@ export class InnerChat {
     p.timer = setTimeout(() => this.drop(p), ASYNC_REPLY_MS);
     p.timer.unref();
     this.addPending(p);
-    return { delivered: true, threadId: thread.id, exchangesRemaining: MAX_EXCHANGES - thread.exchanges };
+    return { delivered: true, threadId: thread.id, exchangesRemaining: this.remaining(thread) };
   }
 
   // ── queries ──────────────────────────────────────────────
@@ -239,16 +251,23 @@ export class InnerChat {
     }
   }
 
-  /** Open thread for this pair, or a new one. Throws when the open thread used its exchange cap. */
+  /** Open thread for this pair, or a new one. Throws when the pair is looping (see LOOP_LIMIT). */
   private openThread(from: Party & { projectId: string }, to: Party): ChatThread {
     const [a, b] = [from, to].sort((x, y) => (x.id < y.id ? -1 : 1));
     const row = this.store.db.prepare(`SELECT * FROM ic_threads WHERE a_id = ? AND b_id = ? AND status != 'closed'
       ORDER BY updated_at DESC LIMIT 1`).get(a.id, b.id) as Record<string, any> | undefined;
     if (row && Date.now() - row.updated_at < THREAD_IDLE_MS) {
       const t = toThread(row);
-      if (t.exchanges >= MAX_EXCHANGES) {
-        throw new HttpError(429, `This conversation with ${to.name} has reached its ${MAX_EXCHANGES}-exchange limit. Stop consulting and report your conclusion to the user; the limit resets when the user messages either of you.`);
+      const recent = this.recentExchanges(t.id);
+      if (recent >= LOOP_LIMIT) {
+        if (!this.pausedNotified.has(t.id)) {
+          this.pausedNotified.add(t.id);
+          this.runtime.postFeed(from.id, { kind: 'system', level: 'warn', id: `ic-${ulid()}`, ts: Date.now(),
+            text: `${LOOP_PAUSE_PREFIX} ${from.name} and ${to.name} exchanged ${recent} messages in ${Math.round(LOOP_WINDOW_MS / 60_000)} minutes without you, so they're paused. Message either agent to let them continue.` });
+        }
+        throw new HttpError(429, `Paused: you and ${to.name} have exchanged ${recent} messages in the last ${Math.round(LOOP_WINDOW_MS / 60_000)} minutes without the user stepping in, which looks like a loop. Stop messaging ${to.name}, summarize where things stand for the user, and wait. This clears when the user messages either of you, or after a few quiet minutes.`);
       }
+      this.pausedNotified.delete(t.id);
       return t;
     }
     if (row) this.store.db.prepare(`UPDATE ic_threads SET status = 'closed' WHERE id = ?`).run(row.id);
@@ -268,6 +287,14 @@ export class InnerChat {
     this.record(thread.id, from, to, kind, text);
     return msgId;
   }
+
+  /** Ask/tell messages in this thread within the loop window. */
+  private recentExchanges(threadId: string): number {
+    const r = this.store.db.prepare(`SELECT COUNT(*) AS n FROM ic_turns WHERE thread_id = ? AND kind IN ('ask','tell') AND ts > ?`)
+      .get(threadId, Date.now() - LOOP_WINDOW_MS) as { n: number };
+    return r.n;
+  }
+  private remaining(thread: ChatThread): number { return Math.max(0, LOOP_LIMIT - this.recentExchanges(thread.id)); }
 
   private bump(thread: ChatThread): void {
     thread.exchanges++;
@@ -376,7 +403,7 @@ export class InnerChat {
     const env = this.enqueue({ kind, from, toServer: to.server, toAgent: to.name, replyTo: null, text, error: null });
     this.runtime.postFeed(from.id, { kind: 'user', id: `ic-${ulid()}`, ts: Date.now(), author: from.name, text: `[${kind} → ${remote.name}] ${text}` });
     this.record(thread.id, from, remote, kind, text);
-    const remaining = MAX_EXCHANGES - thread.exchanges;
+    const remaining = this.remaining(thread);
     const r: RemotePending = { envId: env.id, senderId: from.id, threadId: thread.id, remote, kind, timer: null as any };
     this.remotePending.set(env.id, r);
     if (kind === 'tell') {
@@ -584,7 +611,7 @@ function wrap(from: Party, text: string, kind: 'ask' | 'tell'): string {
 function toThread(r: Record<string, any>): ChatThread {
   return {
     id: r.id, projectId: r.project_id, participants: [{ id: r.a_id, name: r.a_name }, { id: r.b_id, name: r.b_name }],
-    exchanges: r.exchanges, maxExchanges: MAX_EXCHANGES, status: r.status, createdAt: r.created_at, updatedAt: r.updated_at,
+    exchanges: r.exchanges, maxExchanges: LOOP_LIMIT, status: r.status, createdAt: r.created_at, updatedAt: r.updated_at,
   };
 }
 function toEnvelope(r: Record<string, any>): RelayEnvelope {

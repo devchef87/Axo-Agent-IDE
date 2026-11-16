@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { ServersSnapshot, VersionInfo } from '@axo/protocol';
 import { parseSshConfig, validateTarget, sshExec } from '../src/ssh.ts';
-import { nodeSupport, systemdUnit, evaluatePreflight, parseKv } from '../src/remote.ts';
+import { nodeSupport, systemdUnit, evaluatePreflight, parseKv, preflightScript } from '../src/remote.ts';
 import { NodeManager, freePort, type NodeConn } from '../src/node-manager.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -55,6 +55,25 @@ describe('ssh config import', () => {
   });
 });
 
+describe('preflight node selection', () => {
+  test('picks a newer nvm node when the default one is too old', () => {
+    // Like the Spark: nvm default is 20 (first on PATH), 22 installed beside it for Axo.
+    const home = mkdtempSync(join(tmpdir(), 'axo-pfnode-'));
+    const old = join(home, '.nvm/versions/node/v20.20.2/bin');
+    const neu = join(home, '.nvm/versions/node/v22.14.0/bin');
+    mkdirSync(old, { recursive: true });
+    mkdirSync(neu, { recursive: true });
+    writeFileSync(join(old, 'node'), '#!/bin/sh\n[ "$1" = --version ] && echo v20.20.2\nexit 1\n');
+    chmodSync(join(old, 'node'), 0o755);
+    execFileSync('ln', ['-s', process.execPath, join(neu, 'node')]);
+    const out = execFileSync('sh', ['-s'], { input: preflightScript(1), env: { HOME: home, SHELL: '/bin/sh', PATH: `${old}:/usr/bin:/bin` }, encoding: 'utf8' });
+    const kv = parseKv(out);
+    assert.equal(kv.node, join(neu, 'node'));
+    assert.ok(kv.path.startsWith(neu), 'the chosen node leads PATH so agents and claude use it');
+    rmSync(home, { recursive: true, force: true });
+  });
+});
+
 describe('preflight evaluation', () => {
   test('node:sqlite support by version', () => {
     assert.equal(nodeSupport('v22.13.0').status, 'pass');
@@ -74,7 +93,7 @@ describe('preflight evaluation', () => {
     ].join('\n'));
     const r = evaluatePreflight(kv, 31500);
     const by = Object.fromEntries(r.checks.map((c) => [c.id, c.status]));
-    assert.deepEqual(by, { os: 'pass', node: 'warn', claude: 'pass', auth: 'fail', git: 'warn', disk: 'warn', service: 'warn', port: 'pass', groove: 'pass' });
+    assert.deepEqual(by, { os: 'pass', node: 'warn', claude: 'pass', auth: 'fail', git: 'warn', python3: 'warn', disk: 'warn', service: 'warn', port: 'pass', groove: 'pass' });
     assert.equal(r.ok, false);
     assert.deepEqual(r.nodeFlags, ['--experimental-sqlite']);
     assert.equal(r.systemd, true);
