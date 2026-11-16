@@ -1,22 +1,23 @@
 import { readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { homedir } from 'node:os';
-import type { CreateAgentReq, CreateProjectReq, ForkReq, FsEntry, MessageReq, NodeState, ProjectContext, RefreshReq, StateDoc, UpdateAgentReq } from '@axo/protocol';
+import type { CreateAgentReq, CreateProjectReq, ForkReq, FsEntry, MessageReq, NodeState, ProjectContext, RefreshReq, StateDoc, UpdateAgentReq, VersionInfo } from '@axo/protocol';
 import { Router } from './server.ts';
 import type { Node } from '../node.ts';
 import { HttpError } from '../util/http-error.ts';
 import { expandHome } from '../projects.ts';
-import { VERSION } from '../config.ts';
+import { BUILD, VERSION } from '../config.ts';
+import { addCoordinationRoutes } from './coordination-routes.ts';
 import { registerFileRoutes } from '../files/routes.ts';
 
 export function buildRouter(node: Node): Router {
   const { store, bus, runtime, projects, cfg, journalist, rotator } = node;
   const r = new Router();
 
-  r.get('/version', () => ({ version: VERSION, nodeId: cfg.nodeId, hostname: cfg.hostname }));
+  r.get('/version', (): VersionInfo => ({ version: VERSION, build: BUILD, nodeId: cfg.nodeId, hostname: cfg.hostname }));
 
   r.get('/state', (): NodeState => ({
-    nodeId: cfg.nodeId, version: VERSION, hostname: cfg.hostname, seq: bus.currentSeq, epoch: bus.epoch,
+    nodeId: cfg.nodeId, version: VERSION, build: BUILD, hostname: cfg.hostname, seq: bus.currentSeq, epoch: bus.epoch,
     projects: store.listProjects(), teams: store.listTeams(), agents: runtime.list(),
   }));
 
@@ -34,7 +35,11 @@ export function buildRouter(node: Node): Router {
   });
 
   // ── agents ──
-  r.post('/agents', ({ body }) => runtime.create(body as CreateAgentReq));
+  r.post('/agents', ({ body }) => {
+    const b = body as CreateAgentReq;
+    if (b?.teamId && store.getTeam(b.teamId)?.archivedAt) throw new HttpError(400, 'team is archived'); // [core2]
+    return runtime.create(b);
+  });
   r.patch('/agents/:id', ({ params, body }) => runtime.update(params.id, body as UpdateAgentReq));
   r.delete('/agents/:id', ({ params }) => runtime.remove(params.id));
   r.post('/agents/:id/message', ({ params, body }) => {
@@ -52,10 +57,12 @@ export function buildRouter(node: Node): Router {
 
   // ── journalist + rotation ──
   r.post('/agents/:id/refresh', ({ params, body }) => {
+    // Node token, or an agent's own token (`axo rotate`; the server only lets an agent target itself). [core2]
     const b = (body ?? {}) as RefreshReq;
     runtime.get(params.id);
     if (rotator.isRotating(params.id)) throw new HttpError(409, 'a refresh is already in progress');
-    void rotator.rotate(params.id, { reason: 'manual', mode: b.mode, note: b.note?.trim() || undefined }).catch(() => {});
+    const reason = b.reason === 'requested' ? 'requested' : 'manual';
+    void rotator.rotate(params.id, { reason, mode: b.mode, note: b.note?.trim() || undefined }).catch(() => {});
     return { started: true };
   });
   r.post('/agents/:id/fork', ({ params, body }) => rotator.fork(params.id, (body ?? {}) as ForkReq));
@@ -90,5 +97,6 @@ export function buildRouter(node: Node): Router {
     return { path, parent: path === '/' ? null : dirname(path), entries };
   });
 
+  addCoordinationRoutes(r, node); // [core2] teams, knock, innerchat, watches, me
   return r;
 }

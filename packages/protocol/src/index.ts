@@ -108,6 +108,7 @@ export type NodeEvent =
   | { type: 'rotation:started'; agentId: string; reason: string }
   | { type: 'rotation:completed'; agentId: string; generation: number }
   | { type: 'rotation:aborted'; agentId: string; reason: string }
+  | CoordinationEvent // phase 2, defined below
   // ── files (Phase 4) ──
   | { type: 'files:changed'; projectId: string; root: string; paths: string[] };
 
@@ -118,6 +119,7 @@ export type EventEnvelope = NodeEvent & { seq: number; ts: number; nodeId: strin
 export interface NodeState {
   nodeId: string;
   version: string;
+  build: string;           // bundle content hash ('dev' from source); see VersionInfo
   hostname: string;
   seq: number;
   epoch: number;
@@ -146,13 +148,165 @@ export interface FsEntry { name: string; path: string; dir: boolean }
 // ── journalist + rotation (Phase 3) ─────────────────────────
 
 /** POST /agents/:id/refresh — fresh context, same agent/identity/chat. */
-export interface RefreshReq { note?: string; mode?: 'interview' | 'journalist' }
+export interface RefreshReq { note?: string; mode?: 'interview' | 'journalist'; reason?: 'requested' } // reason: set when an agent asks via `axo rotate`
 /** POST /agents/:id/fork — new agent in the same team, seeded with this agent's state. */
 export interface ForkReq { name?: string; task?: string }
 /** GET/POST /agents/:id/state */
 export interface StateDoc { text: string; updatedAt: number }
 /** GET /projects/:id/context */
 export interface ProjectContext { map: string; decisions: string }
+
+// ── Phase 2: teams, knock, InnerChat, watches, CLI (core2) ──
+// Event types for this area are in `CoordinationEvent` (included in `NodeEvent`).
+
+export interface CreateTeamReq {
+  projectId: string;
+  name: string;
+  mode?: TeamMode;          // default: worktree for git projects, direct otherwise
+  base?: string;            // worktree base ref; default project.baseBranch
+}
+export interface UpdateTeamReq { name?: string }
+export interface ArchiveTeamReq { removeWorktree?: boolean }
+export interface UpdateProjectReq { name?: string; baseBranch?: string | null; setupCmd?: string | null }
+
+/** Body the knock hook forwards: Claude's PreToolUse payload, unchanged. */
+export interface KnockReq { tool_name?: string; tool_input?: Record<string, unknown>; cwd?: string }
+export interface KnockRes { allow: boolean; reason?: string; owner?: string; path?: string }
+
+export type ChatTurnKind = 'ask' | 'tell' | 'answer';
+export interface ChatTurn {
+  id: string;
+  threadId: string;
+  fromId: string;
+  fromName: string;
+  toId: string;
+  toName: string;
+  kind: ChatTurnKind;
+  text: string;
+  ts: number;
+}
+export interface ChatThread {
+  id: string;
+  projectId: string;
+  participants: { id: string; name: string }[];
+  exchanges: number;        // ask + tell turns used (cap: maxExchanges)
+  maxExchanges: number;
+  status: 'open' | 'awaiting' | 'closed';
+  createdAt: number;
+  updatedAt: number;
+}
+export interface AskReq { to: string; message: string; timeoutMs?: number }
+export interface AskRes {
+  reply: string | null;     // null when timedOut
+  timedOut: boolean;
+  note?: string;
+  threadId: string;
+  exchangesRemaining: number;
+}
+export interface TellReq { to: string; message: string }
+export interface TellRes { delivered: true; threadId: string; exchangesRemaining: number }
+export interface WhoEntry { id: string; name: string; role: string; team: string; status: AgentStatus; scope: string[]; you: boolean }
+export interface WhoRes { you: string | null; agents: WhoEntry[] }
+
+export type WatchMode = 'command' | 'until';
+export type WatchStatus = 'active' | 'delivered' | 'undeliverable' | 'cancelled';
+export interface WatchResult {
+  outcome: 'success' | 'failure' | 'timeout' | 'error';
+  exitCode: number | null;
+  summary: string;
+  output: string;           // last 4KB
+}
+export interface Watch {
+  id: string;
+  agentId: string | null;   // null for team-level watches (worktree setup)
+  agentName: string | null;
+  teamId: string | null;
+  label: string;
+  mode: WatchMode;
+  command: string;
+  until: string;
+  cwd: string;
+  timeoutMs: number;
+  status: WatchStatus;
+  createdAt: number;
+  finishedAt: number | null;
+  result: WatchResult | null;
+}
+export interface CreateWatchReq {
+  agentId?: string;         // required with the node token; implied by an agent token
+  command?: string;
+  until?: string;
+  label?: string;
+  timeoutMs?: number;       // default 30m, max 24h
+  intervalMs?: number;      // until-mode poll interval
+}
+export interface CreateWatchRes { watch: Watch; reattached: boolean }
+
+/** `GET /api/me` (agent token): what `axo status` prints. */
+export interface MeRes { agent: Agent; team: Team; project: Project; watches: Watch[]; teammates: WhoEntry[] }
+
+export type CoordinationEvent =
+  | { type: 'knock:denied'; agentId: string; agentName: string; tool: string; path: string; owner: string | null; reason: string }
+  | { type: 'innerchat:turn'; thread: ChatThread; turn: ChatTurn }
+  | { type: 'watch:upsert'; watch: Watch }
+  | { type: 'watch:removed'; watchId: string };
+
+// ── Remote nodes / servers (Axo-Remote) ─────────────────────
+// Served by every node at GET /api/version. `build` is a content hash of the
+// bundle ('dev' from source) — it, not `version`, decides whether a node is stale.
+
+export interface VersionInfo { version: string; build: string; nodeId: string; hostname: string }
+
+/** A server the app manages over SSH. Persisted by the app (servers.json). No secrets:
+ *  keys and passphrases stay with ssh-agent / Keychain / ~/.ssh/config. */
+export interface ServerConfig {
+  id: string;              // also the renderer's nodeKey
+  name: string;
+  host: string;            // hostname or ~/.ssh/config alias
+  user?: string;
+  port?: number;
+  identityFile?: string;
+  remotePort: number;      // node port on the server (default 31500, bound to 127.0.0.1)
+  autoConnect: boolean;    // connect on app start
+}
+export type ServerInput = Omit<ServerConfig, 'id' | 'remotePort' | 'autoConnect'> & Partial<Pick<ServerConfig, 'remotePort' | 'autoConnect'>>;
+
+/** Host block from ~/.ssh/config (wildcard patterns skipped). */
+export interface SshHostEntry { alias: string; hostName?: string; user?: string; port?: number; identityFile?: string }
+
+export type CheckStatus = 'pass' | 'warn' | 'fail';
+export interface PreflightCheck { id: string; label: string; status: CheckStatus; detail: string }
+export interface PreflightResult {
+  ok: boolean;             // no 'fail' checks
+  ts: number;
+  checks: PreflightCheck[];
+  nodePath?: string;       // absolute path of node on the server
+  nodeFlags: string[];     // e.g. ['--experimental-sqlite'] on node 22.5–22.12
+  pathEnv?: string;        // login-shell PATH on the server (given to the node)
+  systemd: boolean;        // `systemctl --user` usable
+  linger: boolean;
+  deployedBuild?: string;
+}
+
+export type ServerPhase = 'idle' | 'preflight' | 'deploying' | 'connecting' | 'connected' | 'reconnecting' | 'updating' | 'error';
+export interface ServerStatus {
+  phase: ServerPhase;
+  message?: string;        // progress or last error
+  localPort?: number;      // tunnel endpoint on this Mac
+  node?: VersionInfo;      // the running node, once reachable
+  deployMode?: 'systemd' | 'nohup';
+  updateAvailable: boolean;  // node.build !== bundled build
+  updateWaiting: boolean;    // update requested, waiting for agents to finish their turns
+  preflight?: PreflightResult;
+}
+export interface ServerView { config: ServerConfig; status: ServerStatus }
+
+export interface LocalNodeStatus { node?: VersionInfo; updateAvailable: boolean; updateWaiting: boolean; message?: string }
+export interface ServersSnapshot {
+  bundled: { version: string; build: string };
+  local: LocalNodeStatus;
+  servers: ServerView[];
+}
 
 // ── files (Phase 4) ─────────────────────────────────────────
 // All routes live under /projects/:id/files/*. Paths are relative to the file root
@@ -191,4 +345,3 @@ export interface FileDiff { path: string; status: 'added' | 'modified' | 'delete
 export interface DiffRes { diffs: FileDiff[] }
 /** GET /projects/:id/files/original?path= — the file at HEAD; null if untracked/new. */
 export interface OriginalRes { path: string; content: string | null }
-

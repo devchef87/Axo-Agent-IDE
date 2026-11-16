@@ -5,7 +5,10 @@ import { randomBytes } from 'node:crypto';
 import { ulid } from './util/ulid.ts';
 
 declare const __AXO_VERSION__: string | undefined;
+declare const __AXO_BUILD__: string | undefined;
 export const VERSION: string = typeof __AXO_VERSION__ !== 'undefined' ? __AXO_VERSION__ : '0.1.0-dev';
+/** Content hash of the bundle sources; 'dev' when running from source. */
+export const BUILD: string = typeof __AXO_BUILD__ !== 'undefined' ? __AXO_BUILD__ : 'dev';
 export const DEFAULT_PORT = 31500;
 
 export interface NodeConfig {
