@@ -15,6 +15,19 @@ const UI_INDEX = app.isPackaged ? join(resources, 'ui', 'index.html') : join(res
 let win: BrowserWindow | null = null;
 let local: LocalNode | null = null;
 
+// One Axo per Mac (two would mean two relays and two windows): a second launch, from the
+// Dock, the launcher or `npm run app`, just brings the running window forward.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
+app.on('second-instance', () => {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+});
+
 function bundleInfo(): { version: string; build: string } {
   try { return JSON.parse(readFileSync(join(dirname(NODE_BUNDLE), 'axo-node.json'), 'utf8')); } catch { return { version: '?', build: 'dev' }; }
 }
@@ -208,6 +221,8 @@ function buildMenu(): void {
 
 app.whenReady().then(async () => {
   nativeTheme.themeSource = windowTheme.pref;
+  // Unpackaged runs are Electron.app; show Axo's icon in the Dock anyway.
+  if (!app.isPackaged) app.dock?.setIcon(join(__dirname, '..', 'build', 'icon.png'));
   buildMenu();
   try {
     local = await ensureLocalNode(NODE_BUNDLE);
