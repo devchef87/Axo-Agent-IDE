@@ -220,7 +220,9 @@ export class NodeManager extends EventEmitter {
     this.setStatus(s, { phase: 'preflight', message: 'Running checks…' });
     try {
       const res = await runPreflight(this.o.sshEnv, this.target(s), s.config.remotePort);
-      this.setStatus(s, { preflight: res, phase: prev === 'preflight' ? 'idle' : prev, message: res.ok ? undefined : 'Preflight found problems' });
+      // The connection supervisor may have moved the phase meanwhile; only undo our own.
+      const phase = s.status.phase === 'preflight' ? (prev === 'error' ? 'idle' : prev) : s.status.phase;
+      this.setStatus(s, { preflight: res, phase, message: res.ok ? undefined : 'Preflight found problems' });
       return res;
     } catch (e: any) {
       this.setStatus(s, { phase: 'error', message: e.message });
@@ -239,7 +241,6 @@ export class NodeManager extends EventEmitter {
     if (s.busy) throw new Error('Another operation is running for this server');
     s.busy = true;
     s.cancelUpdate = false;
-    const resumePhase = s.status.phase === 'connected' || s.status.phase === 'reconnecting' ? s.status.phase : 'idle';
     try {
       if (s.token && s.status.localPort && s.status.phase === 'connected') {
         this.setStatus(s, { updateWaiting: true, message: 'Waiting for agents to finish their turns…' });
@@ -259,7 +260,8 @@ export class NodeManager extends EventEmitter {
         nodePath: pf.nodePath, nodeFlags: pf.nodeFlags, pathEnv: pf.pathEnv, remotePort: s.config.remotePort,
         bundle: this.o.readBundle(), bundleInfo: this.o.bundleInfo, allowSystemd: pf.systemd,
       }, (m) => this.setStatus(s, { message: m }));
-      this.setStatus(s, { deployMode: res.mode, phase: resumePhase, message: res.warnings[0] ?? `Deployed (${res.mode})` });
+      // While connected, the supervisor owns the phase (it reconnects to the restarted node).
+      this.setStatus(s, { deployMode: res.mode, message: res.warnings[0] ?? `Deployed (${res.mode})`, ...(s.want ? {} : { phase: 'idle' as const }) });
       if (s.want) {
         await this.refreshVersion(s);
         s.wake?.(); // re-read token / re-probe through the tunnel

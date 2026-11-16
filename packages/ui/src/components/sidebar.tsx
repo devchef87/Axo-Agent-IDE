@@ -5,6 +5,7 @@ import { focusedSel, useAxo, type NodeView } from '../stores/store.ts';
 import { sameSel } from '../lib/layout.ts';
 import { endAgentDrag, startAgentDrag } from '../lib/dnd.ts';
 import { cn, ConnDot, IconButton, StatusDot } from './ui.tsx';
+import { ServersSidebarEntry } from './servers/sidebar-entry.tsx';
 
 export function Sidebar() {
   const nodeOrder = useAxo((s) => s.nodeOrder);
@@ -14,6 +15,7 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto py-2">
         {nodeOrder.map((k) => <NodeSection key={k} node={nodes[k]} />)}
       </div>
+      <ServersSidebarEntry />
     </aside>
   );
 }

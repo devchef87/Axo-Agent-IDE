@@ -10,6 +10,7 @@ import { focusPaneComposer, modalOpen, openNewAgent, toggleDrawer } from './lib/
 import { AddProjectDialog, NewAgentDialog } from './components/dialogs.tsx';
 import { cn, ConnDot, formatTokens } from './components/ui.tsx';
 import { useTheme, type ThemePref } from './lib/theme.ts';
+import { ServersPanel } from './components/servers/servers-panel.tsx';
 
 export function App() {
   const init = useAxo((s) => s.init);
@@ -29,6 +30,7 @@ export function App() {
       <NewAgentDialog />
       <AddProjectDialog />
       <CommandPalette />
+      <ServersPanel />
     </div>
   );
 }

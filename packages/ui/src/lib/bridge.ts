@@ -2,11 +2,31 @@
 // (local + SSH-tunnelled servers). In a plain browser served by a node, we use
 // that node's origin and the token from the URL hash.
 
+import type { PreflightResult, ServerConfig, ServerInput, ServersSnapshot, SshHostEntry } from '@axo/protocol';
+
 export interface NodeConn {
   key: string;      // stable client-side key ('local', 'prod-1', …)
   name: string;     // display name
-  baseUrl: string;  // http://127.0.0.1:<port>
+  baseUrl: string;  // http://127.0.0.1:<port> (remote nodes: the local end of an SSH tunnel)
   token: string;
+  kind?: 'local' | 'remote';
+}
+
+/** Settings → Servers. Long calls resolve when done; progress streams through onChanged. */
+export interface ServersBridge {
+  snapshot(): Promise<ServersSnapshot>;
+  sshHosts(): Promise<SshHostEntry[]>;
+  add(input: ServerInput): Promise<ServerConfig>;
+  update(id: string, patch: Partial<ServerInput>): Promise<ServerConfig>;
+  remove(id: string, opts?: { stopNode?: boolean }): Promise<void>;
+  preflight(id: string): Promise<PreflightResult>;
+  deploy(id: string): Promise<void>;
+  cancelUpdate(id: string): Promise<void>;
+  connect(id: string): Promise<void>;
+  disconnect(id: string): Promise<void>;
+  updateLocal(): Promise<void>;
+  cancelLocalUpdate(): Promise<void>;
+  onChanged(cb: (snap: ServersSnapshot) => void): () => void;
 }
 
 interface AxoBridge {
@@ -16,6 +36,7 @@ interface AxoBridge {
   onNodesChanged(cb: (nodes: NodeConn[]) => void): () => void;
   /** Sync native window chrome with the UI theme. Optional: older preloads lack it. */
   setTheme?(pref: 'system' | 'light' | 'dark', background: string): void;
+  servers?: ServersBridge;
   platform: string;
 }
 
