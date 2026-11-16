@@ -135,7 +135,7 @@ function FoldedProse({ text, startOpen }: { text: string; startOpen: boolean }) 
   };
   return (
     <div className="relative">
-      <div ref={ref} style={folded ? { maxHeight: FOLDED_TO, overflow: 'hidden' } : undefined} className="md my-2 text-[13.5px] leading-[1.65]">
+      <div ref={ref} style={folded ? { maxHeight: FOLDED_TO, overflow: 'hidden' } : undefined} className="md my-2 text-[13px]">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
       </div>
       {folded && <div className="pointer-events-none absolute inset-x-0 bottom-7 h-16 bg-gradient-to-t from-[var(--bg)] to-transparent" aria-hidden />}
@@ -151,7 +151,7 @@ function FoldedProse({ text, startOpen }: { text: string; startOpen: boolean }) 
 
 export const Prose = memo(function Prose({ text }: { text: string }) {
   return (
-    <div className="md my-2 text-[13.5px] leading-[1.65]">
+    <div className="md my-2 text-[13px]">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
     </div>
   );
@@ -183,7 +183,7 @@ function SystemLine({ item }: { item: Extract<FeedItem, { kind: 'system' }> }) {
       )}
     >
       <Icon size={13} className="mt-0.5 shrink-0" />
-      <span className="whitespace-pre-wrap break-words font-mono text-2xs leading-relaxed">{item.text}</span>
+      <span className="whitespace-pre-wrap break-words text-xs leading-relaxed">{item.text}</span>
     </div>
   );
 }

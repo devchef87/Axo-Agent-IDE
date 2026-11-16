@@ -73,7 +73,7 @@ function NodeSection({ node }: { node: NodeView }) {
     <div className="mb-2">
       <div className="group flex h-7 items-center gap-1 pl-3 pr-1.5" onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
         <button data-nav data-level={1} data-label={node.name} aria-expanded={open}
-          className="label !text-[9.5px] flex min-w-0 flex-1 items-center gap-2 rounded-sm outline-none hover:!text-secondary focus-visible:bg-hover cursor-pointer"
+          className="label flex min-w-0 flex-1 items-center gap-2 rounded-sm outline-none hover:!text-secondary focus-visible:bg-hover cursor-pointer"
           onClick={() => setOpen(!open)}
           title={node.projects.map((p) => p.path).join('\n') || node.name}>
           <ConnDot status={node.status} />
@@ -128,7 +128,7 @@ function TeamSection({ node, project, team, agents, showProject }: { node: NodeV
 
   return (
     <div>
-      <div className="group flex h-[26px] items-center gap-0.5 pl-1.5 pr-1.5 text-[12px] text-primary hover:bg-hover"
+      <div className="group mt-1 flex h-[26px] items-center gap-0.5 pl-1.5 pr-1.5 text-[12.5px] font-medium text-secondary hover:bg-hover"
         onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
         {editing ? (
           <div className="flex min-w-0 flex-1 items-center gap-1">
@@ -269,13 +269,16 @@ function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
         title="Click to open · ⌘-click for a split · double-click or F2 to rename · right-click for more"
         aria-current={focused ? 'true' : undefined}
         className={cn(
-          'relative flex h-[26px] w-full items-center gap-2.5 pr-3 text-left text-[12px] outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent cursor-pointer', indent,
+          'relative flex w-full items-center gap-2.5 py-[5px] pr-3 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent cursor-pointer', indent,
           focused ? 'bg-control text-primary' : visible ? 'bg-hover text-primary' : 'text-secondary hover:bg-hover hover:text-primary',
         )}
       >
         {focused && <span className="absolute inset-y-0 left-0 w-px bg-accent" aria-hidden />}
         <StatusDot status={agent.status} />
-        <span className="truncate">{agent.name}</span>
+        <span className="min-w-0">
+          <span className="block truncate text-[12.5px] font-medium leading-[17px]">{agent.name}</span>
+          <span className="block truncate text-[10.5px] leading-[14px] text-faint">{agent.role || agent.model}</span>
+        </span>
         {refreshing && <RefreshCw size={10} className="shrink-0 animate-spin text-rotating [animation-duration:2s]" aria-label="refreshing" />}
         {agent.queued > 0 && <span className="ml-auto font-mono text-[9.5px] text-faint" title={`${agent.queued} queued`}>{agent.queued}</span>}
       </button>
