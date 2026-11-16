@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { useEffect, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode, type RefObject } from 'react';
 import { X } from 'lucide-react';
 import type { AgentStatus } from '@axo/protocol';
 import type { ConnStatus } from '../lib/client.ts';
@@ -64,29 +64,86 @@ export function ConnDot({ status }: { status: ConnStatus }) {
   );
 }
 
-export function Modal({ open, onClose, title, children, width = 440 }: { open: boolean; onClose: () => void; title: string; children: ReactNode; width?: number }) {
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Modal keyboard behaviour: focus moves inside on open (first [autofocus] or focusable),
+ * Tab cycles within, Escape closes (captured, so it never reaches e.g. the composer's
+ * interrupt), and focus returns to where it was on close.
+ */
+export function useModalFocus(ref: RefObject<HTMLElement | null>, open: boolean, onClose: () => void): void {
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     if (!open) return;
-    const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [open, onClose]);
+    const prev = document.activeElement as HTMLElement | null;
+    const raf = requestAnimationFrame(() => {
+      const el = ref.current;
+      if (el && !el.contains(document.activeElement)) (el.querySelector<HTMLElement>('[autofocus]') ?? el.querySelector<HTMLElement>(FOCUSABLE) ?? el).focus();
+    });
+    const onKey = (e: KeyboardEvent) => {
+      if (e.isComposing) return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close.current(); return; }
+      if (e.key !== 'Tab' || !ref.current) return;
+      const items = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((n) => n.offsetParent !== null);
+      if (items.length === 0) { e.preventDefault(); return; }
+      const first = items[0], last = items[items.length - 1];
+      const inside = ref.current.contains(document.activeElement);
+      if (e.shiftKey && (document.activeElement === first || !inside)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (document.activeElement === last || !inside)) { e.preventDefault(); first.focus(); }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('keydown', onKey, true);
+      if (prev?.isConnected) prev.focus();
+    };
+  }, [open, ref]);
+}
+
+/** Close a popover on outside pointer-down or Escape. */
+export function useDismiss(ref: RefObject<HTMLElement | null>, open: boolean, onClose: () => void): void {
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) close.current(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); close.current(); } };
+    window.addEventListener('pointerdown', onDown, true);
+    window.addEventListener('keydown', onKey, true);
+    return () => { window.removeEventListener('pointerdown', onDown, true); window.removeEventListener('keydown', onKey, true); };
+  }, [open, ref]);
+}
+
+export function Modal({ open, onClose, title, children, width = 440 }: { open: boolean; onClose: () => void; title: string; children: ReactNode; width?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  useModalFocus(ref, open, onClose);
   if (!open) return null;
   return (
     <div className="no-drag fixed inset-0 z-50 flex items-start justify-center bg-[var(--overlay)] pt-[12vh]" onMouseDown={onClose}>
       <div
-        className="animate-fade-in rounded-lg border border-border bg-elevated shadow-pop"
-        style={{ width }}
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="animate-fade-in rounded-lg border border-border bg-elevated shadow-pop outline-none"
+        style={{ width, maxWidth: 'calc(100vw - 2rem)' }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border-subtle px-4 py-2.5">
-          <h2 className="text-[13px] font-semibold text-primary">{title}</h2>
+          <h2 id={titleId} className="text-[13px] font-semibold text-primary">{title}</h2>
           <IconButton title="Close" onClick={onClose}><X size={14} /></IconButton>
         </div>
         <div className="p-4">{children}</div>
       </div>
     </div>
   );
+}
+
+export function Kbd({ children }: { children: ReactNode }) {
+  return <kbd className="rounded border border-border bg-control px-1 font-sans text-2xs text-muted">{children}</kbd>;
 }
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {

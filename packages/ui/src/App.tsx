@@ -1,28 +1,34 @@
 import { useEffect } from 'react';
-import { Monitor, Moon, Sun } from 'lucide-react';
-import { useAxo } from './stores/store.ts';
+import { Monitor, Moon, Search, Sun } from 'lucide-react';
+import { focusedSel, useAxo } from './stores/store.ts';
 import { isElectron, isMac } from './lib/bridge.ts';
 import { Sidebar } from './components/sidebar.tsx';
-import { ChatPane, Empty } from './components/chat-pane.tsx';
+import { Fleet } from './components/fleet.tsx';
+import { AgentDrawer } from './components/agent-drawer.tsx';
+import { CommandPalette } from './components/palette.tsx';
+import { focusPaneComposer, modalOpen, openNewAgent, toggleDrawer } from './lib/actions.ts';
 import { AddProjectDialog, NewAgentDialog } from './components/dialogs.tsx';
 import { cn, ConnDot, formatTokens } from './components/ui.tsx';
 import { useTheme, type ThemePref } from './lib/theme.ts';
 
 export function App() {
   const init = useAxo((s) => s.init);
-  const selected = useAxo((s) => s.selected);
+  const drawer = useAxo((s) => s.ui.drawer);
   useEffect(() => { void init(); }, [init]);
+  useGlobalShortcuts();
 
   return (
     <div className="flex h-full flex-col">
       {isElectron && isMac && <TitleStrip />}
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        {selected ? <ChatPane key={`${selected.nodeKey}:${selected.agentId}`} sel={selected} /> : <Empty text="Select an agent, or create one from a project in the sidebar." />}
+        <Fleet />
+        {drawer && <AgentDrawer />}
       </div>
       <StatusBar />
       <NewAgentDialog />
       <AddProjectDialog />
+      <CommandPalette />
     </div>
   );
 }
@@ -32,9 +38,31 @@ export function App() {
  * first 80px, so that area stays empty. Nothing in here is clickable; never put .drag on
  * anything larger — Electron swallows clicks over drag regions, even under modals.
  */
+function useGlobalShortcuts() {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.isComposing) return;
+      const k = e.key.toLowerCase();
+      if (k === 'k' && !e.shiftKey) {
+        const s = useAxo.getState();
+        if (s.ui.newAgent || s.ui.addProject) return;
+        e.preventDefault();
+        s.setUi({ palette: !s.ui.palette });
+        return;
+      }
+      if (modalOpen()) return;
+      if (k === 'n' && !e.shiftKey) { e.preventDefault(); openNewAgent(); }
+      else if (k === 'i' && !e.shiftKey) { e.preventDefault(); toggleDrawer(); }
+      else if (/^[1-3]$/.test(k)) { e.preventDefault(); focusPaneComposer(Number(k) - 1); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+}
+
 function TitleStrip() {
   const crumbs = useAxo((s) => {
-    const sel = s.selected;
+    const sel = focusedSel(s);
     const node = sel ? s.nodes[sel.nodeKey] : undefined;
     const agent = node?.agents.find((a) => a.id === sel!.agentId);
     if (!node || !agent) return null;
@@ -85,6 +113,7 @@ function StatusBar() {
   const all = order.flatMap((k) => nodes[k].agents);
   const working = all.filter((a) => a.status === 'working' || a.status === 'starting').length;
   const tokens = all.reduce((n, a) => n + a.sessionTokens, 0);
+  const setUi = useAxo((s) => s.setUi);
   return (
     <div className="flex h-6 shrink-0 items-center gap-4 border-t border-border-subtle bg-panel px-3 text-2xs text-muted">
       {order.map((k) => (
@@ -93,6 +122,13 @@ function StatusBar() {
           {nodes[k].version && <span className="text-faint">v{nodes[k].version}</span>}
         </span>
       ))}
+      <button
+        className="flex items-center gap-1 rounded px-1 hover:bg-hover hover:text-secondary cursor-pointer"
+        title="Command palette (⌘K)"
+        onClick={() => setUi({ palette: true })}
+      >
+        <Search size={10} /> ⌘K
+      </button>
       <span className="ml-auto">{working} working · {all.length} agents</span>
       <span title="Tokens processed across current sessions">{formatTokens(tokens)} tok</span>
       <ThemeToggle />

@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import type { Agent, EventEnvelope, FeedItem, FeedPage, NodeState, Project, Team } from '@axo/protocol';
 import { NodeClient, type ConnStatus } from '../lib/client.ts';
 import { discoverNodes, type NodeConn } from '../lib/bridge.ts';
+import * as L from '../lib/layout.ts';
+import type { Layout, Selection } from '../lib/layout.ts';
+
+export type { Selection } from '../lib/layout.ts';
 
 export interface NodeView {
   key: string;
@@ -22,18 +26,28 @@ export interface FeedState {
   drafts: Record<string, string>; // streaming text by item id
 }
 
-export interface Selection { nodeKey: string; agentId: string }
-
 interface AxoState {
   nodes: Record<string, NodeView>;
   nodeOrder: string[];
   feeds: Record<string, FeedState>;  // key: `${nodeKey}:${agentId}`
-  selected: Selection | null;
-  ui: { newAgent: { nodeKey: string; projectId: string } | null; addProject: string | null };
+  layout: Layout;
+  ui: {
+    newAgent: { nodeKey: string; projectId: string } | null;
+    addProject: string | null;
+    palette: boolean;
+    drawer: boolean; // agent config drawer for the focused pane
+  };
 
   init(): Promise<void>;
   client(nodeKey: string): NodeClient;
-  select(sel: Selection | null): void;
+  /** Show an agent in the focused pane (or focus the pane already showing it). */
+  select(sel: Selection): void;
+  openInSplit(sel: Selection): void;
+  openInPane(sel: Selection, index: number): void;
+  focusPane(index: number): void;
+  closePane(index: number): void;
+  resizePanes(divider: number, delta: number): void;
+  resetPaneSizes(): void;
   loadFeed(nodeKey: string, agentId: string, older?: boolean): Promise<void>;
   setUi(patch: Partial<AxoState['ui']>): void;
 }
@@ -42,6 +56,19 @@ export const feedKey = (nodeKey: string, agentId: string) => `${nodeKey}:${agent
 const emptyFeed = (): FeedState => ({ items: [], hasMore: false, loaded: false, drafts: {} });
 
 const clients = new Map<string, NodeClient>();
+const LAYOUT_KEY = 'axo.layout';
+
+function loadLayout(): Layout {
+  const raw = localStorage.getItem(LAYOUT_KEY);
+  if (raw) return L.parseLayout(raw);
+  // Phase 1 stored a single selection.
+  const old = L.parseLayout(JSON.stringify({ panes: [JSON.parse(localStorage.getItem('axo.selected') ?? 'null')] }));
+  localStorage.removeItem('axo.selected');
+  return old;
+}
+
+/** The agent in the focused pane, if any. */
+export const focusedSel = (s: { layout: Layout }): Selection | null => s.layout.panes[s.layout.focused] ?? null;
 
 export const useAxo = create<AxoState>((set, get) => {
   const patchNode = (key: string, fn: (n: NodeView) => Partial<NodeView>) =>
@@ -82,8 +109,7 @@ export const useAxo = create<AxoState>((set, get) => {
       case 'agent:upsert': patchNode(key, (n) => ({ agents: upsert(n.agents, ev.agent) })); break;
       case 'agent:removed': {
         patchNode(key, (n) => ({ agents: n.agents.filter((a) => a.id !== ev.agentId) }));
-        const sel = get().selected;
-        if (sel?.nodeKey === key && sel.agentId === ev.agentId) set({ selected: null });
+        setLayout(L.dropAgent(get().layout, { nodeKey: key, agentId: ev.agentId }));
         break;
       }
       case 'agent:feed': {
@@ -114,6 +140,15 @@ export const useAxo = create<AxoState>((set, get) => {
     }
   };
 
+  const setLayout = (layout: Layout) => {
+    if (layout === get().layout) return;
+    set({ layout });
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
+    for (const p of layout.panes) {
+      if (p && !get().feeds[feedKey(p.nodeKey, p.agentId)]?.loaded && clients.has(p.nodeKey)) void get().loadFeed(p.nodeKey, p.agentId);
+    }
+  };
+
   const addNode = (conn: NodeConn) => {
     if (clients.has(conn.key)) return;
     set((s) => ({
@@ -133,15 +168,12 @@ export const useAxo = create<AxoState>((set, get) => {
     nodes: {},
     nodeOrder: [],
     feeds: {},
-    selected: null,
-    ui: { newAgent: null, addProject: null },
+    layout: loadLayout(),
+    ui: { newAgent: null, addProject: null, palette: false, drawer: false },
 
     async init() {
       for (const conn of await discoverNodes()) addNode(conn);
-      const saved = localStorage.getItem('axo.selected');
-      if (saved) {
-        try { get().select(JSON.parse(saved)); } catch { /* ignore */ }
-      }
+      for (const p of get().layout.panes) if (p && clients.has(p.nodeKey)) void get().loadFeed(p.nodeKey, p.agentId);
     },
 
     client(nodeKey) {
@@ -150,13 +182,16 @@ export const useAxo = create<AxoState>((set, get) => {
       return c;
     },
 
-    select(sel) {
-      set({ selected: sel });
-      if (sel) {
-        localStorage.setItem('axo.selected', JSON.stringify(sel));
-        if (!get().feeds[feedKey(sel.nodeKey, sel.agentId)]?.loaded) void get().loadFeed(sel.nodeKey, sel.agentId);
-      } else localStorage.removeItem('axo.selected');
+    select(sel) { setLayout(L.openIn(get().layout, sel)); },
+    openInSplit(sel) { setLayout(L.openInSplit(get().layout, sel)); },
+    openInPane(sel, index) { setLayout(L.openIn(get().layout, sel, index)); },
+    focusPane(index) {
+      const l = get().layout;
+      if (index >= 0 && index < l.panes.length && index !== l.focused) setLayout({ ...l, focused: index });
     },
+    closePane(index) { setLayout(L.closePane(get().layout, index)); },
+    resizePanes(divider, delta) { setLayout(L.resize(get().layout, divider, delta)); },
+    resetPaneSizes() { setLayout(L.resetSizes(get().layout)); },
 
     async loadFeed(nodeKey, agentId, older = false) {
       const fk = feedKey(nodeKey, agentId);
