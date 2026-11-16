@@ -167,7 +167,8 @@ describe('cross-server innerchat (app relay)', () => {
     assert.equal((await call(laptop, '/innerchat/outbox')).body.length, 0, 'nothing queued for an unknown server');
 
     // By display name; queued even while that server is disconnected.
-    laptop.node.innerchat.tell(alice.id, 'bob@prod', 'via display name');
+    const res = laptop.node.innerchat.tell(alice.id, 'bob@prod', 'via display name') as any;
+    assert.equal(res.queued, true, 'the sender is told it waits for an offline server');
     const [env] = (await call(laptop, '/innerchat/outbox')).body as RelayEnvelope[];
     assert.equal(env.toServer, 'prod-1');
 

@@ -100,6 +100,11 @@ describe('preflight evaluation', () => {
     assert.equal(r.linger, false);
   });
 
+  test('python3 is detected (keys may contain digits)', () => {
+    const r = evaluatePreflight(parseKv('os=Linux\npython3=3.10.12'), 31500);
+    assert.equal(r.checks.find((c) => c.id === 'python3')!.status, 'pass');
+  });
+
   test('port held by something else fails', () => {
     const r = evaluatePreflight(parseKv('os=Linux\nport_in_use=1'), 31500);
     assert.equal(r.checks.find((c) => c.id === 'port')!.status, 'fail');

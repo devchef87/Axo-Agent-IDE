@@ -159,7 +159,9 @@ async function tell(a: Args): Promise<void> {
   const to = need(a._[1], usage);
   const message = need(a._.slice(2).join(' '), usage);
   const res = await api<TellRes>('POST', '/innerchat/tell', { to, message });
-  console.log(`Delivered to ${to}. Their reply, if any, will arrive as a message; you don't need to wait.${res.exchangesRemaining <= 5 ? ` (rapid back-and-forth: ${res.exchangesRemaining} more before a loop pause)` : ''}`);
+  const how = res.queued ? `Queued for ${to}: that server is offline, so it waits (up to 24h) and is delivered when it reconnects.`
+    : res.remote ? `Sent to ${to} via the Axo app.` : `Delivered to ${to}.`;
+  console.log(`${how} Their reply, if any, will arrive as a message; you don't need to wait.${res.exchangesRemaining <= 5 ? ` (rapid back-and-forth: ${res.exchangesRemaining} more before a loop pause)` : ''}`);
 }
 
 function fmtWatch(w: Watch): string {

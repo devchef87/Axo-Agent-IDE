@@ -68,7 +68,7 @@ export function parseKv(stdout: string): Record<string, string> {
   const kv: Record<string, string> = {};
   for (const line of stdout.split('\n')) {
     const i = line.indexOf('=');
-    if (i > 0 && /^[a-z_]+$/.test(line.slice(0, i))) kv[line.slice(0, i)] = line.slice(i + 1).trim();
+    if (i > 0 && /^[a-z0-9_]+$/.test(line.slice(0, i))) kv[line.slice(0, i)] = line.slice(i + 1).trim();
   }
   return kv;
 }

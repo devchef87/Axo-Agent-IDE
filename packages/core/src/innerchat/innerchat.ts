@@ -409,7 +409,8 @@ export class InnerChat {
     if (kind === 'tell') {
       r.timer = setTimeout(() => this.dropRemote(r), OUTBOX_EXPIRE_MS);
       r.timer.unref();
-      return { delivered: true, threadId: thread.id, exchangesRemaining: remaining };
+      const offline = this.peers?.find((p) => p.id === to.server)?.connected === false;
+      return { delivered: true, threadId: thread.id, exchangesRemaining: remaining, remote: true, ...(offline ? { queued: true } : {}) };
     }
     const wait = Math.min(Math.max(Number(timeoutMs) || DEFAULT_ASK_TIMEOUT_MS, 1000), MAX_ASK_TIMEOUT_MS);
     return new Promise<AskRes>((resolve) => {

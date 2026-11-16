@@ -208,7 +208,9 @@ export interface AskRes {
   exchangesRemaining: number;
 }
 export interface TellReq { to: string; message: string }
-export interface TellRes { delivered: true; threadId: string; exchangesRemaining: number }
+/** remote: sent to another server via the Axo app's relay; queued: that server is offline right now,
+ *  so it waits in the outbox (up to 24h) and is delivered when it reconnects. */
+export interface TellRes { delivered: true; threadId: string; exchangesRemaining: number; remote?: boolean; queued?: boolean }
 export interface WhoEntry { id: string; name: string; role: string; team: string; status: AgentStatus; scope: string[]; you: boolean }
 export interface WhoRes { you: string | null; agents: WhoEntry[]; servers?: PeerServer[] }  // servers: from the app (name@server)
 
