@@ -39,7 +39,7 @@ export function Sidebar() {
   return (
     <aside style={{ width: size.width }} className="relative flex h-full shrink-0 flex-col border-r border-border-subtle bg-panel">
       <ResizeHandle edge="right" width={size.width} onResize={size.set} onReset={size.reset} label="Resize sidebar" />
-      <div ref={list} id="axo-sidebar" aria-label="Servers, projects and agents" onKeyDown={onKeyDown} className="flex-1 overflow-y-auto py-1.5">
+      <div ref={list} id="axo-sidebar" aria-label="Servers, projects and agents" onKeyDown={onKeyDown} className="flex-1 overflow-y-auto px-1.5 py-1.5">
         {/* A server that's down with nothing cached stays out of the way; the status bar shows its state. */}
         {nodeOrder.filter((k) => nodes[k].status === 'online' || nodes[k].status === 'unauthorized' || nodes[k].projects.length > 0)
           .map((k) => <NodeSection key={k} node={nodes[k]} />)}
@@ -70,17 +70,17 @@ function NodeSection({ node }: { node: NodeView }) {
   };
 
   return (
-    <div className="mb-2">
-      <div className="group flex h-7 items-center gap-1 pl-3 pr-1.5" onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
+    <div className="mb-3">
+      <div className="group flex h-6 items-center gap-1 pl-2 pr-1" onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
         <button data-nav data-level={1} data-label={node.name} aria-expanded={open}
-          className="label flex min-w-0 flex-1 items-center gap-2 rounded-sm outline-none hover:!text-secondary focus-visible:bg-hover cursor-pointer"
+          className="label !text-[9.5px] !text-dim flex min-w-0 flex-1 items-center gap-2 rounded-sm outline-none hover:!text-secondary focus-visible:bg-hover cursor-pointer"
           onClick={() => setOpen(!open)}
           title={node.projects.map((p) => p.path).join('\n') || node.name}>
           <ConnDot status={node.status} />
           <span className="truncate">{node.name}</span>
           {!open && <ChevronRight size={10} />}
         </button>
-        <span className="font-mono text-[9.5px] text-faint group-hover:hidden group-focus-within:hidden" title={`${node.agents.length} agents`}>{node.agents.length || ''}</span>
+        <span className="pr-1 font-mono text-[9.5px] text-dim group-hover:hidden group-focus-within:hidden" title={`${node.agents.length} agents`}>{node.agents.length || ''}</span>
         {node.projects.length > 0 && (
           <span className="hidden group-hover:flex group-focus-within:flex">
             <IconButton title="New team" onClick={newTeam}><Plus size={13} /></IconButton>
@@ -104,7 +104,7 @@ function NodeSection({ node }: { node: NodeView }) {
           {node.status === 'online' && node.projects.length === 0 && (
             <button
               data-nav data-level={2} data-label="Add a project"
-              className="flex h-[26px] w-full items-center gap-2 px-3 text-[11px] text-faint outline-none hover:bg-hover hover:text-secondary focus-visible:bg-hover cursor-pointer"
+              className="flex h-6 w-full items-center gap-1.5 rounded-[5px] px-2 text-[10.5px] text-dim outline-none hover:bg-hover hover:text-secondary focus-visible:bg-hover cursor-pointer"
               onClick={() => setUi({ addProject: node.key })}
             >
               <Plus size={12} /> Add project
@@ -128,11 +128,11 @@ function TeamSection({ node, project, team, agents, showProject }: { node: NodeV
 
   return (
     <div>
-      <div className="group mt-1 flex h-[26px] items-center gap-0.5 pl-1.5 pr-1.5 text-[12.5px] font-medium text-secondary hover:bg-hover"
+      <div className="group flex h-[26px] items-center gap-0.5 rounded-[5px] pl-1 pr-1 text-[11px] font-medium text-muted hover:bg-hover"
         onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
         {editing ? (
           <div className="flex min-w-0 flex-1 items-center gap-1">
-            <ChevronDown size={11} className="shrink-0 text-faint" />
+            <ChevronDown size={10} className="shrink-0 text-dim" />
             <RenameInput initial={team.name} onSave={rename} onDone={() => setEditing(false)} />
           </div>
         ) : (
@@ -141,13 +141,13 @@ function TeamSection({ node, project, team, agents, showProject }: { node: NodeV
             onClick={() => setOpen(!open)} onDoubleClick={() => setEditing(true)}
             onKeyDown={(e) => { if (e.key === 'F2') { e.preventDefault(); setEditing(true); } }}
             title={`${team.name} · ${project.name}${team.branch ? ` · ${team.branch}` : ''} · double-click to rename`}>
-            {open ? <ChevronDown size={11} className="shrink-0 text-faint" /> : <ChevronRight size={11} className="shrink-0 text-faint" />}
+            {open ? <ChevronDown size={10} className="shrink-0 text-dim" /> : <ChevronRight size={10} className="shrink-0 text-dim" />}
             <span className="truncate">{team.name}</span>
-            {showProject && <span className="shrink-0 truncate text-[11px] text-faint">· {project.name}</span>}
+            {showProject && <span className="shrink-0 truncate font-normal text-dim">· {project.name}</span>}
           </button>
         )}
         {!editing && (
-          <span className="pr-1 font-mono text-[9.5px] text-faint group-hover:hidden group-focus-within:hidden" title={`${agents.length} agents${working ? `, ${working} working` : ''}`}>
+          <span className="pr-1 font-mono text-[9.5px] text-dim group-hover:hidden group-focus-within:hidden" title={`${agents.length} agents${working ? `, ${working} working` : ''}`}>
             {agents.length || ''}
           </span>
         )}
@@ -170,7 +170,7 @@ function TeamSection({ node, project, team, agents, showProject }: { node: NodeV
       {open && agents.length === 0 && (
         <button
           data-nav data-level={3} data-label="New agent"
-          className="flex h-[26px] w-full items-center gap-2 pl-[28px] text-[11px] text-faint outline-none hover:bg-hover hover:text-secondary focus-visible:bg-hover cursor-pointer"
+          className="flex h-6 w-full items-center gap-1.5 rounded-[5px] pl-[22px] text-[10.5px] text-dim outline-none hover:bg-hover hover:text-secondary focus-visible:bg-hover cursor-pointer"
           onClick={newAgent}
         >
           <Plus size={12} /> New agent
@@ -208,7 +208,7 @@ function RenameInput({ initial, onSave, onDone }: { initial: string; onSave(name
           if (e.key === 'Escape') { e.preventDefault(); onDone(); }
         }}
         onBlur={() => (error ? onDone() : void commit())}
-        className={cn('h-5 w-full rounded-[3px] border bg-inset px-1.5 text-[12px] text-primary outline-none', error ? 'border-danger' : 'border-control-hover')}
+        className={cn('h-5 w-full rounded-[3px] border bg-inset px-1.5 text-[11px] text-primary outline-none', error ? 'border-danger' : 'border-control-hover')}
       />
       {error && <div className="pt-0.5 text-[9.5px] leading-tight text-danger">{error}</div>}
     </div>
@@ -233,7 +233,7 @@ function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
   const refreshing = useRefreshing(sel);
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const indent = 'pl-[28px]';
+  const indent = 'pl-[22px]';
   const running = agent.status === 'working' || agent.status === 'starting' || agent.status === 'idle' || agent.status === 'rotating';
 
   const rename = (name: string) => client(nodeKey).patch(`/agents/${agent.id}`, { name }).then(() => {});
@@ -244,7 +244,7 @@ function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
 
   if (editing) {
     return (
-      <div className={cn('flex min-h-[26px] w-full items-center gap-2.5 pr-3', indent, focused && 'bg-control')}>
+      <div className={cn('flex min-h-[30px] w-full items-center gap-2 rounded-[5px] pr-2', indent, focused && 'bg-control')}>
         <StatusDot status={agent.status} />
         <RenameInput initial={agent.name} onSave={rename} onDone={() => setEditing(false)} />
       </div>
@@ -269,18 +269,17 @@ function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
         title="Click to open · ⌘-click for a split · double-click or F2 to rename · right-click for more"
         aria-current={focused ? 'true' : undefined}
         className={cn(
-          'relative flex w-full items-center gap-2.5 py-[5px] pr-3 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent cursor-pointer', indent,
+          'relative flex w-full items-center gap-2 rounded-[5px] py-[5px] pr-2 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent cursor-pointer', indent,
           focused ? 'bg-control text-primary' : visible ? 'bg-hover text-primary' : 'text-secondary hover:bg-hover hover:text-primary',
         )}
       >
-        {focused && <span className="absolute inset-y-0 left-0 w-px bg-accent" aria-hidden />}
         <StatusDot status={agent.status} />
         <span className="min-w-0">
-          <span className="block truncate text-[12.5px] font-medium leading-[17px]">{agent.name}</span>
-          <span className="block truncate text-[10.5px] leading-[14px] text-faint">{agent.role || agent.model}</span>
+          <span className="block truncate text-[11px] leading-[15px]">{agent.name}</span>
+          <span className="block truncate text-[10.5px] leading-[14px] text-dim">{agent.role || agent.model}</span>
         </span>
         {refreshing && <RefreshCw size={10} className="shrink-0 animate-spin text-rotating [animation-duration:2s]" aria-label="refreshing" />}
-        {agent.queued > 0 && <span className="ml-auto font-mono text-[9.5px] text-faint" title={`${agent.queued} queued`}>{agent.queued}</span>}
+        {agent.queued > 0 && <span className="ml-auto font-mono text-[9.5px] text-dim" title={`${agent.queued} queued`}>{agent.queued}</span>}
       </button>
       {menu && (
         <ContextMenu menu={menu} onClose={() => setMenu(null)} items={[

@@ -13,7 +13,7 @@ export function ServersSidebarEntry() {
   if (!isElectron) return null;
   return (
     <button
-      className="flex h-8 shrink-0 items-center gap-2 border-t border-border-subtle px-3 text-[11px] text-faint hover:bg-hover hover:text-secondary cursor-pointer"
+      className="flex h-8 shrink-0 items-center gap-2 border-t border-border-subtle px-3 text-[10.5px] text-faint hover:bg-hover hover:text-secondary cursor-pointer"
       title="Servers: add, connect, deploy and update"
       onClick={() => setUi({ servers: true })}
     >

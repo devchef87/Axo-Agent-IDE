@@ -31,6 +31,7 @@
   --text-secondary: #d6dde1;  /* off-white: body and normal UI text */
   --text-muted: #b8c5cb;
   --text-faint: #b0bec5;
+  --text-dim: #8a9ba4;      /* secondary metadata (roles): quiet on purpose, ≥4.4:1 on the sidebar */
   --accent: #28ACE6;
   --accent-hover: #4cc0f0;
   --accent-fg: #0d1b22;
@@ -74,6 +75,7 @@
   --text-secondary: #404040;
   --text-muted: #555555;
   --text-faint: #636363;
+  --text-dim: #6b6b6b;
   --accent: #0a0a0a;
   --accent-hover: #000000;
   --accent-fg: #ffffff;
@@ -133,6 +135,7 @@
   --color-control: var(--control);
   --color-control-hover: var(--control-hover);
   --color-terminal: var(--terminal);
+  --color-dim: var(--text-dim);
   --color-border: var(--border);
   --color-border-subtle: var(--border-subtle);
   --color-border-strong: var(--border-strong);
