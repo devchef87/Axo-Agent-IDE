@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Agent, EventEnvelope, FeedItem, FeedPage, NodeState, Project, Team } from '@axo/protocol';
 import { NodeClient, type ConnStatus } from '../lib/client.ts';
-import { discoverNodes, type NodeConn } from '../lib/bridge.ts';
+import { bridge, discoverNodes, type NodeConn } from '../lib/bridge.ts';
 import * as L from '../lib/layout.ts';
 import type { Layout, Selection } from '../lib/layout.ts';
 
@@ -43,6 +43,7 @@ interface AxoState {
     refresh: Selection | null;  // refresh dialog target
     fork: Selection | null;     // fork dialog target
     context: { nodeKey: string; projectId: string } | null; // project map + decisions
+    servers: boolean; // Settings → Servers
   };
 
   init(): Promise<void>;
@@ -102,6 +103,10 @@ export const useAxo = create<AxoState>((set, get) => {
     // Node restarted or gap too large: refetch any feeds we had loaded.
     for (const fk of Object.keys(get().feeds)) {
       if (fk.startsWith(key + ':')) void get().loadFeed(key, fk.slice(key.length + 1));
+    }
+    // Panes restored from localStorage for a node that connected after startup (e.g. a remote server).
+    for (const p of get().layout.panes) {
+      if (p?.nodeKey === key && !get().feeds[feedKey(key, p.agentId)]?.loaded) void get().loadFeed(key, p.agentId);
     }
   };
 
@@ -181,6 +186,42 @@ export const useAxo = create<AxoState>((set, get) => {
       nodes: { ...s.nodes, [conn.key]: { key: conn.key, name: conn.name, status: 'connecting', projects: [], teams: [], agents: [] } },
       nodeOrder: [...s.nodeOrder, conn.key],
     }));
+    startClient(conn);
+  };
+
+  const removeNode = (key: string) => {
+    clients.get(key)?.stop();
+    clients.delete(key);
+    set((s) => {
+      const nodes = { ...s.nodes };
+      delete nodes[key];
+      const feeds = Object.fromEntries(Object.entries(s.feeds).filter(([fk]) => !fk.startsWith(key + ':')));
+      return { nodes, feeds, nodeOrder: s.nodeOrder.filter((k) => k !== key) };
+    });
+    // Disconnected/removed on purpose: close its panes.
+    let layout = get().layout;
+    for (const p of layout.panes) if (p?.nodeKey === key) layout = L.dropAgent(layout, p);
+    setLayout(layout);
+  };
+
+  /** Main process says the node set changed (server connected/disconnected, tunnel port moved, local node restarted). */
+  const syncNodes = (conns: NodeConn[]) => {
+    const keys = new Set(conns.map((c) => c.key));
+    for (const key of get().nodeOrder) if (!keys.has(key)) removeNode(key);
+    for (const conn of conns) {
+      const c = clients.get(conn.key);
+      if (!c) { addNode(conn); continue; }
+      if (c.conn.baseUrl !== conn.baseUrl || c.conn.token !== conn.token) {
+        c.stop(); // keep the node's data; the new client refetches state on connect
+        clients.delete(conn.key);
+        startClient(conn);
+      }
+      if (get().nodes[conn.key]?.name !== conn.name) patchNode(conn.key, () => ({ name: conn.name }));
+    }
+    set({ nodeOrder: conns.map((c) => c.key) });
+  };
+
+  const startClient = (conn: NodeConn) => {
     const c = new NodeClient(conn, {
       onState: (st) => onState(conn.key, st),
       onEvent: (ev) => onEvent(conn.key, ev),
@@ -197,9 +238,10 @@ export const useAxo = create<AxoState>((set, get) => {
     layout: loadLayout(),
     refreshing: {},
     journalRev: {},
-    ui: { newAgent: null, addProject: null, palette: false, drawer: false, refresh: null, fork: null, context: null },
+    ui: { newAgent: null, addProject: null, palette: false, drawer: false, refresh: null, fork: null, context: null, servers: false },
 
     async init() {
+      bridge?.onNodesChanged(syncNodes);
       for (const conn of await discoverNodes()) addNode(conn);
       for (const p of get().layout.panes) if (p && clients.has(p.nodeKey)) void get().loadFeed(p.nodeKey, p.agentId);
     },

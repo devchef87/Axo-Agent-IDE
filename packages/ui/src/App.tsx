@@ -11,6 +11,7 @@ import { AddProjectDialog, ForkDialog, NewAgentDialog, RefreshDialog } from './c
 import { ProjectContextDialog } from './components/project-context.tsx';
 import { cn, ConnDot, formatTokens } from './components/ui.tsx';
 import { useTheme, type ThemePref } from './lib/theme.ts';
+import { ServersPanel } from './components/servers/servers-panel.tsx';
 
 export function App() {
   const init = useAxo((s) => s.init);
@@ -33,6 +34,7 @@ export function App() {
       <ForkDialog />
       <ProjectContextDialog />
       <CommandPalette />
+      <ServersPanel />
     </div>
   );
 }

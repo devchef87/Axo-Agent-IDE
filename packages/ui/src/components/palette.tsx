@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { BookOpen, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Search, Sun, X, type LucideIcon } from 'lucide-react';
+import { BookOpen, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Search, Server, Sun, X, type LucideIcon } from 'lucide-react';
 import type { AgentStatus } from '@axo/protocol';
 import { focusedSel, useAxo } from '../stores/store.ts';
 import { useTheme, type ThemePref } from '../lib/theme.ts';
 import { fuzzyFilter } from '../lib/fuzzy.ts';
 import { openNewAgent, toggleDrawer } from '../lib/actions.ts';
+import { isElectron } from '../lib/bridge.ts';
 import { cn, Kbd, StatusDot, useModalFocus } from './ui.tsx';
 
 interface Command {
@@ -78,6 +79,7 @@ function useCommands(open: boolean): Command[] {
     for (const p of ['system', 'light', 'dark'] as ThemePref[]) {
       if (p !== pref) out.push({ id: `theme:${p}`, group: 'Actions', label: `Theme: ${p[0].toUpperCase()}${p.slice(1)}`, icon: THEME_ICON[p], run: () => useTheme.getState().setPref(p) });
     }
+    if (isElectron) out.push({ id: 'servers', group: 'Actions', label: 'Servers…', detail: 'Add, deploy and connect remote servers', icon: Server, run: () => s.setUi({ servers: true }) });
     const f = focusedSel(s);
     const fa = f ? nodes[f.nodeKey]?.agents.find((a) => a.id === f.agentId) : undefined;
     if (f && fa) {

@@ -9,9 +9,9 @@ import { join } from 'node:path';
 export const LOCAL_PORT = Number(process.env.AXO_PORT) || 31500;
 const HOME = process.env.AXO_HOME || join(homedir(), '.axo');
 
-export interface LocalNode { baseUrl: string; token: string; version: string }
+export interface LocalNode { baseUrl: string; token: string; version: string; build: string }
 
-async function health(baseUrl: string, token: string): Promise<{ version: string } | null> {
+async function health(baseUrl: string, token: string): Promise<{ version: string; build?: string } | null> {
   try {
     const r = await fetch(`${baseUrl}/api/version`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(1500) });
     return r.ok ? ((await r.json()) as { version: string }) : null;
@@ -45,7 +45,7 @@ export async function ensureLocalNode(bundlePath: string): Promise<LocalNode> {
   let token = readToken();
   if (token) {
     const h = await health(baseUrl, token);
-    if (h) return { baseUrl, token, version: h.version };
+    if (h) return { baseUrl, token, version: h.version, build: h.build ?? 'unknown' };
   }
 
   if (!existsSync(bundlePath)) throw new Error(`Axo node bundle missing at ${bundlePath} — run npm run build`);
@@ -65,7 +65,7 @@ export async function ensureLocalNode(bundlePath: string): Promise<LocalNode> {
     token = token ?? readToken();
     if (!token) continue;
     const h = await health(baseUrl, token);
-    if (h) return { baseUrl, token, version: h.version };
+    if (h) return { baseUrl, token, version: h.version, build: h.build ?? 'unknown' };
   }
   throw new Error(`Local Axo node did not start. See ${join(HOME, 'logs', 'node.log')}`);
 }
