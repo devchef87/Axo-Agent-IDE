@@ -27,9 +27,17 @@ for d in "$HOME/.local/bin" "$HOME/.npm-global/bin" "$HOME/.volta/bin" "$HOME/.b
   [ -n "$d" ] && [ -d "$d" ] && case ":$PATH:" in *":$d:"*) ;; *) PATH="$PATH:$d" ;; esac
 done
 export PATH
-kv path "$PATH"
 NODE=$(command -v node 2>/dev/null)
+# The default node may be too old for Axo (node:sqlite needs 22.5+) while a newer one sits beside it
+# (e.g. nvm default 20, plus 22 installed for Axo). Prefer PATH's node if new enough, else the newest that is.
+okv() { "$1" -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=5)?0:1)' 2>/dev/null; }
+if [ -z "$NODE" ] || ! okv "$NODE"; then
+  for n in $(ls -d "$HOME"/.nvm/versions/node/v*/bin/node "$HOME"/.volta/bin/node /usr/local/bin/node /usr/bin/node 2>/dev/null | sort -rV); do
+    if [ -x "$n" ] && okv "$n"; then NODE="$n"; PATH="$(dirname "$n"):$PATH"; export PATH; break; fi
+  done
+fi
 kv node "$NODE"
+kv path "$PATH"
 [ -n "$NODE" ] && kv node_version "$("$NODE" --version 2>&1)"
 CL=$(command -v claude 2>/dev/null)
 kv claude "$CL"
