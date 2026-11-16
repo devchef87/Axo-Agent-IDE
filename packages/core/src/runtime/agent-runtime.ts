@@ -203,6 +203,19 @@ export class AgentRuntime extends EventEmitter {
     return this.view(agent);
   }
 
+  /**
+   * [core2] Point a not-yet-started agent at another directory (its own worktree). Only before the
+   * first session: claude keys sessions by cwd, so moving later would break --resume.
+   */
+  setWorkdir(id: string, workdir: string): Agent {
+    const a = this.get(id);
+    if (a.sessionId || this.live.has(id)) throw new HttpError(409, 'workdir can only be set before the agent first runs');
+    a.workdir = workdir;
+    this.store.saveAgent(a);
+    this.emitAgent(a);
+    return this.view(a);
+  }
+
   update(id: string, req: UpdateAgentReq): Agent {
     const a = this.get(id);
     if (req.name !== undefined && req.name !== a.name) {
