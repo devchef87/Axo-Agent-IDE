@@ -6,7 +6,7 @@ import { bridge } from '../lib/bridge.ts';
 import { Button, Field, inputCls, Modal } from './ui.tsx';
 
 const ROLES = ['fullstack', 'backend', 'frontend', 'devops', 'testing', 'research', 'docs'];
-const MODELS = [
+export const MODELS = [
   { id: 'opus', label: 'Opus (latest)' },
   { id: 'sonnet', label: 'Sonnet (latest)' },
   { id: 'haiku', label: 'Haiku (latest)' },
@@ -17,6 +17,9 @@ export function NewAgentDialog() {
   const setUi = useAxo((s) => s.setUi);
   const client = useAxo((s) => s.client);
   const select = useAxo((s) => s.select);
+  const nodes = useAxo((s) => s.nodes);
+  const nodeOrder = useAxo((s) => s.nodeOrder);
+  const [dest, setDest] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('fullstack');
   const [model, setModel] = useState('opus');
@@ -24,20 +27,22 @@ export function NewAgentDialog() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { if (target) { setName(''); setTask(''); setError(null); } }, [target]);
+  useEffect(() => { if (target) { setName(''); setTask(''); setError(null); setDest(`${target.nodeKey}|${target.projectId}`); } }, [target]);
   const close = () => setUi({ newAgent: null });
+  const projects = nodeOrder.flatMap((k) => nodes[k].projects.map((p) => ({ value: `${k}|${p.id}`, label: nodeOrder.length > 1 ? `${nodes[k].name} / ${p.name}` : p.name })));
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!target) return;
+    const [nodeKey, projectId] = dest.split('|');
+    if (!target || !nodeKey || !projectId || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const agent = await client(target.nodeKey).post<Agent>('/agents', {
-        projectId: target.projectId, name: name.trim() || undefined, role, model, task: task.trim() || undefined,
+      const agent = await client(nodeKey).post<Agent>('/agents', {
+        projectId, name: name.trim() || undefined, role, model, task: task.trim() || undefined,
       });
       close();
-      select({ nodeKey: target.nodeKey, agentId: agent.id });
+      select({ nodeKey, agentId: agent.id });
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -58,11 +63,18 @@ export function NewAgentDialog() {
             </select>
           </Field>
         </div>
-        <Field label="Model">
-          <select className={inputCls} value={model} onChange={(e) => setModel(e.target.value)}>
-            {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-          </select>
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Project">
+            <select className={inputCls} value={dest} onChange={(e) => setDest(e.target.value)}>
+              {projects.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Model">
+            <select className={inputCls} value={model} onChange={(e) => setModel(e.target.value)}>
+              {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          </Field>
+        </div>
         <Field label="Task" hint="Optional — sent as the first message. ⌘Enter to create.">
           <textarea
             className={inputCls + ' min-h-24 resize-y'}

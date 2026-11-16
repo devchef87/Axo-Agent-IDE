@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, FolderPlus, Plus, Server, Trash2 } from 'lucide-react';
 import type { Agent, Project } from '@axo/protocol';
-import { useAxo, type NodeView } from '../stores/store.ts';
+import { focusedSel, useAxo, type NodeView } from '../stores/store.ts';
+import { sameSel } from '../lib/layout.ts';
+import { endAgentDrag, startAgentDrag } from '../lib/dnd.ts';
 import { cn, ConnDot, IconButton, StatusDot } from './ui.tsx';
 
 export function Sidebar() {
@@ -28,7 +30,7 @@ function NodeSection({ node }: { node: NodeView }) {
           <span className="truncate">{node.name}</span>
           <ConnDot status={node.status} />
         </button>
-        <IconButton title="Add project" className="opacity-0 group-hover:opacity-100" onClick={() => setUi({ addProject: node.key })}>
+        <IconButton title="Add project" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setUi({ addProject: node.key })}>
           <FolderPlus size={13} />
         </IconButton>
       </div>
@@ -69,8 +71,8 @@ function ProjectSection({ node, project }: { node: NodeView; project: Project })
           {open ? <ChevronDown size={12} className="text-faint" /> : <ChevronRight size={12} className="text-faint" />}
           <span className="truncate font-medium">{project.name}</span>
         </button>
-        <IconButton title="Remove project" className="opacity-0 group-hover:opacity-100" onClick={remove}><Trash2 size={12} /></IconButton>
-        <IconButton title="New agent" className="opacity-0 group-hover:opacity-100" onClick={() => setUi({ newAgent: { nodeKey: node.key, projectId: project.id } })}>
+        <IconButton title="Remove project" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={remove}><Trash2 size={12} /></IconButton>
+        <IconButton title="New agent" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setUi({ newAgent: { nodeKey: node.key, projectId: project.id } })}>
           <Plus size={13} />
         </IconButton>
       </div>
@@ -88,19 +90,29 @@ function ProjectSection({ node, project }: { node: NodeView; project: Project })
 }
 
 function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
-  const selected = useAxo((s) => s.selected?.nodeKey === nodeKey && s.selected.agentId === agent.id);
+  const sel = { nodeKey, agentId: agent.id };
+  const focused = useAxo((s) => sameSel(focusedSel(s), sel));
+  // Shown in some other pane (not the focused one).
+  const visible = useAxo((s) => s.layout.panes.some((p) => sameSel(p, sel)));
   const select = useAxo((s) => s.select);
+  const openInSplit = useAxo((s) => s.openInSplit);
   return (
     <button
-      onClick={() => select({ nodeKey, agentId: agent.id })}
+      draggable
+      onDragStart={(e) => startAgentDrag(e, sel, agent.name)}
+      onDragEnd={endAgentDrag}
+      onClick={(e) => (e.metaKey || e.ctrlKey ? openInSplit : select)(sel)}
+      title="Click to open · ⌘-click to open in a split · drag into a pane"
+      aria-current={focused ? 'true' : undefined}
       className={cn(
-        'flex h-7 w-full items-center gap-2 pl-9 pr-3 text-left text-[13px] cursor-pointer',
-        selected ? 'bg-accent/12 text-primary' : 'text-muted hover:bg-hover hover:text-secondary',
+        'relative flex h-7 w-full items-center gap-2 pl-9 pr-3 text-left text-[13px] cursor-pointer',
+        focused ? 'bg-accent/12 text-primary' : visible ? 'bg-hover text-secondary' : 'text-muted hover:bg-hover hover:text-secondary',
       )}
     >
+      {focused && <span className="absolute inset-y-1 left-0 w-0.5 rounded-r bg-accent" aria-hidden />}
       <StatusDot status={agent.status} />
       <span className="truncate">{agent.name}</span>
-      {agent.queued > 0 && <span className="ml-auto rounded bg-control px-1 text-2xs text-muted">{agent.queued}</span>}
+      {agent.queued > 0 && <span className="ml-auto rounded bg-control px-1 text-2xs text-secondary" title={`${agent.queued} queued`}>{agent.queued}</span>}
     </button>
   );
 }
