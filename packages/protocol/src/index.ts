@@ -78,6 +78,7 @@ export type FeedItem =
       durationMs?: number;
     })
   | (FeedBase & { kind: 'system'; level: 'info' | 'warn' | 'error'; text: string })
+  | (FeedBase & { kind: 'rotation'; generation: number; reason: string; note: string | null }) // context refresh divider
   | (FeedBase & {
       kind: 'turn';
       isError: boolean;
@@ -101,7 +102,12 @@ export type NodeEvent =
   | { type: 'agent:removed'; agentId: string }
   | { type: 'agent:feed'; agentId: string; item: FeedItem } // upsert by item.id
   | { type: 'agent:text-delta'; agentId: string; itemId: string; text: string }
-  | { type: 'rate-limit'; info: Record<string, unknown> };
+  | { type: 'rate-limit'; info: Record<string, unknown> }
+  // ── journalist + rotation (Phase 3) ──
+  | { type: 'journalist:updated'; projectId: string; agentId: string | null; doc: 'state' | 'map' | 'decisions' }
+  | { type: 'rotation:started'; agentId: string; reason: string }
+  | { type: 'rotation:completed'; agentId: string; generation: number }
+  | { type: 'rotation:aborted'; agentId: string; reason: string };
 
 export type EventEnvelope = NodeEvent & { seq: number; ts: number; nodeId: string };
 
@@ -134,3 +140,14 @@ export interface MessageReq { text: string; author?: string }
 export interface FeedPage { items: FeedItem[]; hasMore: boolean }
 export interface EventsPage { events: EventEnvelope[]; reset: boolean; seq: number; epoch: number }
 export interface FsEntry { name: string; path: string; dir: boolean }
+
+// ── journalist + rotation (Phase 3) ─────────────────────────
+
+/** POST /agents/:id/refresh — fresh context, same agent/identity/chat. */
+export interface RefreshReq { note?: string; mode?: 'interview' | 'journalist' }
+/** POST /agents/:id/fork — new agent in the same team, seeded with this agent's state. */
+export interface ForkReq { name?: string; task?: string }
+/** GET/POST /agents/:id/state */
+export interface StateDoc { text: string; updatedAt: number }
+/** GET /projects/:id/context */
+export interface ProjectContext { map: string; decisions: string }

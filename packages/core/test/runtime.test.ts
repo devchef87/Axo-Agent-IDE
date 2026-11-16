@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { makeNode, type TestNode } from './helpers.ts';
 
 let t: TestNode;
-afterEach(async () => { await t?.stop(); });
+afterEach(async () => { await t?.stop(); t = undefined as any; });
 
 const lastText = (t: TestNode, id: string) =>
   t.feed(id).filter((i) => i.kind === 'text').map((i) => (i as any).text).at(-1);
@@ -17,7 +17,7 @@ describe('agent runtime', () => {
     await t.waitFor(() => t.node.runtime.get(a.id).status === 'idle');
     t.node.runtime.deliver(a.id, 'RECALL');
     await t.waitFor(() => lastText(t, a.id) === 'prior=1');
-    assert.equal(t.spawns().length, 1, 'one process for both turns');
+    assert.equal(t.spawns().filter((s) => s.args.includes('--input-format')).length, 1, 'one process for both turns');
     const agent = t.node.runtime.get(a.id);
     assert.equal(agent.id, a.id);
     assert.ok(agent.contextTokens > 0);
@@ -35,7 +35,7 @@ describe('agent runtime', () => {
     await t.waitFor(() => lastText(t, a.id)?.includes('[from backend-1] three'));
     const text = lastText(t, a.id)!;
     assert.match(text, /^echo: two\n\n---\n\n\[from backend-1\] three$/);
-    assert.equal(t.spawns().length, 1);
+    assert.equal(t.spawns().filter((s) => s.args.includes('--input-format')).length, 1);
   });
 
   it('pairs tool_use with tool_result in the feed', async () => {
@@ -63,7 +63,7 @@ describe('agent runtime', () => {
     assert.equal(turn.isError, false);
     t.node.runtime.deliver(a.id, 'after');
     await t.waitFor(() => lastText(t, a.id) === 'echo: after');
-    assert.equal(t.spawns().length, 1);
+    assert.equal(t.spawns().filter((s) => s.args.includes('--input-format')).length, 1);
   });
 
   it('falls back to killing the process when an interrupt is ignored, then resumes', async () => {
@@ -75,7 +75,7 @@ describe('agent runtime', () => {
     await t.waitFor(() => t.node.runtime.get(a.id).status === 'asleep');
     t.node.runtime.deliver(a.id, 'RECALL');
     await t.waitFor(() => lastText(t, a.id) === 'prior=1');
-    const spawns = t.spawns();
+    const spawns = t.spawns().filter((s) => s.args.includes('--input-format'));
     assert.equal(spawns.length, 2);
     assert.ok(spawns[1].args.includes('--resume'));
   });
@@ -95,7 +95,7 @@ describe('agent runtime', () => {
 
     t.node.runtime.deliver(a.id, 'RECALL');
     await t.waitFor(() => lastText(t, a.id) === 'prior=1');
-    const spawns = t.spawns();
+    const spawns = t.spawns().filter((s) => s.args.includes('--input-format'));
     assert.deepEqual(spawns[1].args.slice(spawns[1].args.indexOf('--resume'), spawns[1].args.indexOf('--resume') + 2), ['--resume', sid]);
     assert.equal(t.node.runtime.get(a.id).sessionId, sid);
   });
@@ -109,7 +109,7 @@ describe('agent runtime', () => {
     await t.waitFor(() => lastText(t, a.id)?.startsWith('echo: [from axo] Your previous turn was cut off'));
     const sys = t.feed(a.id).find((i) => i.kind === 'system' && i.level === 'error') as any;
     assert.match(sys.text, /simulated crash/);
-    assert.ok(t.spawns()[1].args.includes('--resume'));
+    assert.ok(t.spawns().filter((s) => s.args.includes('--input-format'))[1].args.includes('--resume'));
   });
 
   it('enters error state after repeated crashes instead of looping', async () => {
@@ -145,7 +145,7 @@ describe('agent runtime', () => {
     await t.waitFor(() => t.node.runtime.get(a.id).status === 'asleep', 3000);
     t.node.runtime.deliver(a.id, 'RECALL');
     await t.waitFor(() => lastText(t, a.id) === 'prior=1');
-    assert.equal(t.spawns().length, 2);
+    assert.equal(t.spawns().filter((s) => s.args.includes('--input-format')).length, 2);
   });
 
   it('passes identity env and strips inherited agent env', async () => {
@@ -154,7 +154,7 @@ describe('agent runtime', () => {
     const p = t.node.projects.create(t.project);
     const a = t.node.runtime.create({ projectId: p.id, task: 'x' });
     await t.waitFor(() => t.node.runtime.get(a.id).status === 'idle');
-    assert.equal(t.spawns()[0].env.AXO_AGENT_ID, a.id);
+    assert.equal(t.spawns().filter((s) => s.args.includes('--input-format'))[0].env.AXO_AGENT_ID, a.id);
     delete process.env.GROOVE_AGENT_ID;
   });
 

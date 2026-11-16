@@ -5,7 +5,7 @@ import type { EventEnvelope, NodeState } from '@axo/protocol';
 import { makeNode, type TestNode } from './helpers.ts';
 
 let t: TestNode;
-afterEach(async () => { await t?.stop(); });
+afterEach(async () => { await t?.stop(); t = undefined as any; });
 
 const base = () => `http://127.0.0.1:${t.node.cfg.port}/api`;
 const call = async (path: string, init: RequestInit = {}, token = t.node.cfg.token) => {

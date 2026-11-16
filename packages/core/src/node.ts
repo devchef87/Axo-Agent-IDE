@@ -8,6 +8,9 @@ import { Projects } from './projects.ts';
 import { AgentRuntime, type RuntimeOptions } from './runtime/agent-runtime.ts';
 import { startServer } from './api/server.ts';
 import { buildRouter } from './api/routes.ts';
+import { Headless } from './journalist/headless.ts';
+import { Journalist, type JournalistOptions } from './journalist/journalist.ts';
+import { Rotator, type RotationConfig } from './rotation/rotator.ts';
 
 /** One Axo node: store + runtime + API. Same code locally and on servers. */
 export class Node {
@@ -16,18 +19,32 @@ export class Node {
   readonly bus: EventBus;
   readonly projects: Projects;
   readonly runtime: AgentRuntime;
+  readonly headless: Headless;
+  readonly journalist: Journalist;
+  readonly rotator: Rotator;
   private server: Server | null = null;
 
-  constructor(overrides: Partial<NodeConfig> = {}, runtimeOpts: RuntimeOptions = {}, dbFile?: string) {
+  constructor(
+    overrides: Partial<NodeConfig> = {},
+    runtimeOpts: RuntimeOptions = {},
+    dbFile?: string,
+    extra: { journalist?: JournalistOptions; rotation?: Partial<RotationConfig> } = {},
+  ) {
     this.cfg = loadConfig(overrides);
     this.store = new Store(this.cfg.home, dbFile);
     this.bus = new EventBus(this.cfg.nodeId);
     this.projects = new Projects(this.store, this.bus);
     this.runtime = new AgentRuntime(this.store, this.bus, this.cfg, this.projects, runtimeOpts);
+    this.headless = new Headless(this.cfg);
+    this.journalist = new Journalist(this.runtime, this.store, this.bus, this.headless, extra.journalist);
+    this.rotator = new Rotator(this.runtime, this.journalist, this.headless, this.bus, this.cfg, extra.rotation);
+    this.runtime.on('renamed', ({ agent, from }) => this.journalist.renameAgent(agent, from));
   }
 
   async start(): Promise<void> {
     this.runtime.startup();
+    this.journalist.start();
+    this.rotator.start();
     this.server = await startServer(this.cfg, this.bus, buildRouter(this), () => ({
       type: 'hello', nodeId: this.cfg.nodeId, version: VERSION, seq: this.bus.currentSeq, epoch: this.bus.epoch,
       ts: Date.now(),
@@ -38,6 +55,8 @@ export class Node {
   }
 
   async stop(): Promise<void> {
+    this.rotator.stop();
+    this.journalist.stop();
     await this.runtime.shutdown();
     await new Promise<void>((res) => (this.server ? this.server.close(() => res()) : res()));
     this.server?.closeAllConnections?.();

@@ -22,7 +22,7 @@ export interface TestNode {
   stop(): Promise<void>;
 }
 
-export async function makeNode(opts: RuntimeOptions = {}, extra: Record<string, unknown> = {}): Promise<TestNode> {
+export async function makeNode(opts: RuntimeOptions = {}, extra: Record<string, unknown> = {}, nodeExtra: ConstructorParameters<typeof Node>[3] = {}): Promise<TestNode> {
   const root = mkdtempSync(join(tmpdir(), 'axo-test-'));
   const home = join(root, 'home');
   const project = join(root, 'project');
@@ -31,7 +31,7 @@ export async function makeNode(opts: RuntimeOptions = {}, extra: Record<string, 
   mkdirSync(fakeDir, { recursive: true });
   process.env.FAKE_CLAUDE_DIR = fakeDir;
 
-  const mk = () => new Node({ home, port: 0, claudeBin: FAKE_CLAUDE, idleReapMs: 60_000, ...extra }, opts);
+  const mk = () => new Node({ home, port: 0, claudeBin: FAKE_CLAUDE, idleReapMs: 60_000, ...extra }, opts, undefined, { journalist: { debounceMs: 60_000, ...nodeExtra?.journalist }, rotation: nodeExtra?.rotation });
   const t: TestNode = {
     node: mk(),
     home, project, fakeDir,

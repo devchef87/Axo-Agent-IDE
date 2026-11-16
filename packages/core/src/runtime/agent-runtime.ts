@@ -8,7 +8,8 @@ import type { NodeConfig } from '../config.ts';
 import type { Projects } from '../projects.ts';
 import { ClaudeProcess } from './claude-process.ts';
 import { parseLine, ParseContext, contextWindowFor, type Action } from './parser.ts';
-import { buildSystemPrompt } from './system-prompt.ts';
+import { buildSystemPrompt, type PromptExtras } from './system-prompt.ts';
+import type { SpawnSpec } from './claude-process.ts';
 import { ulid } from '../util/ulid.ts';
 import { HttpError } from '../util/http-error.ts';
 
@@ -45,7 +46,12 @@ export interface TurnEndEvent {
   interrupted: boolean;
   /** Messages that started this turn. */
   inputs: { text: string; author: string }[];
+  /** Fresh tokens (input + output + cache creation) used by this turn. */
+  freshTokens: number;
+  startedAt: number;
 }
+
+export type ContextProvider = (agent: Agent) => PromptExtras;
 
 export interface RuntimeOptions {
   interruptGraceMs?: number;   // wait for control_request interrupt before SIGINT
@@ -56,6 +62,14 @@ export interface RuntimeOptions {
 const DEFAULT_MODEL = 'opus';
 const STRIP_ENV = /^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CLAUDE_CODE_SSE_PORT|CLAUDE_AGENT_SDK_VERSION|GROOVE_.*|AXO_.*)$/;
 
+/** Clean environment for any claude child process (no inherited agent identity, subscription auth by default). */
+export function claudeEnv(cfg: { authMode: 'subscription' | 'api' }): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(process.env)) if (!STRIP_ENV.test(k)) env[k] = v;
+  if (cfg.authMode === 'subscription') delete env.ANTHROPIC_API_KEY;
+  return env;
+}
+
 export class AgentRuntime extends EventEmitter {
   private readonly agents = new Map<string, Agent>();
   private readonly live = new Map<string, Live>();
@@ -63,6 +77,10 @@ export class AgentRuntime extends EventEmitter {
   private readonly crashes = new Map<string, number[]>();
   private readonly idleTimers = new Map<string, NodeJS.Timeout>();
   private readonly emitTimers = new Map<string, NodeJS.Timeout>();
+  /** Agents whose queue is held while a rotation swaps processes. */
+  private readonly held = new Set<string>();
+  private readonly idleWaiters = new Map<string, (() => void)[]>();
+  private contextProvider: ContextProvider = () => ({});
   private readonly opts: Required<RuntimeOptions>;
   private readonly store: Store;
   private readonly bus: EventBus;
@@ -121,7 +139,15 @@ export class AgentRuntime extends EventEmitter {
     if (!a) throw new HttpError(404, 'agent not found');
     return a;
   }
-  private view(a: Agent): Agent { return { ...a, queued: this.queues.get(a.id)?.length ?? 0 }; }
+  private view(a: Agent): Agent {
+    return { ...a, status: this.held.has(a.id) ? 'rotating' : a.status, queued: this.queues.get(a.id)?.length ?? 0 };
+  }
+
+  /** Journalist/introducer supply project map, decisions, state doc, handoff for system prompts. */
+  setContextProvider(fn: ContextProvider): void { this.contextProvider = fn; }
+
+  isTurnActive(id: string): boolean { return !!this.live.get(id)?.turnActive; }
+  hasProcess(id: string): boolean { return this.live.has(id); }
 
   // ── CRUD ──────────────────────────────────────────────────
 
@@ -164,7 +190,9 @@ export class AgentRuntime extends EventEmitter {
       const name = req.name.trim();
       if (!/^[\w.-]{1,40}$/.test(name)) throw new HttpError(400, 'invalid name');
       if (this.store.agentNameTaken(a.projectId, name, a.id)) throw new HttpError(409, 'name taken');
+      const from = a.name;
       a.name = name;
+      this.emit('renamed', { agent: a, from });
     }
     // Model/effort/instructions apply on the next process start (system prompt and flags are fixed per process).
     if (req.model !== undefined) { a.model = req.model; a.contextWindow = contextWindowFor(req.model); }
@@ -213,7 +241,7 @@ export class AgentRuntime extends EventEmitter {
     if (!a) return;
     const q = this.queues.get(id);
     const l = this.live.get(id);
-    if (!q?.length || l?.turnActive || a.status === 'rotating' || a.status === 'error') {
+    if (!q?.length || l?.turnActive || this.held.has(id) || a.status === 'error') {
       this.emitAgent(a);
       return;
     }
@@ -262,31 +290,23 @@ export class AgentRuntime extends EventEmitter {
 
   // ── process management ───────────────────────────────────
 
-  private spawn(a: Agent): Live | null {
+  /** Build the claude command for an agent. Used by spawn() and by the rotator's warm-up process. */
+  buildSpawnSpec(a: Agent, opts: { sessionId: string; resume: boolean; extraPrompt?: string }): SpawnSpec | null {
     const project = this.store.getProject(a.projectId);
     const team = this.store.getTeam(a.teamId);
-    if (!project || !team) {
-      this.fail(a, 'project or team missing');
-      return null;
-    }
-
-    const resume = !!a.sessionId && this.store.sessionInitialized(a.sessionId);
-    if (!resume) {
-      a.sessionId = randomUUID();
-      this.store.insertSession(a.sessionId, a.id, a.generation);
-      a.contextTokens = 0;
-      a.sessionTokens = 0;
-      a.compactions = 0;
-    }
-
+    if (!project || !team) return null;
+    let extras: PromptExtras = {};
+    try { extras = this.contextProvider(a); } catch (e) { console.error('[runtime] context provider failed', e); }
+    if (opts.extraPrompt) extras = { ...extras, handoff: opts.extraPrompt };
     const prompt = buildSystemPrompt({
       agent: a, project, team, hostname: this.cfg.hostname,
       teammates: [...this.agents.values()].filter((x) => x.teamId === a.teamId),
+      extras,
     });
     const args = [
       '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
       '--include-partial-messages',
-      resume ? '--resume' : '--session-id', a.sessionId!,
+      opts.resume ? '--resume' : '--session-id', opts.sessionId,
       '--permission-mode', 'bypassPermissions',
       '--disallowedTools', 'AskUserQuestion',
       '--append-system-prompt', prompt,
@@ -294,27 +314,103 @@ export class AgentRuntime extends EventEmitter {
     ];
     if (a.effort) args.push('--effort', a.effort);
 
-    const env: NodeJS.ProcessEnv = {};
-    for (const [k, v] of Object.entries(process.env)) if (!STRIP_ENV.test(k)) env[k] = v;
-    if (this.cfg.authMode === 'subscription') delete env.ANTHROPIC_API_KEY;
+    const env = claudeEnv(this.cfg);
     env.AXO_AGENT_ID = a.id;
     env.AXO_AGENT_NAME = a.name;
     env.AXO_NODE_URL = `http://${this.cfg.host}:${this.cfg.port}`;
     env.AXO_TOKEN = this.cfg.token;
+    return { bin: this.cfg.claudeBin, args, cwd: a.workdir, env };
+  }
 
-    const proc = new ClaudeProcess({ bin: this.cfg.claudeBin, args, cwd: a.workdir, env });
+  private spawn(a: Agent): Live | null {
+    const resume = !!a.sessionId && this.store.sessionInitialized(a.sessionId);
+    const sessionId = resume ? a.sessionId! : randomUUID();
+    const spec = this.buildSpawnSpec(a, { sessionId, resume });
+    if (!spec) {
+      this.fail(a, 'project or team missing');
+      return null;
+    }
+    if (!resume) {
+      a.sessionId = sessionId;
+      this.store.insertSession(sessionId, a.id, a.generation);
+      a.contextTokens = 0;
+      a.sessionTokens = 0;
+      a.compactions = 0;
+    }
+    const live = this.attach(a, new ClaudeProcess(spec));
+    live.proc.start();
+    this.store.setLivePid(a.id, live.proc.pid);
+    a.status = 'starting';
+    if (resume) a.lastError = null;
+    return live;
+  }
+
+  private attach(a: Agent, proc: ClaudeProcess, sawInit = false): Live {
     const live: Live = {
-      proc, ctx: new ParseContext(a.workdir), turnActive: false, turnStartedAt: 0, sawInit: false,
+      proc, ctx: new ParseContext(a.workdir), turnActive: false, turnStartedAt: 0, sawInit,
       interruptRequested: false, interruptTimers: [], ending: null, toolStarts: new Map(), inflight: [], turnText: [],
     };
     this.live.set(a.id, live);
     proc.on('line', (line: string) => this.onLine(a.id, live, line));
     proc.on('exit', (code: number | null, signal: string | null) => this.onExit(a.id, live, code, signal));
-    proc.start();
-    this.store.setLivePid(a.id, proc.pid);
-    a.status = 'starting';
-    if (resume) a.lastError = null;
     return live;
+  }
+
+  // ── rotation support (used by the rotator) ───────────────
+
+  /** Resolve when the agent is between turns (or has no process). */
+  whenIdle(id: string): Promise<void> {
+    if (!this.live.get(id)?.turnActive) return Promise.resolve();
+    return new Promise((res) => {
+      const list = this.idleWaiters.get(id) ?? [];
+      list.push(res);
+      this.idleWaiters.set(id, list);
+    });
+  }
+
+  /** Stop sending queued messages to this agent until release(). Messages keep queueing. */
+  hold(id: string): void { this.held.add(id); const a = this.agents.get(id); if (a) this.emitAgent(a); }
+  release(id: string): void { this.held.delete(id); const a = this.agents.get(id); if (a) { this.emitAgent(a); this.pump(id); } }
+
+  /**
+   * Swap in a warmed-up process (new Claude session) for an agent. The old
+   * process, if any, is ended quietly. Identity, feed, queue and name are kept.
+   */
+  adopt(id: string, proc: ClaudeProcess, sessionId: string, stats: { contextTokens: number; sessionTokens: number }): void {
+    const a = this.get(id);
+    const old = this.live.get(id);
+    if (old) {
+      old.ending = 'sleep';
+      this.live.delete(id); // detach first so its exit is ignored
+      old.proc.endInput();
+      setTimeout(() => old.proc.kill('SIGTERM'), 5000).unref();
+    }
+    if (a.sessionId) this.store.endSession(a.sessionId, 'rotated');
+    a.generation += 1;
+    a.sessionId = sessionId;
+    this.store.insertSession(sessionId, a.id, a.generation);
+    this.store.markSessionInitialized(sessionId);
+    a.contextTokens = stats.contextTokens;
+    a.sessionTokens = stats.sessionTokens;
+    a.compactions = 0;
+    a.status = 'idle';
+    a.lastError = null;
+    this.crashes.delete(id);
+    proc.removeAllListeners('line');
+    proc.removeAllListeners('exit');
+    this.attach(a, proc, true);
+    this.store.setLivePid(id, proc.pid);
+    this.store.saveAgent(a);
+    this.armIdle(id);
+    this.emitAgent(a);
+  }
+
+  /** Append a feed item on behalf of another subsystem (rotation dividers, notices). */
+  postFeed(id: string, item: FeedItem): void { this.addFeed(this.get(id), item); }
+
+  /** Feed items newer than `since` (for journalist / handoff transcripts). */
+  feedSince(id: string, since: number, limit = 400): FeedItem[] {
+    return this.store.feedPage(id, null, limit).items.filter((i) => i.ts > since);
   }
 
   private endProcess(id: string, why: 'sleep' | 'stop' | 'delete'): Promise<void> {
@@ -419,16 +515,25 @@ export class AgentRuntime extends EventEmitter {
     this.emitAgent(a);
     const ev: TurnEndEvent = {
       agentId: a.id, sessionId: a.sessionId, text: live.turnText.join('\n\n'), lastText: live.turnText.at(-1) ?? '',
-      isError: act.isError && !interrupted, interrupted, inputs,
+      isError: act.isError && !interrupted, interrupted, inputs, freshTokens: fresh, startedAt: live.turnStartedAt,
     };
     try { this.emit('turn-end', ev); } catch (e) { console.error('[runtime] turn-end listener failed', e); }
+    this.flushIdleWaiters(a.id);
     this.pump(a.id);
     if (!live.turnActive) this.armIdle(a.id);
+  }
+
+  private flushIdleWaiters(id: string): void {
+    const w = this.idleWaiters.get(id);
+    if (!w) return;
+    this.idleWaiters.delete(id);
+    for (const fn of w) fn();
   }
 
   private onExit(id: string, live: Live, code: number | null, signal: string | null): void {
     if (this.live.get(id) !== live) return;
     this.live.delete(id);
+    this.flushIdleWaiters(id);
     for (const t of live.interruptTimers) clearTimeout(t);
     this.clearIdle(id);
     this.store.setLivePid(id, null);

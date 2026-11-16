@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { homedir } from 'node:os';
-import type { CreateAgentReq, CreateProjectReq, FsEntry, MessageReq, NodeState, UpdateAgentReq } from '@axo/protocol';
+import type { CreateAgentReq, CreateProjectReq, ForkReq, FsEntry, MessageReq, NodeState, ProjectContext, RefreshReq, StateDoc, UpdateAgentReq } from '@axo/protocol';
 import { Router } from './server.ts';
 import type { Node } from '../node.ts';
 import { HttpError } from '../util/http-error.ts';
@@ -9,7 +9,7 @@ import { expandHome } from '../projects.ts';
 import { VERSION } from '../config.ts';
 
 export function buildRouter(node: Node): Router {
-  const { store, bus, runtime, projects, cfg } = node;
+  const { store, bus, runtime, projects, cfg, journalist, rotator } = node;
   const r = new Router();
 
   r.get('/version', () => ({ version: VERSION, nodeId: cfg.nodeId, hostname: cfg.hostname }));
@@ -47,6 +47,32 @@ export function buildRouter(node: Node): Router {
     const before = query.get('before');
     const limit = Math.min(Number(query.get('limit') ?? 200), 1000);
     return store.feedPage(params.id, before ? Number(before) : null, limit);
+  });
+
+  // ── journalist + rotation ──
+  r.post('/agents/:id/refresh', ({ params, body }) => {
+    const b = (body ?? {}) as RefreshReq;
+    runtime.get(params.id);
+    if (rotator.isRotating(params.id)) throw new HttpError(409, 'a refresh is already in progress');
+    void rotator.rotate(params.id, { reason: 'manual', mode: b.mode, note: b.note?.trim() || undefined }).catch(() => {});
+    return { started: true };
+  });
+  r.post('/agents/:id/fork', ({ params, body }) => rotator.fork(params.id, (body ?? {}) as ForkReq));
+  r.get('/agents/:id/state', ({ params }): StateDoc => journalist.readState(runtime.get(params.id)));
+  r.post('/agents/:id/state', ({ params, body }) => {
+    const text = String((body as StateDoc)?.text ?? '');
+    journalist.writeStateManual(runtime.get(params.id), text);
+  });
+  r.get('/projects/:id/context', ({ params }): ProjectContext => {
+    const p = store.getProject(params.id);
+    if (!p) throw new HttpError(404, 'project not found');
+    return journalist.projectContext(p);
+  });
+  r.post('/projects/:id/context/refresh', async ({ params }) => {
+    const p = store.getProject(params.id);
+    if (!p) throw new HttpError(404, 'project not found');
+    await journalist.refreshMap(p);
+    return journalist.projectContext(p);
   });
 
   // ── fs (minimal: directory picker for remote nodes; full file API arrives in phase 4) ──

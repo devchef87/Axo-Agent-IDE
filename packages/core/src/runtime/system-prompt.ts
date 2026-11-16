@@ -1,14 +1,31 @@
 import type { Agent, Project, Team } from '@axo/protocol';
 
+/** Context supplied by the journalist (project map, decisions, live state) and the rotator (handoff). */
+export interface PromptExtras {
+  projectMap?: string;
+  decisions?: string;
+  teamBrief?: string;
+  stateDoc?: string;
+  handoff?: string;
+}
+
 export interface PromptContext {
   agent: Agent;
   project: Project;
   team: Team;
   teammates: Agent[];
   hostname: string;
+  extras?: PromptExtras;
 }
 
-const MAX_PROMPT = 12_000;
+const MAX_PROMPT = 16_000;
+const BUDGET = { projectMap: 3500, decisions: 1500, teamBrief: 1200, stateDoc: 5000, handoff: 6000 };
+
+function clip(s: string | undefined, max: number): string {
+  if (!s?.trim()) return '';
+  const t = s.trim();
+  return t.length > max ? t.slice(0, max) + '\n…(truncated)' : t;
+}
 
 /**
  * Introducer, phase-1 edition: identity + working rules. Phase 3 adds the
@@ -47,6 +64,31 @@ export function buildSystemPrompt(c: PromptContext): string {
     lines.push('');
     lines.push('## Standing instructions from the user');
     lines.push(agent.instructions.trim());
+  }
+
+  const x = c.extras ?? {};
+  const map = clip(x.projectMap, BUDGET.projectMap);
+  const decisions = clip(x.decisions, BUDGET.decisions);
+  const brief = clip(x.teamBrief, BUDGET.teamBrief);
+  const state = clip(x.stateDoc, BUDGET.stateDoc);
+  const handoff = clip(x.handoff, BUDGET.handoff);
+  if (map || decisions || brief) {
+    lines.push('');
+    lines.push('## Project context (maintained by the Axo journalist — trust it, verify details in code when it matters)');
+    if (brief) lines.push('', '### Team brief', brief);
+    if (map) lines.push('', '### Project map', map);
+    if (decisions) lines.push('', '### Recent decisions', decisions);
+  }
+  if (state) {
+    lines.push('');
+    lines.push('## Your working state (from your previous session — this is YOUR work, continue it)');
+    lines.push(state);
+  }
+  if (handoff) {
+    lines.push('');
+    lines.push('## Handoff');
+    lines.push('Your context was refreshed to keep you sharp. The user did not see a break; do not mention it or re-introduce yourself. Continue exactly where this leaves off.');
+    lines.push('', handoff);
   }
 
   const out = lines.join('\n');

@@ -15,6 +15,25 @@ const args = process.argv.slice(2);
 const flag = (n) => { const i = args.indexOf(n); return i === -1 ? null : args[i + 1]; };
 appendFileSync(join(dir, 'spawns.log'), JSON.stringify({ args, pid: process.pid, env: { AXO_AGENT_ID: process.env.AXO_AGENT_ID } }) + '\n');
 
+// Headless one-shot mode (journalist): `-p --output-format json` without stream input.
+// Responds with the first matching rule from $FAKE_CLAUDE_DIR/headless.json ([{match, reply}]) or a default.
+if (flag('--output-format') === 'json') {
+  let input = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (d) => { input += d; });
+  process.stdin.on('end', () => {
+    const system = flag('--system-prompt') ?? '';
+    appendFileSync(join(dir, 'headless.log'), JSON.stringify({ system, prompt: input, model: flag('--model') }) + '\n');
+    const rulesFile = join(dir, 'headless.json');
+    const rules = existsSync(rulesFile) ? JSON.parse(readFileSync(rulesFile, 'utf8')) : [];
+    const hit = rules.find((r) => (system + '\n' + input).includes(r.match));
+    process.stdout.write(JSON.stringify({ type: 'result', is_error: false, result: hit ? hit.reply : `HEADLESS_OK ${input.length}`, total_cost_usd: 0.001 }));
+  });
+} else {
+  main();
+}
+
+function main() {
 const resume = flag('--resume');
 const sessionId = resume ?? flag('--session-id');
 const file = join(dir, `${sessionId}.json`);
@@ -87,3 +106,4 @@ rl.on('close', async () => {
   while (busy || queue.length) await new Promise((r) => setTimeout(r, 20));
   process.exit(0);
 });
+}
