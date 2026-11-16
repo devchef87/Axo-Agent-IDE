@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { BookOpen, ListTree, Code2, Eye, GitMerge, FileSearch, Users, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Bell, BellOff, Search, Server, Sun, X, type LucideIcon } from 'lucide-react';
+import { BookOpen, ListTree, Code2, Eye, FileSearch, Users, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Bell, BellOff, Search, Server, SquareTerminal, Sun, X, type LucideIcon } from 'lucide-react';
 import type { AgentStatus } from '@axo/protocol';
 import { focusedSel, useAxo } from '../stores/store.ts';
+import { contextPlace, useTerminals } from '../stores/terminals.ts';
 import { useTheme, type ThemePref } from '../lib/theme.ts';
 import { fuzzyFilter } from '../lib/fuzzy.ts';
 import { focusSidebar, openNewAgent, openQuickOpen, toggleDrawer, toggleView } from '../lib/actions.ts';
@@ -75,7 +76,14 @@ function useCommands(open: boolean): Command[] {
       ? { id: 'view', group: 'Actions', label: 'Back to Fleet', icon: Users, shortcut: '⌘E', run: () => toggleView() }
       : { id: 'view', group: 'Actions', label: 'Open editor', icon: Code2, shortcut: '⌘E', run: () => toggleView() });
     out.push({ id: 'focus-sidebar', group: 'Actions', label: 'Focus sidebar (arrow keys to move)', icon: ListTree, shortcut: '⌘L', run: () => focusSidebar() });
-    out.push({ id: 'view-teams', group: 'Actions', label: 'Teams: review & merge branches', icon: GitMerge, run: () => s.setView('teams') });
+    out.push({ id: 'terminal-new', group: 'Actions', label: 'New terminal', detail: contextPlace()?.label, icon: SquareTerminal, run: () => void useTerminals.getState().create() });
+    out.push({ id: 'terminal-toggle', group: 'Actions', label: useTerminals.getState().open ? 'Hide terminal' : 'Show terminal', icon: SquareTerminal, shortcut: '⌃`', run: () => useTerminals.getState().toggle() });
+    for (const k of order.filter((k) => nodes[k].status === 'online')) {
+      for (const p of nodes[k].projects) {
+        out.push({ id: `terminal-in:${k}:${p.id}`, group: 'Actions', label: `New terminal in ${p.name}`, detail: multiNode ? nodes[k].name : undefined, icon: SquareTerminal,
+          run: () => void useTerminals.getState().create({ nodeKey: k, cwd: p.path, label: `${nodes[k].name} · ${p.name}` }) });
+      }
+    }
     out.push({ id: 'view-watches', group: 'Actions', label: 'Watches', icon: Eye, run: () => s.setView('watches') });
     out.splice(1, 0, { id: 'go-to-file', group: 'Actions', label: 'Go to file…', icon: FileSearch, shortcut: '⌘P', run: () => openQuickOpen() });
     out.unshift({ id: 'new-agent', group: 'Actions', label: 'New agent…', icon: Plus, shortcut: '⌘N', run: () => openNewAgent() });

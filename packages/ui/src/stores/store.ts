@@ -38,11 +38,6 @@ interface AxoState {
   /** Main area view. Persisted. */
   view: View;
   setView(view: View): void;
-  /** Team shown in the Teams view. Persisted. */
-  team: { nodeKey: string; teamId: string } | null;
-  selectTeam(t: { nodeKey: string; teamId: string } | null): void;
-  /** Bumped on team:merged so open reviews refetch. Key: `${nodeKey}:${teamId}`. */
-  teamRev: Record<string, number>;
   ui: {
     newAgent: { nodeKey: string; projectId: string } | null;
     addProject: string | null;
@@ -72,8 +67,8 @@ export const feedKey = (nodeKey: string, agentId: string) => `${nodeKey}:${agent
 const emptyFeed = (): FeedState => ({ items: [], hasMore: false, loaded: false, drafts: {} });
 
 const clients = new Map<string, NodeClient>();
-export type View = 'fleet' | 'editor' | 'teams' | 'watches';
-const VIEWS: View[] = ['fleet', 'editor', 'teams', 'watches'];
+export type View = 'fleet' | 'editor' | 'watches';
+const VIEWS: View[] = ['fleet', 'editor', 'watches'];
 
 type FilesListener = (nodeKey: string, ev: Extract<EventEnvelope, { type: 'files:changed' }>) => void;
 const filesListeners = new Set<FilesListener>();
@@ -205,11 +200,6 @@ export const useAxo = create<AxoState>((set, get) => {
         set((s) => ({ journalRev: { ...s.journalRev, [rk]: (s.journalRev[rk] ?? 0) + 1 } }));
         break;
       }
-      case 'team:merged': {
-        const k = `${key}:${ev.teamId}`;
-        set((s) => ({ teamRev: { ...s.teamRev, [k]: (s.teamRev[k] ?? 0) + 1 } }));
-        break;
-      }
       case 'files:changed':
         for (const fn of filesListeners) fn(key, ev);
         break;
@@ -286,9 +276,6 @@ export const useAxo = create<AxoState>((set, get) => {
     journalRev: {},
     view: (VIEWS as string[]).includes(localStorage.getItem('axo.view') ?? '') ? localStorage.getItem('axo.view') as View : 'fleet',
     setView(view) { localStorage.setItem('axo.view', view); set({ view }); },
-    team: (() => { try { const t = JSON.parse(localStorage.getItem('axo.team') ?? 'null'); return t?.nodeKey && t?.teamId ? t : null; } catch { return null; } })(),
-    selectTeam(team) { localStorage.setItem('axo.team', JSON.stringify(team)); set({ team }); },
-    teamRev: {},
     ui: { newAgent: null, addProject: null, palette: false, drawer: false, refresh: null, fork: null, context: null, servers: false },
 
     async init() {

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { lazy, Suspense } from 'react';
-import { Code2, Eye, GitMerge, Monitor, Moon, Search, Sun, Users } from 'lucide-react';
+import { Code2, Eye, Monitor, SquareTerminal, Moon, Search, Sun, Users } from 'lucide-react';
 import { focusedSel, useAxo } from './stores/store.ts';
 import { isElectron, isMac } from './lib/bridge.ts';
 import { Sidebar } from './components/sidebar.tsx';
@@ -15,7 +15,8 @@ import { cn, ConnDot, formatTokens } from './components/ui.tsx';
 import { useTheme, type ThemePref } from './lib/theme.ts';
 import { ServersPanel } from './components/servers/servers-panel.tsx';
 import { startNotifications } from './lib/notifications.ts';
-import { TeamsView } from './components/teams/teams-view.tsx';
+import { TerminalPanel } from './components/terminal/terminal-panel.tsx';
+import { startTerminalSync, useTerminals } from './stores/terminals.ts';
 import { WatchesView } from './components/watches/watches-view.tsx';
 import { useActiveWatchCount, useWatchSync } from './stores/watches.ts';
 import { formatUsd, totalTokens, useNodeToday, useUsage, useUsageSync } from './stores/usage.ts';
@@ -26,6 +27,7 @@ export function App() {
   const view = useAxo((s) => s.view);
   useEffect(() => { void init(); }, [init]);
   useEffect(() => { startNotifications(); }, []);
+  useEffect(() => startTerminalSync(), []);
   useGlobalShortcuts();
   useWatchSync();
   useUsageSync();
@@ -40,8 +42,6 @@ export function App() {
             <ErrorBoundary resetKey={view} label={view === 'fleet' ? 'Fleet' : view[0].toUpperCase() + view.slice(1)} onReset={view === 'fleet' ? undefined : () => useAxo.getState().setView('fleet')}>
             {view === 'editor' ? (
               <Suspense fallback={<div className="flex-1 bg-bg" />}><EditorView /></Suspense>
-            ) : view === 'teams' ? (
-              <TeamsView />
             ) : view === 'watches' ? (
               <WatchesView />
             ) : (
@@ -52,6 +52,9 @@ export function App() {
             )}
             </ErrorBoundary>
           </div>
+          <ErrorBoundary label="Terminal" onReset={() => useTerminals.getState().setOpen(false)}>
+            <TerminalPanel />
+          </ErrorBoundary>
         </main>
       </div>
       <StatusBar />
@@ -72,7 +75,6 @@ const EditorView = lazy(() => import('./components/editor/editor-view.tsx').then
 const VIEWS = [
   { id: 'fleet' as const, label: 'Fleet', icon: Users },
   { id: 'editor' as const, label: 'Editor', icon: Code2 },
-  { id: 'teams' as const, label: 'Teams', icon: GitMerge },
   { id: 'watches' as const, label: 'Watches', icon: Eye },
 ];
 
@@ -131,7 +133,10 @@ function TitleBar() {
 function useGlobalShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.key === '`') { e.preventDefault(); useTerminals.getState().toggle(); return; }
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.isComposing) return;
+      // Control keys belong to the shell (⌃C, ⌃L, ⌃E…) while a terminal has focus.
+      if (!e.metaKey && (e.target as Element | null)?.closest?.('.xterm')) return;
       const k = e.key.toLowerCase();
       if (k === 'k' && !e.shiftKey) {
         const s = useAxo.getState();
@@ -144,6 +149,7 @@ function useGlobalShortcuts() {
       if (k === 'n' && !e.shiftKey) { e.preventDefault(); openNewAgent(); }
       else if (k === 'e' && !e.shiftKey) { e.preventDefault(); toggleView(); }
       else if (k === 'l' && !e.shiftKey) { e.preventDefault(); focusSidebar(); } // ⌘0 is the menu's reset-zoom
+      else if (k === 'j' && !e.shiftKey) { e.preventDefault(); useTerminals.getState().toggle(); }
       else if (k === 'p' && !e.shiftKey) { e.preventDefault(); openQuickOpen(); }
       else if (k === 'i' && !e.shiftKey) { e.preventDefault(); useAxo.getState().setView('fleet'); toggleDrawer(); }
       else if (/^[1-3]$/.test(k)) { e.preventDefault(); useAxo.getState().setView('fleet'); focusPaneComposer(Number(k) - 1); }
@@ -195,6 +201,17 @@ function NodeStatus({ nodeKey }: { nodeKey: string }) {
   );
 }
 
+function TerminalToggle({ className }: { className: string }) {
+  const open = useTerminals((s) => s.open);
+  const count = useTerminals((s) => s.tabs.filter((t) => !t.exited).length);
+  return (
+    <button className={cn(className, 'hover:bg-hover hover:text-secondary cursor-pointer', open && 'text-secondary')}
+      title={`${open ? 'Hide' : 'Show'} terminal (⌃\` or ⌘J)`} aria-pressed={open} onClick={() => useTerminals.getState().toggle()}>
+      <SquareTerminal size={10} /> terminal{count > 0 && <span className="text-secondary">{count}</span>}
+    </button>
+  );
+}
+
 function StatusBar() {
   const nodes = useAxo((s) => s.nodes);
   const order = useAxo((s) => s.nodeOrder);
@@ -224,6 +241,7 @@ function StatusBar() {
         <span className={seg} title={`Today across ${order.length === 1 ? 'this node' : 'all nodes'}`}>
           today <span className="text-secondary">{formatTokens(todayTok)}</span> tok <span className="text-secondary">{formatUsd(todayCost)}</span>
         </span>
+        <TerminalToggle className={seg} />
         <span className={cn(seg, 'pr-2')}><ThemeToggle /></span>
       </div>
     </footer>
