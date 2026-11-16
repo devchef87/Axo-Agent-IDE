@@ -28,7 +28,7 @@
   --border-strong: #7d929c; /* hover outlines, dividers that must read (≥3:1) */
   --ring: #8fa2ac;          /* focus: neutral, ≥3:1 */
   --text-primary: #f4f7f8;
-  --text-secondary: #e2e8eb;  /* off-white: normal UI text */
+  --text-secondary: #d6dde1;  /* off-white: body and normal UI text */
   --text-muted: #b8c5cb;
   --text-faint: #b0bec5;
   --accent: #28ACE6;
@@ -160,9 +160,9 @@ body {
   background: var(--bg);
   color: var(--text-primary);
   font-size: 13px;
-  letter-spacing: -0.005em;
-  font-feature-settings: 'cv11', 'ss01', 'ss03';
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   margin: 0;
 }
 #root { width: 100vw; height: 100vh; overflow: hidden; }
@@ -193,7 +193,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex="-1
 }
 
 /* Small monospace caps for section labels and meta ("LOCAL", "CONTEXT"). */
-.label { font-family: var(--font-mono); font-size: 10px; line-height: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+.label { font-family: var(--font-sans); font-size: 10px; font-weight: 600; line-height: 1rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
 
 /* Transparent-image backdrop in the media viewer. */
 .checkerboard {
@@ -203,15 +203,15 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex="-1
 }
 
 /* Markdown (assistant prose) */
-.md { line-height: 1.6; color: var(--text-primary); word-wrap: break-word; }
+.md { line-height: 1.625; color: var(--text-secondary); word-wrap: break-word; }
 .md > :first-child { margin-top: 0; }
 .md > :last-child { margin-bottom: 0; }
-.md p { margin: 0.5em 0; }
+.md p { margin: 0.6em 0; }
 .md h1, .md h2, .md h3, .md h4 { color: var(--text-primary); font-weight: 600; margin: 1em 0 0.4em; line-height: 1.3; }
 .md h1 { font-size: 1.25em; } .md h2 { font-size: 1.12em; } .md h3, .md h4 { font-size: 1em; }
 .md ul, .md ol { margin: 0.4em 0; padding-left: 1.4em; }
 .md ul { list-style: disc; } .md ol { list-style: decimal; }
-.md li { margin: 0.15em 0; }
+.md li { margin: 0.25em 0; }
 .md li::marker { color: var(--text-faint); }
 .md a { color: var(--text-primary); text-decoration: underline; text-decoration-color: color-mix(in oklab, var(--text-primary) 40%, transparent); text-underline-offset: 2px; }
 .md a:hover { text-decoration-color: var(--text-primary); }
