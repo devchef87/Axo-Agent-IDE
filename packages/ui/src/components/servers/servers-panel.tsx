@@ -56,7 +56,7 @@ function LocalRow({ snap }: { snap: ServersSnapshot }) {
   return (
     <div className="mb-2 rounded-md border border-border-subtle bg-inset px-3 py-2.5">
       <div className="flex items-center gap-2">
-        <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" />
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted" />
         <span className="text-[13px] font-medium text-primary">Local</span>
         <span className="text-2xs text-faint">this Mac</span>
         <VersionTag build={local.node?.build} stale={local.updateAvailable} />
@@ -82,7 +82,7 @@ const PHASE: Record<ServerPhase, { label: string; dot: string }> = {
   updating: { label: 'updating', dot: 'bg-working animate-pulse-dot' },
   connecting: { label: 'connecting', dot: 'bg-warning animate-pulse-dot' },
   reconnecting: { label: 'reconnecting', dot: 'bg-warning animate-pulse-dot' },
-  connected: { label: 'connected', dot: 'bg-success' },
+  connected: { label: 'connected', dot: 'bg-muted' },
   error: { label: 'error', dot: 'bg-danger' },
 };
 
@@ -179,7 +179,7 @@ function Checks({ result }: { result: PreflightResult }) {
     <div className="mt-1 overflow-hidden rounded border border-border-subtle">
       {result.checks.map((c) => (
         <div key={c.id} className="flex items-start gap-2 border-b border-border-subtle bg-panel px-2.5 py-1.5 text-xs last:border-b-0">
-          {c.status === 'pass' && <Check size={13} className="mt-px shrink-0 text-success" />}
+          {c.status === 'pass' && <Check size={13} className="mt-px shrink-0 text-muted" />}
           {c.status === 'warn' && <AlertTriangle size={13} className="mt-px shrink-0 text-warning" />}
           {c.status === 'fail' && <X size={13} className="mt-px shrink-0 text-danger" />}
           <span className="w-32 shrink-0 text-secondary">{c.label}</span>

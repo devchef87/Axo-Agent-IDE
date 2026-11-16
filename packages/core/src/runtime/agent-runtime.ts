@@ -12,6 +12,7 @@ import { buildSystemPrompt, type PromptExtras } from './system-prompt.ts';
 import type { SpawnSpec } from './claude-process.ts';
 import { ulid } from '../util/ulid.ts';
 import { HttpError } from '../util/http-error.ts';
+import { ImageStore } from './images.ts';
 
 interface Queued { text: string; author: string; id?: string } // [core2] id = feed item id, reported as TurnEndEvent.messageIds
 
@@ -102,6 +103,8 @@ export class AgentRuntime extends EventEmitter {
   private readonly bus: EventBus;
   private readonly cfg: NodeConfig;
   private readonly projects: Projects;
+  /** Images from tool results, stored as files (not in the feed). */
+  readonly images: ImageStore;
   /** [core2] See SpecHook. Set by the node. */
   specHook: SpecHook | null = null;
   private shuttingDown = false; // [core2] no new processes once shutdown() starts
@@ -113,6 +116,7 @@ export class AgentRuntime extends EventEmitter {
     this.bus = bus;
     this.cfg = cfg;
     this.projects = projects;
+    this.images = new ImageStore(cfg.home);
     this.opts = { interruptGraceMs: 8000, crashWindowMs: 120_000, crashLimit: 3, ...opts };
     for (const a of store.listAgents()) this.agents.set(a.id, a);
   }
@@ -249,6 +253,7 @@ export class AgentRuntime extends EventEmitter {
     this.clearIdle(id);
     this.agents.delete(id);
     this.store.deleteAgent(id);
+    this.images.remove(id);
     this.bus.publish({ type: 'agent:removed', agentId: id });
     this.emit('gone', { agentId: id, reason: 'delete' } satisfies GoneEvent); // [core2]
   }
@@ -499,8 +504,9 @@ export class AgentRuntime extends EventEmitter {
         if (item?.kind !== 'tool') break;
         const started = live.toolStarts.get(act.toolUseId);
         live.toolStarts.delete(act.toolUseId);
+        const images = act.images?.length ? this.images.save(a.id, act.images) : [];
         this.addFeed(a, { ...item, status: act.isError ? 'error' : 'ok', result: act.content,
-          durationMs: started ? act.ts - started : undefined });
+          durationMs: started ? act.ts - started : undefined, ...(images.length ? { images } : {}) });
         break;
       }
 

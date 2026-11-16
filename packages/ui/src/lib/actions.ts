@@ -37,6 +37,16 @@ export function modalOpen(): boolean {
   return !!ui.newAgent || !!ui.addProject || ui.palette || !!ui.refresh || !!ui.fork || !!ui.context || ui.servers;
 }
 
+/** ⌘L: move keyboard focus to the sidebar (the focused agent's row, else the first row). */
+export function focusSidebar(): void {
+  const list = document.getElementById('axo-sidebar');
+  if (!list) return;
+  const sel = focusedSel(useAxo.getState());
+  const row = (sel && list.querySelector<HTMLElement>(`[data-agent="${sel.nodeKey}:${sel.agentId}"]`)) || list.querySelector<HTMLElement>('[data-nav]');
+  row?.focus();
+  row?.scrollIntoView({ block: 'nearest' });
+}
+
 /** ⌘E: switch between Fleet and Editor. */
 export function toggleView(): void {
   const s = useAxo.getState();

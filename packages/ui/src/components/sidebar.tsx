@@ -1,18 +1,39 @@
-import { useState } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { BookOpen, ChevronDown, ChevronRight, FolderPlus, Plus, RefreshCw, Server, Trash2 } from 'lucide-react';
 import type { Agent, Project } from '@axo/protocol';
 import { focusedSel, useAxo, useRefreshing, type NodeView } from '../stores/store.ts';
 import { sameSel } from '../lib/layout.ts';
 import { endAgentDrag, startAgentDrag } from '../lib/dnd.ts';
+import { treeNav } from '../lib/tree-nav.ts';
 import { cn, ConnDot, IconButton, StatusDot } from './ui.tsx';
 import { ServersSidebarEntry } from './servers/sidebar-entry.tsx';
 
 export function Sidebar() {
   const nodeOrder = useAxo((s) => s.nodeOrder);
   const nodes = useAxo((s) => s.nodes);
+  const list = useRef<HTMLDivElement>(null);
+
+  // Arrow keys move between rows, Right/Left expand/collapse or go to the parent,
+  // Home/End jump, letters jump to the next matching name. Enter opens (⌘Enter: split).
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || !list.current) return;
+    const rows = [...list.current.querySelectorAll<HTMLElement>('[data-nav]')];
+    const cur = rows.indexOf(document.activeElement as HTMLElement);
+    if (cur === -1) return;
+    const act = treeNav(rows.map((el) => ({
+      level: Number(el.dataset.level),
+      expanded: el.hasAttribute('aria-expanded') ? el.getAttribute('aria-expanded') === 'true' : null,
+      label: el.dataset.label ?? el.textContent ?? '',
+    })), cur, e.key);
+    if (!act) return;
+    e.preventDefault();
+    if ('focus' in act) { rows[act.focus].focus(); rows[act.focus].scrollIntoView({ block: 'nearest' }); }
+    else rows[act.toggle].click();
+  };
+
   return (
     <aside className="flex h-full w-60 shrink-0 flex-col border-r border-border-subtle bg-panel">
-      <div className="flex-1 overflow-y-auto py-2">
+      <div ref={list} id="axo-sidebar" aria-label="Servers, projects and agents" onKeyDown={onKeyDown} className="flex-1 overflow-y-auto py-2">
         {nodeOrder.map((k) => <NodeSection key={k} node={nodes[k]} />)}
       </div>
       <ServersSidebarEntry />
@@ -26,7 +47,7 @@ function NodeSection({ node }: { node: NodeView }) {
   return (
     <div className="mb-1">
       <div className="group flex h-7 items-center gap-1.5 px-2 text-xs font-semibold uppercase tracking-wide text-faint">
-        <button className="flex flex-1 items-center gap-1.5 cursor-pointer" onClick={() => setOpen(!open)}>
+        <button data-nav data-level={1} data-label={node.name} aria-expanded={open} className="flex flex-1 items-center gap-1.5 rounded outline-none focus-visible:bg-hover cursor-pointer" onClick={() => setOpen(!open)}>
           {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           <Server size={12} />
           <span className="truncate">{node.name}</span>
@@ -43,6 +64,7 @@ function NodeSection({ node }: { node: NodeView }) {
           {node.projects.map((p) => <ProjectSection key={p.id} node={node} project={p} />)}
           {node.status === 'online' && node.projects.length === 0 && (
             <button
+              data-nav data-level={2} data-label="Add a project"
               className="mx-3 mt-1 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-xs text-faint hover:border-accent/60 hover:text-secondary cursor-pointer"
               onClick={() => setUi({ addProject: node.key })}
             >
@@ -69,7 +91,7 @@ function ProjectSection({ node, project }: { node: NodeView; project: Project })
   return (
     <div>
       <div className="group flex h-7 items-center gap-1 pl-4 pr-2 text-[13px] text-secondary hover:bg-hover">
-        <button className="flex min-w-0 flex-1 items-center gap-1.5 cursor-pointer" onClick={() => setOpen(!open)} title={project.path}>
+        <button data-nav data-level={2} data-label={project.name} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-1.5 rounded outline-none focus-visible:bg-hover cursor-pointer" onClick={() => setOpen(!open)} title={project.path}>
           {open ? <ChevronDown size={12} className="text-faint" /> : <ChevronRight size={12} className="text-faint" />}
           <span className="truncate font-medium">{project.name}</span>
         </button>
@@ -84,7 +106,8 @@ function ProjectSection({ node, project }: { node: NodeView; project: Project })
       {open && agents.map((a) => <AgentRow key={a.id} nodeKey={node.key} agent={a} />)}
       {open && agents.length === 0 && (
         <button
-          className="flex h-7 w-full items-center gap-1.5 pl-9 text-xs text-faint hover:text-secondary cursor-pointer"
+          data-nav data-level={3} data-label="New agent"
+          className="flex h-7 w-full items-center gap-1.5 pl-9 text-xs text-faint outline-none hover:text-secondary focus-visible:bg-hover cursor-pointer"
           onClick={() => setUi({ newAgent: { nodeKey: node.key, projectId: project.id } })}
         >
           <Plus size={12} /> New agent
@@ -108,10 +131,12 @@ function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
       onDragStart={(e) => startAgentDrag(e, sel, agent.name)}
       onDragEnd={endAgentDrag}
       onClick={(e) => (e.metaKey || e.ctrlKey ? openInSplit : select)(sel)}
-      title="Click to open · ⌘-click to open in a split · drag into a pane"
+      onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); openInSplit(sel); } }}
+      data-nav data-level={3} data-label={agent.name} data-agent={`${nodeKey}:${agent.id}`}
+      title="Click or Enter to open · ⌘-click or ⌘Enter to open in a split · drag into a pane"
       aria-current={focused ? 'true' : undefined}
       className={cn(
-        'relative flex h-7 w-full items-center gap-2 pl-9 pr-3 text-left text-[13px] cursor-pointer',
+        'relative flex h-7 w-full items-center gap-2 pl-9 pr-3 text-left text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent cursor-pointer',
         focused ? 'bg-accent/12 text-primary' : visible ? 'bg-hover text-secondary' : 'text-muted hover:bg-hover hover:text-secondary',
       )}
     >

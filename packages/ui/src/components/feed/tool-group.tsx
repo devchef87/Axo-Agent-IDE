@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import type { FeedItem } from '@axo/protocol';
 import { cn, formatDuration } from '../ui.tsx';
+import { Collapsible, ImageStrip } from './collapsible.tsx';
 
 type ToolItem = Extract<FeedItem, { kind: 'tool' }>;
 
@@ -45,6 +46,8 @@ export function ToolGroup({ items, live }: { items: ToolItem[]; live: boolean })
           </>
         )}
       </button>
+      {/* Images stay visible even when the group is collapsed. */}
+      <ImageStrip images={items.flatMap((t) => t.images ?? [])} />
       {open && (
         <div className="ml-4 mt-0.5 border-l border-border-subtle pl-2">
           {items.map((t) => <ToolRow key={t.id} item={t} />)}
@@ -90,10 +93,12 @@ function ToolDetail({ item }: { item: ToolItem }) {
 }
 
 function Pre({ children, className }: { children: string; className?: string }) {
+  // Long output folds to its first lines; expanded, it scrolls within a taller box.
   return (
-    <pre className={cn('max-h-72 overflow-auto whitespace-pre-wrap break-all rounded border border-border-subtle bg-inset px-2.5 py-1.5 font-mono text-2xs leading-relaxed text-muted', className)}>
-      {children}
-    </pre>
+    <Collapsible
+      text={children}
+      className={cn('max-h-[28rem] overflow-auto whitespace-pre-wrap break-all rounded border border-border-subtle bg-inset px-2.5 py-1.5 font-mono text-2xs leading-relaxed text-muted', className)}
+    />
   );
 }
 
