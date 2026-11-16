@@ -36,7 +36,8 @@ export function App() {
     <div className="flex h-full flex-col">
       <TitleBar />
       <div className="flex min-h-0 flex-1">
-        <Sidebar />
+        {/* The editor has its own file tree; the teams sidebar would only take room from the code. */}
+        {view !== 'editor' && <Sidebar />}
         <main className="flex min-w-0 flex-1 flex-col">
           <div className="flex min-h-0 flex-1">
             <ErrorBoundary resetKey={view} label={view === 'fleet' ? 'Fleet' : view[0].toUpperCase() + view.slice(1)} onReset={view === 'fleet' ? undefined : () => useAxo.getState().setView('fleet')}>

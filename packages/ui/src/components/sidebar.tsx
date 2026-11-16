@@ -14,9 +14,7 @@ export function Sidebar() {
   const nodeOrder = useAxo((s) => s.nodeOrder);
   const nodes = useAxo((s) => s.nodes);
   const list = useRef<HTMLDivElement>(null);
-  // The editor wants room for code, so it keeps its own (narrower) sidebar width.
-  const editor = useAxo((s) => s.view === 'editor');
-  const size = usePanelWidth(editor ? 'sidebar-editor' : 'sidebar', editor ? 200 : 232, 150, 480);
+  const size = usePanelWidth('sidebar', 232, 150, 480);
 
   // Arrow keys move between rows, Right/Left expand/collapse or go to the parent,
   // Home/End jump, letters jump to the next matching name. Enter opens (⌘Enter: split).
@@ -244,7 +242,7 @@ function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
 
   if (editing) {
     return (
-      <div className={cn('flex min-h-[30px] w-full items-center gap-2 rounded-[5px] pr-2', indent, focused && 'bg-control')}>
+      <div className={cn('flex min-h-[30px] w-full items-center gap-2 rounded-[5px] pr-2', indent)}>
         <StatusDot status={agent.status} />
         <RenameInput initial={agent.name} onSave={rename} onDone={() => setEditing(false)} />
       </div>
@@ -270,7 +268,8 @@ function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
         aria-current={focused ? 'true' : undefined}
         className={cn(
           'relative flex w-full items-center gap-2 rounded-[5px] py-[5px] pr-2 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent cursor-pointer', indent,
-          focused ? 'bg-control text-primary' : visible ? 'bg-hover text-primary' : 'text-secondary hover:bg-hover hover:text-primary',
+          // Selected: blue name, no fill. Open in another pane: white. Otherwise off-white.
+          focused ? 'text-accent' : visible ? 'text-primary hover:bg-hover' : 'text-secondary hover:bg-hover hover:text-primary',
         )}
       >
         <StatusDot status={agent.status} />
