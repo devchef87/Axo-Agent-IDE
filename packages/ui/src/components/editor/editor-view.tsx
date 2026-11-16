@@ -88,7 +88,7 @@ export function EditorTargetPicker() {
       aria-label="Project"
       value={value}
       onChange={(e) => { const [nodeKey, projectId, team, agent] = e.target.value.split('|'); setTarget({ nodeKey, projectId, team: team || null, agent: agent || null }); }}
-      className="h-7 w-full max-w-64 rounded border border-border bg-bg px-1.5 text-xs text-secondary outline-none hover:border-border-strong focus:border-accent cursor-pointer"
+      className="h-7 w-full max-w-64 rounded border border-border bg-bg px-1.5 text-xs text-secondary outline-none hover:border-border-strong/60 focus:border-ring cursor-pointer"
     >
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>

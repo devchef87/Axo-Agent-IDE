@@ -308,7 +308,7 @@ function NameInput({ depth, dir, initial, onDone }: { depth: number; dir: boolea
           if (e.key === 'Escape') { e.stopPropagation(); finish(''); }
         }}
         onBlur={(e) => finish(e.currentTarget.value === initial ? '' : e.currentTarget.value)}
-        className="h-5 min-w-0 flex-1 rounded border border-accent bg-bg px-1 text-xs text-primary outline-none"
+        className="h-5 min-w-0 flex-1 rounded border border-ring bg-bg px-1 text-xs text-primary outline-none"
       />
     </div>
   );

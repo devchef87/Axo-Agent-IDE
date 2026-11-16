@@ -172,7 +172,7 @@ function Composer({ agent, sel, autoFocus }: { agent: Agent; sel: Selection; aut
     <div className="shrink-0 px-6 pb-4 pt-1">
       <div>
         {error && <div className="mb-1.5 text-xs text-danger">{error}</div>}
-        <div className="rounded border border-border bg-panel transition-colors focus-within:border-border-strong">
+        <div className="rounded border border-border bg-panel transition-colors focus-within:border-ring">
           <textarea
             ref={ta}
             value={text}

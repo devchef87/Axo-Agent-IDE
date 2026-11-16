@@ -57,7 +57,7 @@ for (const [name, t] of Object.entries(THEMES)) {
     it('input outlines and the focus ring pass non-text contrast (3:1)', () => {
       for (const bg of ['bg', 'elevated', 'panel']) {
         assert.ok(contrast(t['border-strong'], bg === 'bg' ? t.bg : t[bg]) >= 3, `border-strong on ${bg}`);
-        assert.ok(contrast(t.accent, t[bg]) >= 3, `focus ring on ${bg}`);
+        assert.ok(contrast(t.ring, t[bg]) >= 3, `focus ring on ${bg}`);
       }
     });
   });
@@ -73,7 +73,7 @@ describe('monochrome', () => {
     const neutral = ['accent', 'accent-hover', 'accent-fg', 'bg', 'panel', 'elevated', 'inset', 'hover', 'control', 'border', 'border-strong',
       'text-primary', 'text-secondary', 'text-muted', 'text-faint', 'working', 'rotating', 'innerchat', 'info'];
     for (const [name, t] of Object.entries(THEMES)) {
-      for (const k of neutral) assert.ok(chroma(t[k]) <= 6, `${name} ${k} ${t[k]} should be grey`);
+      for (const k of neutral) assert.ok(chroma(t[k]) <= 12, `${name} ${k} ${t[k]} should be grey (a slight cool zinc tint is fine)`);
     }
   });
 

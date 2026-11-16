@@ -7,7 +7,7 @@
  */
 
 /*
- * Monochrome on purpose: neutral greys, a white accent on dark and a black accent on light.
+ * Monochrome on purpose: near-black zinc greys on dark, clean neutrals on light, a white accent on dark and a black accent on light.
  * Colour is reserved for what needs it: danger (errors), warning (context filling up),
  * diff additions/removals, and quiet syntax highlighting. Status is shown with shade and
  * motion (working pulses in the accent, idle is grey, asleep is a hollow ring).
@@ -15,43 +15,44 @@
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0d0d0d;            /* main canvas (chat) */
-  --panel: #0a0a0a;         /* sidebar, title strip, status bar */
-  --elevated: #141414;      /* modals, menus, composer */
-  --inset: #080808;         /* code blocks, tool output */
-  --hover: #181818;
-  --control: #1f1f1f;       /* subtle fills: buttons, badges, user bubble, tracks */
-  --control-hover: #282828;
-  --border: #222222;
-  --border-subtle: #181818;
-  --border-strong: #666666; /* input outlines (≥3:1) */
-  --text-primary: #ededed;
-  --text-secondary: #a3a3a3;
-  --text-muted: #8f8f8f;
-  --text-faint: #828282;
-  --accent: #ededed;
+  --bg: #09090b;            /* main canvas (chat) */
+  --panel: #0c0c0e;         /* sidebar, title strip, status bar */
+  --elevated: #111113;      /* modals, menus, composer */
+  --inset: #060607;         /* code blocks, tool output */
+  --hover: #17171a;
+  --control: #1c1c1f;       /* subtle fills: buttons, badges, user bubble, tracks */
+  --control-hover: #26262a;
+  --border: #1f1f23;
+  --border-subtle: #161619;
+  --border-strong: #66666f; /* hover outlines, dividers that must read (≥3:1) */
+  --ring: #71717a;          /* focus: visible (≥3:1), not glaring */
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #8d8d97;
+  --text-faint: #84848c;
+  --accent: #fafafa;
   --accent-hover: #ffffff;
-  --accent-fg: #111111;
+  --accent-fg: #09090b;
   /* colour, used sparingly */
   --success: #5fb87f;       /* diff additions */
   --warning: #d9a74a;
   --danger: #ef6f62;
   /* neutral roles (kept as tokens so components stay semantic) */
-  --info: #8f8f8f;
-  --working: #ededed;
-  --rotating: #8f8f8f;
-  --innerchat: #a3a3a3;
+  --info: #8d8d97;
+  --working: #fafafa;
+  --rotating: #8d8d97;
+  --innerchat: #a1a1aa;
   /* syntax: low-chroma so code reads as text first */
   --syn-keyword: #c8b6e2;
   --syn-string: #a9c7a0;
   --syn-number: #d8b48a;
-  --syn-comment: #828282;
+  --syn-comment: #84848c;
   --syn-function: #a8c4e0;
   --syn-type: #9fd0c8;
   --syn-property: #cfc29a;
   --syn-tag: #e0a598;
-  --scrollbar: #262626;
-  --scrollbar-hover: #383838;
+  --scrollbar: #232327;
+  --scrollbar-hover: #34343a;
   --overlay: rgb(0 0 0 / 0.6);
   --shadow: 0 8px 28px rgb(0 0 0 / 0.5), 0 1px 3px rgb(0 0 0 / 0.4);
 }
@@ -68,6 +69,7 @@
   --border: #e5e5e5;
   --border-subtle: #eeeeee;
   --border-strong: #8f8f8f;
+  --ring: #858585;
   --text-primary: #0a0a0a;
   --text-secondary: #404040;
   --text-muted: #555555;
@@ -133,6 +135,7 @@
   --color-border: var(--border);
   --color-border-subtle: var(--border-subtle);
   --color-border-strong: var(--border-strong);
+  --color-ring: var(--ring);
   --color-primary: var(--text-primary);
   --color-secondary: var(--text-secondary);
   --color-muted: var(--text-muted);
@@ -170,8 +173,9 @@ body {
 ::selection { background: color-mix(in oklab, var(--accent) 22%, transparent); }
 
 /* Keyboard focus: visible ring for keyboard users only. */
-:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
-input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
+:focus-visible { outline: 1px solid var(--ring); outline-offset: 1px; }
+/* Inputs show focus with their border; containers focused in code (dialogs, tab-index -1) show nothing. */
+input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex="-1"]:focus-visible { outline: none; }
 
 /* Electron window drag region (macOS hidden titlebar). Only the 32px title strip may use .drag. */
 .drag { -webkit-app-region: drag; }
