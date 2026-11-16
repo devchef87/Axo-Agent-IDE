@@ -47,7 +47,7 @@ function useGlobalShortcuts() {
       const k = e.key.toLowerCase();
       if (k === 'k' && !e.shiftKey) {
         const s = useAxo.getState();
-        if (s.ui.newAgent || s.ui.addProject) return;
+        if (s.ui.newAgent || s.ui.addProject || s.ui.servers) return;
         e.preventDefault();
         s.setUi({ palette: !s.ui.palette });
         return;

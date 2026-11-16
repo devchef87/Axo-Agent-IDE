@@ -15,7 +15,7 @@ export function buildRouter(node: Node): Router {
   r.get('/version', (): VersionInfo => ({ version: VERSION, build: BUILD, nodeId: cfg.nodeId, hostname: cfg.hostname }));
 
   r.get('/state', (): NodeState => ({
-    nodeId: cfg.nodeId, version: VERSION, hostname: cfg.hostname, seq: bus.currentSeq, epoch: bus.epoch,
+    nodeId: cfg.nodeId, version: VERSION, build: BUILD, hostname: cfg.hostname, seq: bus.currentSeq, epoch: bus.epoch,
     projects: store.listProjects(), teams: store.listTeams(), agents: runtime.list(),
   }));
 

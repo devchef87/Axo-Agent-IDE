@@ -378,10 +378,12 @@ export class NodeManager extends EventEmitter {
         while (!settled && Date.now() < deadline) {
           try {
             await httpJson(base, '/api/health', undefined, 1500);
+            if (settled) return;
             up = true;
             onUp();
             this.setStatus(s, { phase: 'connected', message: undefined });
             await this.refreshVersion(s);
+            if (settled) return; // ended while we awaited: don't leave a watcher behind
             let misses = 0;
             watch = setInterval(async () => {
               try { await httpJson(base, '/api/health', undefined, 3000); misses = 0; } catch { if (++misses >= 3) end('node stopped responding'); }

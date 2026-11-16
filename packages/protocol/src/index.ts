@@ -116,6 +116,7 @@ export type EventEnvelope = NodeEvent & { seq: number; ts: number; nodeId: strin
 export interface NodeState {
   nodeId: string;
   version: string;
+  build: string;           // bundle content hash ('dev' from source); see VersionInfo
   hostname: string;
   seq: number;
   epoch: number;
