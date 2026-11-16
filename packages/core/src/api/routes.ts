@@ -34,11 +34,7 @@ export function buildRouter(node: Node): Router {
   });
 
   // ── agents ──
-  r.post('/agents', ({ body }) => {
-    const b = body as CreateAgentReq;
-    if (b?.teamId && store.getTeam(b.teamId)?.archivedAt) throw new HttpError(400, 'team is archived'); // [core2]
-    return runtime.create(b);
-  });
+  r.post('/agents', ({ body }) => node.teams.createAgent(body as CreateAgentReq)); // [core2] archived check + ownWorktree
   r.patch('/agents/:id', ({ params, body }) => runtime.update(params.id, body as UpdateAgentReq));
   r.delete('/agents/:id', ({ params }) => runtime.remove(params.id));
   r.post('/agents/:id/message', ({ params, body }) => {
