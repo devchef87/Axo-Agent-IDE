@@ -1,3 +1,4 @@
+import { ResizeHandle, usePanelWidth } from '../resize.tsx';
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { AlertTriangle, FileDiff, FileText, MessageSquarePlus, Search, X } from 'lucide-react';
 import type { FileContent, FileSearchRes, FileWatchRes, WriteFileRes } from '@axo/protocol';
@@ -48,11 +49,13 @@ export function EditorView() {
   const project = node?.projects.find((p) => p.id === target.projectId);
   const team = target.team ? node?.teams.find((t) => t.id === target.team) : undefined;
   const ownAgent = target.agent ? node?.agents.find((a) => a.id === target.agent) : undefined;
+  const tree = usePanelWidth('filetree', 256, 160, 560);
   const label = [project?.name, team?.name, ownAgent ? `${ownAgent.name}'s worktree` : null].filter(Boolean).join(' · ') || 'Files';
 
   return (
     <div className="flex h-full min-w-0 flex-1">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-border-subtle bg-panel">
+      <aside style={{ width: tree.width }} className="relative flex shrink-0 flex-col border-r border-border-subtle bg-panel">
+        <ResizeHandle edge="right" width={tree.width} onResize={tree.set} onReset={tree.reset} label="Resize file tree" />
         <div className="border-b border-border-subtle p-2"><EditorTargetPicker /></div>
         <FileTree key={targetKey(target)} target={target} label={label} />
       </aside>
@@ -88,7 +91,7 @@ export function EditorTargetPicker() {
       aria-label="Project"
       value={value}
       onChange={(e) => { const [nodeKey, projectId, team, agent] = e.target.value.split('|'); setTarget({ nodeKey, projectId, team: team || null, agent: agent || null }); }}
-      className="h-7 w-full max-w-64 rounded border border-border bg-bg px-1.5 text-xs text-secondary outline-none hover:border-border-strong/60 focus:border-ring cursor-pointer"
+      className="h-7 w-full max-w-64 rounded border border-border bg-bg px-1.5 text-xs text-secondary outline-none hover:border-control-hover focus:border-control-hover cursor-pointer"
     >
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>

@@ -6,12 +6,16 @@ import { sameSel } from '../lib/layout.ts';
 import { endAgentDrag, startAgentDrag } from '../lib/dnd.ts';
 import { treeNav } from '../lib/tree-nav.ts';
 import { cn, ConnDot, IconButton, StatusDot } from './ui.tsx';
+import { ResizeHandle, usePanelWidth } from './resize.tsx';
 import { ServersSidebarEntry } from './servers/sidebar-entry.tsx';
 
 export function Sidebar() {
   const nodeOrder = useAxo((s) => s.nodeOrder);
   const nodes = useAxo((s) => s.nodes);
   const list = useRef<HTMLDivElement>(null);
+  // The editor wants room for code, so it keeps its own (narrower) sidebar width.
+  const editor = useAxo((s) => s.view === 'editor');
+  const size = usePanelWidth(editor ? 'sidebar-editor' : 'sidebar', editor ? 200 : 232, 150, 480);
 
   // Arrow keys move between rows, Right/Left expand/collapse or go to the parent,
   // Home/End jump, letters jump to the next matching name. Enter opens (⌘Enter: split).
@@ -32,7 +36,8 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex h-full w-[232px] shrink-0 flex-col border-r border-border-subtle bg-panel">
+    <aside style={{ width: size.width }} className="relative flex h-full shrink-0 flex-col border-r border-border-subtle bg-panel">
+      <ResizeHandle edge="right" width={size.width} onResize={size.set} onReset={size.reset} label="Resize sidebar" />
       <div ref={list} id="axo-sidebar" aria-label="Servers, projects and agents" onKeyDown={onKeyDown} className="flex-1 overflow-y-auto py-1.5">
         {/* A server that's down with nothing cached stays out of the way; the status bar shows its state. */}
         {nodeOrder.filter((k) => nodes[k].status === 'online' || nodes[k].status === 'unauthorized' || nodes[k].projects.length > 0)
