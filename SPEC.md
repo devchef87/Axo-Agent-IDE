@@ -331,7 +331,7 @@ About 25 event types, against Groove's ~150.
 
 ## 13. UI
 
-**Layout:** the One Dark/teal theme from Groove, dense type, dark only.
+**Look:** new Axo identity: graphite (dark) and warm paper (light) with an axolotl-coral accent. Semantic tokens (`bg-panel`, `text-muted`, …), WCAG AA checked by `packages/ui/test/theme.test.ts`. Theme setting: System (default) / Light / Dark. The accent is brand-only, never used for status.
 
 ```
 ┌ sidebar ──────────┬ main ─────────────────────────────────┬ detail drawer ┐
