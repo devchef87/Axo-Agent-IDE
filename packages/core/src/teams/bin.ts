@@ -35,7 +35,7 @@ export function knockSettings(knockPath: string): string {
     hooks: {
       PreToolUse: [{
         matcher: 'Write|Edit|MultiEdit|NotebookEdit',
-        hooks: [{ type: 'command', command: `sh ${shq(knockPath)}`, timeout: 10 }],
+        hooks: [{ type: 'command', command: shq(knockPath), timeout: 10 }], // executable (0755); bare path keeps Claude's 'hook error: [cmd]' prefix short
       }],
     },
   });
