@@ -5,6 +5,7 @@ import { Sidebar } from './components/sidebar.tsx';
 import { ChatPane, Empty } from './components/chat-pane.tsx';
 import { AddProjectDialog, NewAgentDialog } from './components/dialogs.tsx';
 import { ConnDot, formatTokens } from './components/ui.tsx';
+import { ServersPanel } from './components/servers/servers-panel.tsx';
 
 export function App() {
   const init = useAxo((s) => s.init);
@@ -22,6 +23,7 @@ export function App() {
       <StatusBar />
       <NewAgentDialog />
       <AddProjectDialog />
+      <ServersPanel />
     </div>
   );
 }

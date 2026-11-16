@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Agent, EventEnvelope, FeedItem, FeedPage, NodeState, Project, Team } from '@axo/protocol';
 import { NodeClient, type ConnStatus } from '../lib/client.ts';
-import { discoverNodes, type NodeConn } from '../lib/bridge.ts';
+import { bridge, discoverNodes, type NodeConn } from '../lib/bridge.ts';
 
 export interface NodeView {
   key: string;
@@ -29,7 +29,7 @@ interface AxoState {
   nodeOrder: string[];
   feeds: Record<string, FeedState>;  // key: `${nodeKey}:${agentId}`
   selected: Selection | null;
-  ui: { newAgent: { nodeKey: string; projectId: string } | null; addProject: string | null };
+  ui: { newAgent: { nodeKey: string; projectId: string } | null; addProject: string | null; servers: boolean };
 
   init(): Promise<void>;
   client(nodeKey: string): NodeClient;
@@ -67,6 +67,9 @@ export const useAxo = create<AxoState>((set, get) => {
     for (const fk of Object.keys(get().feeds)) {
       if (fk.startsWith(key + ':')) void get().loadFeed(key, fk.slice(key.length + 1));
     }
+    // A restored selection on a node that connected after startup (e.g. a remote server).
+    const sel = get().selected;
+    if (sel?.nodeKey === key && !get().feeds[feedKey(key, sel.agentId)]?.loaded) void get().loadFeed(key, sel.agentId);
   };
 
   const onEvent = (key: string, ev: EventEnvelope) => {
@@ -120,6 +123,38 @@ export const useAxo = create<AxoState>((set, get) => {
       nodes: { ...s.nodes, [conn.key]: { key: conn.key, name: conn.name, status: 'connecting', projects: [], teams: [], agents: [] } },
       nodeOrder: [...s.nodeOrder, conn.key],
     }));
+    startClient(conn);
+  };
+
+  const removeNode = (key: string) => {
+    clients.get(key)?.stop();
+    clients.delete(key);
+    set((s) => {
+      const nodes = { ...s.nodes };
+      delete nodes[key];
+      const feeds = Object.fromEntries(Object.entries(s.feeds).filter(([fk]) => !fk.startsWith(key + ':')));
+      return { nodes, feeds, nodeOrder: s.nodeOrder.filter((k) => k !== key), selected: s.selected?.nodeKey === key ? null : s.selected };
+    });
+  };
+
+  /** Main process says the node set changed (server connected/disconnected, tunnel port moved, local node restarted). */
+  const syncNodes = (conns: NodeConn[]) => {
+    const keys = new Set(conns.map((c) => c.key));
+    for (const key of get().nodeOrder) if (!keys.has(key)) removeNode(key);
+    for (const conn of conns) {
+      const c = clients.get(conn.key);
+      if (!c) { addNode(conn); continue; }
+      if (c.conn.baseUrl !== conn.baseUrl || c.conn.token !== conn.token) {
+        c.stop(); // keep the node's data; the new client refetches state on connect
+        clients.delete(conn.key);
+        startClient(conn);
+      }
+      if (get().nodes[conn.key]?.name !== conn.name) patchNode(conn.key, () => ({ name: conn.name }));
+    }
+    set({ nodeOrder: conns.map((c) => c.key) });
+  };
+
+  const startClient = (conn: NodeConn) => {
     const c = new NodeClient(conn, {
       onState: (st) => onState(conn.key, st),
       onEvent: (ev) => onEvent(conn.key, ev),
@@ -134,9 +169,10 @@ export const useAxo = create<AxoState>((set, get) => {
     nodeOrder: [],
     feeds: {},
     selected: null,
-    ui: { newAgent: null, addProject: null },
+    ui: { newAgent: null, addProject: null, servers: false },
 
     async init() {
+      bridge?.onNodesChanged(syncNodes);
       for (const conn of await discoverNodes()) addNode(conn);
       const saved = localStorage.getItem('axo.selected');
       if (saved) {
