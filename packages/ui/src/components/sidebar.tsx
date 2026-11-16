@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent } from 'react';
-import { BookOpen, ChevronDown, ChevronRight, Columns2, FolderPlus, Pencil, Plus, RefreshCw, Settings2, Square, Trash2, Users } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, Columns2, FolderPlus, Pencil, Plus, RefreshCw, Settings2, Square, Trash2, Users, UsersRound } from 'lucide-react';
 import type { Agent, Project, Team } from '@axo/protocol';
 import { focusedSel, useAxo, useRefreshing, type NodeView } from '../stores/store.ts';
 import { sameSel } from '../lib/layout.ts';
@@ -51,20 +51,39 @@ export function Sidebar() {
 
 function NodeSection({ node }: { node: NodeView }) {
   const [open, setOpen] = useState(true);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const setUi = useAxo((s) => s.setUi);
+  const sel = useAxo((s) => focusedSel(s));
+  // New team defaults to the project you're looking at on this server, else its first project.
+  const newTeam = () => {
+    const agent = sel?.nodeKey === node.key ? node.agents.find((a) => a.id === sel.agentId) : undefined;
+    const projectId = agent?.projectId ?? node.projects[0]?.id;
+    if (projectId) setUi({ newTeam: { nodeKey: node.key, projectId } });
+  };
   return (
     <div className="mb-2">
-      <div className="group flex h-8 items-center gap-1 pl-3 pr-1.5">
+      <div className="group flex h-8 items-center gap-1 pl-3 pr-1.5" onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
         <button data-nav data-level={1} data-label={node.name} aria-expanded={open} className="label flex min-w-0 flex-1 items-center gap-2 rounded-sm outline-none hover:!text-secondary focus-visible:bg-hover cursor-pointer" onClick={() => setOpen(!open)}>
           <ConnDot status={node.status} />
           <span className="truncate">{node.name}</span>
           {!open && <ChevronRight size={10} />}
         </button>
         <span className="font-mono text-2xs text-faint" title={`${node.agents.length} agents`}>{node.agents.length || ''}</span>
+        {node.projects.length > 0 && (
+          <IconButton title="New team" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={newTeam}>
+            <UsersRound size={12} strokeWidth={1.75} />
+          </IconButton>
+        )}
         <IconButton title="Add project" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setUi({ addProject: node.key })}>
           <FolderPlus size={13} strokeWidth={1.75} />
         </IconButton>
       </div>
+      {menu && (
+        <ContextMenu menu={menu} onClose={() => setMenu(null)} items={[
+          ...(node.projects.length ? [{ icon: UsersRound, label: 'New team', run: newTeam }] : []),
+          { icon: FolderPlus, label: 'Add project', run: () => setUi({ addProject: node.key }) },
+        ]} />
+      )}
       {open && (
         <div>
           {node.status === 'unauthorized' && <p className="px-3 py-1 text-xs text-danger">Bad token for this node.</p>}
@@ -92,6 +111,7 @@ function ProjectSection({ node, project }: { node: NodeView; project: Project })
   const client = useAxo((s) => s.client);
   const groups = groupByTeam(project.id, node.agents, node.teams);
   const newAgent = () => setUi({ newAgent: { nodeKey: node.key, projectId: project.id } });
+  const newTeam = () => setUi({ newTeam: { nodeKey: node.key, projectId: project.id } });
 
   const remove = async () => {
     if (!confirm(`Remove project "${project.name}" from Axo?\n\nIts agents will be stopped and deleted. Files on disk are not touched.`)) return;
@@ -121,6 +141,9 @@ function ProjectSection({ node, project }: { node: NodeView; project: Project })
         <IconButton title="Project map and decisions" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setUi({ context: { nodeKey: node.key, projectId: project.id } })}>
           <BookOpen size={12} />
         </IconButton>
+        <IconButton title="New team" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={newTeam}>
+          <UsersRound size={12} />
+        </IconButton>
         <IconButton title="New agent" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={newAgent}>
           <Plus size={13} />
         </IconButton>
@@ -128,6 +151,7 @@ function ProjectSection({ node, project }: { node: NodeView; project: Project })
       {menu && (
         <ContextMenu menu={menu} onClose={() => setMenu(null)} items={[
           { icon: Plus, label: 'New agent', run: newAgent },
+          { icon: UsersRound, label: 'New team', run: newTeam },
           { icon: Pencil, label: 'Rename project', hint: 'F2', run: () => setEditing(true) },
           { icon: BookOpen, label: 'Map & decisions', run: () => setUi({ context: { nodeKey: node.key, projectId: project.id } }) },
           { icon: Trash2, label: 'Remove project', danger: true, run: () => void remove() },
@@ -195,6 +219,7 @@ function TeamSection({ node, project, team, agents }: { node: NodeView; project:
         <ContextMenu menu={menu} onClose={() => setMenu(null)} items={[
           { icon: Plus, label: 'New agent in team', run: newAgent },
           { icon: Pencil, label: 'Rename team', hint: 'F2', run: () => setEditing(true) },
+          { icon: UsersRound, label: 'New team', run: () => setUi({ newTeam: { nodeKey: node.key, projectId: project.id } }) },
         ]} />
       )}
       {open && agents.map((a) => <AgentRow key={a.id} nodeKey={node.key} agent={a} level={4} />)}

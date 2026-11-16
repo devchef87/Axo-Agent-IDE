@@ -9,7 +9,7 @@ import { ErrorBoundary } from './components/error-boundary.tsx';
 import { AgentDrawer } from './components/agent-drawer.tsx';
 import { CommandPalette } from './components/palette.tsx';
 import { focusPaneComposer, focusSidebar, modalOpen, openNewAgent, openQuickOpen, toggleDrawer, toggleView } from './lib/actions.ts';
-import { AddProjectDialog, ForkDialog, NewAgentDialog, RefreshDialog } from './components/dialogs.tsx';
+import { AddProjectDialog, ForkDialog, NewAgentDialog, NewTeamDialog, RefreshDialog } from './components/dialogs.tsx';
 import { ProjectContextDialog } from './components/project-context.tsx';
 import { cn, ConnDot, formatTokens } from './components/ui.tsx';
 import { useTheme, type ThemePref } from './lib/theme.ts';
@@ -59,6 +59,7 @@ export function App() {
       </div>
       <StatusBar />
       <NewAgentDialog />
+      <NewTeamDialog />
       <AddProjectDialog />
       <RefreshDialog />
       <ForkDialog />
