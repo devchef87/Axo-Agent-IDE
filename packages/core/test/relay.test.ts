@@ -144,3 +144,25 @@ describe('cross-server innerchat (app relay)', () => {
     assert.equal((await call(laptop, '/innerchat/outbox')).body.length, 0, 'team address is not relayed');
   });
 });
+
+describe('relay idempotency', () => {
+  it('applies a retried envelope only once', async () => {
+    const { makeNode } = await import('./helpers.ts');
+    const t = await makeNode();
+    try {
+      const p = t.node.projects.create(t.project);
+      const bob = t.node.runtime.create({ projectId: p.id, name: 'bob' });
+      const env = {
+        id: 'env-retry-1', kind: 'tell' as const, from: { agentId: 'x', name: 'alice', role: 'backend' },
+        toServer: 'here', toAgent: 'bob', replyTo: null, text: 'ping once', error: null, createdAt: Date.now(),
+      };
+      assert.deepEqual(t.node.innerchat.relayIn(env, 'prod-1'), { ok: true });
+      assert.deepEqual(t.node.innerchat.relayIn(env, 'prod-1'), { ok: true }); // app crashed before ack, retried
+      await t.waitFor(() => t.node.runtime.get(bob.id).status === 'idle', 5000);
+      const userMsgs = t.feed(bob.id).filter((i) => i.kind === 'user' && i.text.includes('ping once'));
+      assert.equal(userMsgs.length, 1);
+    } finally {
+      await t.stop();
+    }
+  });
+});
