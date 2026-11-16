@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowUp, MoreHorizontal, PanelRight, Power, Square, Trash2, X } from 'lucide-react';
+import { ArrowUp, GitFork, MoreHorizontal, PanelRight, Power, RefreshCw, Square, Trash2, X } from 'lucide-react';
 import type { Agent } from '@axo/protocol';
-import { feedKey, useAgent, useAxo, type Selection } from '../stores/store.ts';
+import { feedKey, useAgent, useAxo, useRefreshing, type Selection } from '../stores/store.ts';
 import { Feed } from './feed/feed.tsx';
 import { cn, formatTokens, IconButton, STATUS_LABEL, StatusDot, useDismiss } from './ui.tsx';
 
@@ -41,6 +41,7 @@ function Header({ agent, sel, subtitle, index, focused, multi }: { agent: Agent;
   const setUi = useAxo((s) => s.setUi);
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const refreshing = useRefreshing(sel);
   useDismiss(menuRef, menu, () => setMenu(false));
   const pct = agent.contextWindow ? Math.min(100, Math.round((agent.contextTokens / agent.contextWindow) * 100)) : 0;
   const pctColor = pct >= 80 ? 'bg-danger' : pct >= 60 ? 'bg-warning' : 'bg-muted';
@@ -55,7 +56,13 @@ function Header({ agent, sel, subtitle, index, focused, multi }: { agent: Agent;
         <div className="flex items-baseline gap-2">
           <span className={cn('truncate text-[13px] font-semibold', multi && !focused ? 'text-secondary' : 'text-primary')}>{agent.name}</span>
           <span className="hidden text-xs text-faint @md:inline">{agent.role}</span>
-          <span className={cn('text-2xs', agent.status === 'error' ? 'text-danger' : 'text-faint')}>{STATUS_LABEL[agent.status]}</span>
+          {refreshing ? (
+            <span className="flex items-center gap-1 text-2xs text-rotating" title="Preparing a fresh context in the background; the agent keeps working">
+              <RefreshCw size={10} className="animate-spin [animation-duration:2s]" /> refreshing…
+            </span>
+          ) : (
+            <span className={cn('text-2xs', agent.status === 'error' ? 'text-danger' : 'text-faint')}>{STATUS_LABEL[agent.status]}</span>
+          )}
         </div>
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-4 text-2xs text-faint">
@@ -81,6 +88,9 @@ function Header({ agent, sel, subtitle, index, focused, multi }: { agent: Agent;
           <IconButton title="Agent actions" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}><MoreHorizontal size={14} /></IconButton>
           {menu && (
             <div role="menu" className="absolute right-0 top-7 z-20 w-48 rounded-md border border-border bg-elevated py-1 shadow-pop">
+              <MenuItem icon={RefreshCw} disabled={refreshing} onClick={() => { setMenu(false); setUi({ refresh: sel }); }}>Refresh context…</MenuItem>
+              <MenuItem icon={GitFork} onClick={() => { setMenu(false); setUi({ fork: sel }); }}>Fork agent…</MenuItem>
+              <div className="my-1 border-t border-border-subtle" />
               <MenuItem icon={Power} onClick={() => act(() => client(sel.nodeKey).post(`/agents/${agent.id}/stop`))}>Stop process</MenuItem>
               <MenuItem icon={Trash2} danger onClick={() => {
                 if (confirm(`Delete agent ${agent.name}? Its chat history will be removed.`)) void act(() => client(sel.nodeKey).del(`/agents/${agent.id}`));
@@ -95,9 +105,9 @@ function Header({ agent, sel, subtitle, index, focused, multi }: { agent: Agent;
   );
 }
 
-function MenuItem({ icon: Icon, children, onClick, danger }: { icon: typeof Power; children: string; onClick: () => void; danger?: boolean }) {
+function MenuItem({ icon: Icon, children, onClick, danger, disabled }: { icon: typeof Power; children: string; onClick: () => void; danger?: boolean; disabled?: boolean }) {
   return (
-    <button role="menuitem" onClick={onClick} className={cn('flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-hover cursor-pointer', danger ? 'text-danger' : 'text-secondary')}>
+    <button role="menuitem" disabled={disabled} onClick={onClick} className={cn('flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-hover cursor-pointer disabled:opacity-40 disabled:pointer-events-none', danger ? 'text-danger' : 'text-secondary')}>
       <Icon size={13} /> {children}
     </button>
   );
