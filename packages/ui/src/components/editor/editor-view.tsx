@@ -35,9 +35,10 @@ export function EditorView() {
     const name = nodes[target.nodeKey]?.name ?? target.nodeKey;
     return (
       <Centered>
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex flex-col items-center gap-2">
           <span className="text-secondary">{name} isn't connected.</span>
-          <span>Its files will show here when it reconnects, or pick another project above.</span>
+          <span>Its files will show here when it reconnects, or pick another project:</span>
+          <EditorTargetPicker />
         </div>
       </Centered>
     );
@@ -52,6 +53,7 @@ export function EditorView() {
   return (
     <div className="flex h-full min-w-0 flex-1">
       <aside className="flex w-64 shrink-0 flex-col border-r border-border-subtle bg-panel">
+        <div className="border-b border-border-subtle p-2"><EditorTargetPicker /></div>
         <FileTree key={targetKey(target)} target={target} label={label} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col bg-bg">
@@ -86,7 +88,7 @@ export function EditorTargetPicker() {
       aria-label="Project"
       value={value}
       onChange={(e) => { const [nodeKey, projectId, team, agent] = e.target.value.split('|'); setTarget({ nodeKey, projectId, team: team || null, agent: agent || null }); }}
-      className="h-6 max-w-64 rounded border border-border bg-bg px-1.5 text-xs text-secondary outline-none focus:border-accent cursor-pointer"
+      className="h-7 w-full max-w-64 rounded border border-border bg-bg px-1.5 text-xs text-secondary outline-none hover:border-border-strong focus:border-accent cursor-pointer"
     >
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>

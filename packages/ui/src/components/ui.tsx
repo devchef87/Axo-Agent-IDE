@@ -12,12 +12,12 @@ export function Button({ variant = 'subtle', size = 'md', className, ...p }: But
     <button
       {...p}
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer',
-        size === 'sm' ? 'h-6 px-2 text-xs' : 'h-8 px-3 text-[13px]',
+        'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer',
+        size === 'sm' ? 'h-6 px-2 text-xs' : 'h-7 px-3 text-xs',
         variant === 'primary' && 'bg-accent text-accent-fg hover:bg-accent-hover',
-        variant === 'subtle' && 'bg-control text-secondary hover:bg-control-hover',
+        variant === 'subtle' && 'border border-border bg-transparent text-secondary hover:border-border-strong hover:text-primary',
         variant === 'ghost' && 'text-muted hover:text-primary hover:bg-hover',
-        variant === 'danger' && 'bg-danger/15 text-danger hover:bg-danger/25',
+        variant === 'danger' && 'border border-danger/40 text-danger hover:bg-danger/10',
         className,
       )}
     />
@@ -30,7 +30,7 @@ export function IconButton({ className, title, ...p }: ButtonHTMLAttributes<HTML
       {...p}
       title={title}
       aria-label={title}
-      className={cn('inline-flex h-6 w-6 items-center justify-center rounded text-faint hover:bg-hover hover:text-primary transition-colors cursor-pointer disabled:opacity-40', className)}
+      className={cn('inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-faint hover:bg-hover hover:text-primary transition-colors cursor-pointer disabled:opacity-40 [&_svg]:stroke-[1.75]', className)}
     />
   );
 }
@@ -57,7 +57,7 @@ export const REFRESH_REASON: Record<string, string> = {
 
 export function StatusDot({ status, className }: { status: AgentStatus; className?: string }) {
   const live = status === 'working' || status === 'starting' || status === 'rotating';
-  return <span className={cn('inline-block h-2 w-2 shrink-0 rounded-full', STATUS_COLOR[status], live && 'animate-pulse-dot', className)} />;
+  return <span className={cn('inline-block h-1.5 w-1.5 shrink-0 rounded-full', STATUS_COLOR[status], live && 'animate-pulse-dot', className)} />;
 }
 
 export function ConnDot({ status }: { status: ConnStatus }) {
@@ -85,7 +85,8 @@ export function useModalFocus(ref: RefObject<HTMLElement | null>, open: boolean,
     const prev = document.activeElement as HTMLElement | null;
     const raf = requestAnimationFrame(() => {
       const el = ref.current;
-      if (el && !el.contains(document.activeElement)) (el.querySelector<HTMLElement>('[autofocus]') ?? el.querySelector<HTMLElement>(FOCUSABLE) ?? el).focus();
+      // Focus the dialog itself (not its first button, which would show a focus ring); Tab moves in.
+      if (el && !el.contains(document.activeElement)) (el.querySelector<HTMLElement>('[autofocus]') ?? el).focus();
     });
     const onKey = (e: KeyboardEvent) => {
       if (e.isComposing) return;
@@ -134,12 +135,12 @@ export function Modal({ open, onClose, title, children, width = 440 }: { open: b
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="animate-fade-in rounded-lg border border-border bg-elevated shadow-pop outline-none"
+        className="animate-fade-in rounded-md border border-border bg-elevated shadow-pop outline-none"
         style={{ width, maxWidth: 'calc(100vw - 2rem)' }}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-border-subtle px-4 py-2.5">
-          <h2 id={titleId} className="text-[13px] font-semibold text-primary">{title}</h2>
+        <div className="flex h-10 items-center justify-between border-b border-border-subtle pl-4 pr-2">
+          <h2 id={titleId} className="label !text-secondary">{title}</h2>
           <IconButton title="Close" onClick={onClose}><X size={14} /></IconButton>
         </div>
         <div className="p-4">{children}</div>

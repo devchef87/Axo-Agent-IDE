@@ -32,11 +32,10 @@ export function App() {
 
   return (
     <div className="flex h-full flex-col">
-      {isElectron && isMac && <TitleStrip />}
+      <TitleBar />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="flex min-w-0 flex-1 flex-col">
-          <ViewBar />
           <div className="flex min-h-0 flex-1">
             <ErrorBoundary resetKey={view} label={view === 'fleet' ? 'Fleet' : view[0].toUpperCase() + view.slice(1)} onReset={view === 'fleet' ? undefined : () => useAxo.getState().setView('fleet')}>
             {view === 'editor' ? (
@@ -67,14 +66,8 @@ export function App() {
   );
 }
 
-/**
- * macOS title strip: the only drag region in the app. Traffic lights sit at x:12 in the
- * first 80px, so that area stays empty. Nothing in here is clickable; never put .drag on
- * anything larger — Electron swallows clicks over drag regions, even under modals.
- */
 // The editor (CodeMirror, language data) loads on first use; pdf.js loads only for PDFs.
 const EditorView = lazy(() => import('./components/editor/editor-view.tsx').then((m) => ({ default: m.EditorView })));
-const EditorTargetPicker = lazy(() => import('./components/editor/editor-view.tsx').then((m) => ({ default: m.EditorTargetPicker })));
 
 const VIEWS = [
   { id: 'fleet' as const, label: 'Fleet', icon: Users },
@@ -83,30 +76,55 @@ const VIEWS = [
   { id: 'watches' as const, label: 'Watches', icon: Eye },
 ];
 
-function ViewBar() {
-  const activeWatches = useActiveWatchCount();
+
+/**
+ * The one bar at the top: wordmark, views, where you are, and search. On macOS it is also
+ * the window's drag region (the only one; Electron swallows clicks over drag regions, even
+ * under modals), with the traffic lights centred in the first 84px. Controls opt out with .no-drag.
+ */
+function TitleBar() {
   const view = useAxo((s) => s.view);
   const setView = useAxo((s) => s.setView);
+  const setUi = useAxo((s) => s.setUi);
+  const activeWatches = useActiveWatchCount();
+  const mac = isElectron && isMac;
+  const crumbs = useAxo((s) => {
+    const sel = focusedSel(s);
+    const node = sel ? s.nodes[sel.nodeKey] : undefined;
+    const agent = node?.agents.find((a) => a.id === sel!.agentId);
+    if (!node || !agent) return null;
+    return [node.name, node.projects.find((p) => p.id === agent.projectId)?.name, agent.name].filter(Boolean).join(' / ');
+  });
   return (
-    <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border-subtle bg-panel px-2">
-      <div role="tablist" aria-label="View" className="flex items-center gap-0.5">
+    <header className={cn('relative flex h-[38px] shrink-0 select-none items-center gap-3 border-b border-border-subtle bg-panel pr-2', mac ? 'drag pl-[84px]' : 'pl-3')}>
+      <span className="label !text-primary !tracking-[0.18em]">Axo</span>
+      <nav role="tablist" aria-label="View" className="no-drag flex items-center">
         {VIEWS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             role="tab"
             aria-selected={view === id}
-            title={id === 'fleet' || id === 'editor' ? `${label} (⌘E switches Fleet/Editor)` : label}
+            title={id === 'fleet' || id === 'editor' ? `${label} · ⌘E switches Fleet/Editor` : label}
             onClick={() => setView(id)}
-            className={cn('flex h-6 items-center gap-1.5 rounded px-2 text-xs font-medium cursor-pointer',
-              view === id ? 'bg-control text-primary' : 'text-muted hover:bg-hover hover:text-secondary')}
+            className={cn('relative flex h-[38px] items-center gap-1.5 px-2.5 text-xs cursor-pointer transition-colors',
+              view === id ? 'text-primary' : 'text-faint hover:text-secondary')}
           >
-            <Icon size={12} /> {label}
-            {id === 'watches' && activeWatches > 0 && <span className="rounded bg-working/15 px-1 text-2xs text-working">{activeWatches}</span>}
+            <Icon size={13} strokeWidth={1.75} /> {label}
+            {id === 'watches' && activeWatches > 0 && <span className="font-mono text-2xs text-secondary">{activeWatches}</span>}
+            {view === id && <span className="absolute inset-x-2.5 bottom-0 h-px bg-accent" aria-hidden />}
           </button>
         ))}
-      </div>
-      {view === 'editor' && <div className="ml-2"><Suspense fallback={null}><EditorTargetPicker /></Suspense></div>}
-    </div>
+      </nav>
+      <span className="min-w-0 flex-1 truncate text-center font-mono text-2xs text-faint">{crumbs}</span>
+      <button
+        onClick={() => setUi({ palette: true })}
+        title="Search agents, projects and commands"
+        className="no-drag flex h-6 w-56 shrink items-center gap-2 rounded border border-border bg-bg px-2 text-xs text-faint hover:border-border-strong hover:text-secondary cursor-pointer"
+      >
+        <Search size={12} /> Search or jump to…
+        <span className="ml-auto font-mono text-2xs">⌘K</span>
+      </button>
+    </header>
   );
 }
 
@@ -135,23 +153,6 @@ function useGlobalShortcuts() {
   }, []);
 }
 
-function TitleStrip() {
-  const crumbs = useAxo((s) => {
-    const sel = focusedSel(s);
-    const node = sel ? s.nodes[sel.nodeKey] : undefined;
-    const agent = node?.agents.find((a) => a.id === sel!.agentId);
-    if (!node || !agent) return null;
-    return [node.name, node.projects.find((p) => p.id === agent.projectId)?.name, agent.name].filter(Boolean).join('  /  ');
-  });
-  return (
-    <div className="drag relative flex h-8 shrink-0 select-none items-center border-b border-border-subtle bg-panel pl-20 pr-3">
-      <span className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-primary">
-        Axo
-      </span>
-      {crumbs && <span className="absolute inset-x-48 truncate text-center text-xs text-muted">{crumbs}</span>}
-    </div>
-  );
-}
 
 const THEME_OPTIONS: { pref: ThemePref; label: string; icon: typeof Sun }[] = [
   { pref: 'system', label: 'System', icon: Monitor },
@@ -185,14 +186,11 @@ function ThemeToggle() {
 function NodeStatus({ nodeKey }: { nodeKey: string }) {
   const node = useAxo((s) => s.nodes[nodeKey]);
   const today = useNodeToday(nodeKey);
-  const multi = useAxo((s) => s.nodeOrder.length > 1);
   return (
-    <span className="flex items-center gap-1.5"
+    <span className="flex shrink-0 items-center gap-1.5"
       title={[node.error ?? node.status, node.version ? `v${node.version}` : null,
         today ? `today: ${formatTokens(totalTokens(today))} tokens, ${formatUsd(today.costUsd)}, ${today.turns} turns` : null].filter(Boolean).join(' · ')}>
-      <ConnDot status={node.status} /> {node.name}
-      {multi && today && <span className="font-mono text-faint">{formatTokens(totalTokens(today))} · {formatUsd(today.costUsd)}</span>}
-      {!multi && node.version && <span className="text-faint">v{node.version}</span>}
+      <ConnDot status={node.status} /> <span className={node.status === 'online' ? 'text-secondary' : undefined}>{node.name}</span>
     </span>
   );
 }
@@ -205,29 +203,29 @@ function StatusBar() {
   const byNode = useUsage((s) => s.byNode);
   const todayTok = order.reduce((n, k) => n + totalTokens(byNode[k]?.total), 0);
   const todayCost = order.reduce((n, k) => n + (byNode[k]?.total.costUsd ?? 0), 0);
-  const setUi = useAxo((s) => s.setUi);
   const setView = useAxo((s) => s.setView);
   const activeWatches = useActiveWatchCount();
+  const seg = 'flex h-full items-center gap-1.5 border-l border-border-subtle px-3';
   return (
-    <div className="flex h-6 shrink-0 items-center gap-4 border-t border-border-subtle bg-panel px-3 text-2xs text-muted">
-      {order.map((k) => <NodeStatus key={k} nodeKey={k} />)}
-      <button
-        className="flex items-center gap-1 rounded px-1 hover:bg-hover hover:text-secondary cursor-pointer"
-        title="Command palette (⌘K)"
-        onClick={() => setUi({ palette: true })}
-      >
-        <Search size={10} /> ⌘K
-      </button>
-      <span className="ml-auto">{working} working · {all.length} agents</span>
-      {activeWatches > 0 && (
-        <button className="flex items-center gap-1 rounded px-1 hover:bg-hover hover:text-secondary cursor-pointer" title="Open Watches" onClick={() => setView('watches')}>
-          <Eye size={10} /> {activeWatches} watch{activeWatches === 1 ? '' : 'es'}
-        </button>
-      )}
-      <span title={`Today across ${order.length === 1 ? 'this node' : 'all nodes'}: ${formatTokens(todayTok)} tokens, ${formatUsd(todayCost)}`}>
-        today {formatTokens(todayTok)} tok · {formatUsd(todayCost)}
-      </span>
-      <ThemeToggle />
-    </div>
+    <footer className="flex h-6 shrink-0 items-stretch border-t border-border-subtle bg-panel font-mono text-2xs text-faint">
+      <div className="flex min-w-0 items-center gap-3 px-3">
+        {order.map((k) => <NodeStatus key={k} nodeKey={k} />)}
+      </div>
+      <div className="ml-auto flex items-stretch">
+        <span className={seg} title={`${working} working of ${all.length} agents`}>
+          {working > 0 && <span className="h-1.5 w-1.5 rounded-full bg-working animate-pulse-dot" aria-hidden />}
+          <span className="text-secondary">{working}</span>/{all.length} working
+        </span>
+        {activeWatches > 0 && (
+          <button className={cn(seg, 'hover:bg-hover hover:text-secondary cursor-pointer')} title="Open Watches" onClick={() => setView('watches')}>
+            <Eye size={10} /> <span className="text-secondary">{activeWatches}</span> watch{activeWatches === 1 ? '' : 'es'}
+          </button>
+        )}
+        <span className={seg} title={`Today across ${order.length === 1 ? 'this node' : 'all nodes'}`}>
+          today <span className="text-secondary">{formatTokens(todayTok)}</span> tok <span className="text-secondary">{formatUsd(todayCost)}</span>
+        </span>
+        <span className={cn(seg, 'pr-2')}><ThemeToggle /></span>
+      </div>
+    </footer>
   );
 }

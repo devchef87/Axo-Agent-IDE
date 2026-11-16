@@ -47,7 +47,7 @@ export function AddServer({ onDone, existing }: { onDone: () => void; existing: 
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
 
   return (
-    <div className="mt-2 rounded-md border border-border bg-inset p-3">
+    <div className="px-4 py-3">
       <div className="mb-3 flex items-center gap-1 text-xs">
         {(['config', 'manual'] as const).map((t) => (
           <button

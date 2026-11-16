@@ -26,21 +26,21 @@ export function ServersPanel() {
         <p className="flex items-center gap-2 text-[13px] text-muted"><Loader2 size={13} className="animate-spin" /> Loading…</p>
       ) : (
         <div className="-m-4 flex max-h-[70vh] flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="min-h-0 flex-1 divide-y divide-border-subtle overflow-y-auto">
             <LocalRow snap={snap} />
             {snap.servers.map((v) => <ServerRow key={v.config.id} view={v} bundledBuild={snap.bundled.build} />)}
             {adding
               ? <AddServer onDone={() => setAdding(false)} existing={snap.servers.map((s) => s.config.host)} />
               : (
                 <button
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-border px-3 py-2.5 text-xs text-faint hover:border-accent/60 hover:text-secondary cursor-pointer"
+                  className="flex h-10 w-full items-center gap-2 px-4 text-xs text-faint hover:bg-hover hover:text-secondary cursor-pointer"
                   onClick={() => setAdding(true)}
                 >
-                  <Plus size={13} /> Add server
+                  <Plus size={13} strokeWidth={1.75} /> Add server
                 </button>
               )}
           </div>
-          <p className="border-t border-border-subtle px-4 py-2 text-2xs text-faint">
+          <p className="border-t border-border-subtle px-4 py-2.5 text-2xs leading-relaxed text-faint">
             Axo connects with your system <code className="font-mono">ssh</code>, so keys come from ssh-agent, Keychain and ~/.ssh/config. Nothing secret is stored.
             Bundled node build <span className="font-mono">{snap.bundled.build}</span>.
           </p>
@@ -54,13 +54,17 @@ function LocalRow({ snap }: { snap: ServersSnapshot }) {
   const { local } = snap;
   const api = serversApi()!;
   return (
-    <div className="mb-2 rounded-md border border-border-subtle bg-inset px-3 py-2.5">
-      <div className="flex items-center gap-2">
-        <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted" />
-        <span className="text-[13px] font-medium text-primary">Local</span>
-        <span className="text-2xs text-faint">this Mac</span>
-        <VersionTag build={local.node?.build} stale={local.updateAvailable} />
-        <div className="ml-auto flex items-center gap-1.5">
+    <div className="px-4 py-3">
+      <div className="flex items-center gap-3">
+        <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-muted" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[13px] text-primary">Local</span>
+            <span className="font-mono text-2xs text-faint">connected</span>
+          </div>
+          <div className="mt-0.5 flex items-center gap-2 font-mono text-2xs text-faint">this Mac <VersionTag build={local.node?.build} stale={local.updateAvailable} /></div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
           {local.updateWaiting
             ? <Button size="sm" variant="ghost" onClick={() => void api.cancelLocalUpdate()}>Cancel update</Button>
             : local.updateAvailable && (
@@ -70,7 +74,7 @@ function LocalRow({ snap }: { snap: ServersSnapshot }) {
             )}
         </div>
       </div>
-      {local.message && <p className="mt-1 pl-3.5 text-xs text-muted">{local.message}</p>}
+      {local.message && <p className="mt-1.5 pl-[18px] text-xs text-muted">{local.message}</p>}
     </div>
   );
 }
@@ -110,14 +114,20 @@ function ServerRow({ view, bundledBuild }: { view: ServerView; bundledBuild: str
   const shownError = error && error !== st.message ? error : null;
 
   return (
-    <div className="mb-2 rounded-md border border-border-subtle bg-inset px-3 py-2.5">
-      <div className="flex items-center gap-2">
+    <div className="px-4 py-3">
+      <div className="flex items-center gap-3">
         <span className={cn('inline-block h-1.5 w-1.5 shrink-0 rounded-full', phase.dot)} />
-        <span className="truncate text-[13px] font-medium text-primary">{c.name}</span>
-        <span className="truncate font-mono text-2xs text-faint">{where}</span>
-        <span className="text-2xs text-faint">· {phase.label}</span>
-        <VersionTag build={st.node?.build} stale={st.updateAvailable} />
-        <div className="ml-auto flex shrink-0 items-center gap-1">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="truncate text-[13px] text-primary" title={c.name}>{c.name}</span>
+            <span className={cn('shrink-0 font-mono text-2xs', st.phase === 'error' ? 'text-danger' : 'text-faint')}>{phase.label}</span>
+          </div>
+          <div className="mt-0.5 flex min-w-0 items-center gap-2 font-mono text-2xs text-faint">
+            <span className="truncate" title={where}>{where}</span>
+            <VersionTag build={st.node?.build} stale={st.updateAvailable} />
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => { setShowChecks(true); void act('preflight', () => api.preflight(c.id)); }} title="Check OS, node, claude login, git, disk">
             {pending === 'preflight' ? <Loader2 size={12} className="animate-spin" /> : <ListChecks size={12} />} Preflight
           </Button>
@@ -126,7 +136,7 @@ function ServerRow({ view, bundledBuild }: { view: ServerView; bundledBuild: str
           ) : (
             <Button
               size="sm"
-              variant={st.updateAvailable || !deployed ? 'primary' : 'ghost'}
+              variant={st.updateAvailable ? 'primary' : deployed ? 'ghost' : 'subtle'}
               disabled={busy}
               onClick={() => void act('deploy', () => api.deploy(c.id))}
               title={st.phase === 'connected' ? 'Waits until no agent is mid-turn, then restarts the node; agents resume by session' : `Upload the node (build ${bundledBuild}) and start it`}
@@ -140,7 +150,7 @@ function ServerRow({ view, bundledBuild }: { view: ServerView; bundledBuild: str
               <Unplug size={12} /> Disconnect
             </Button>
           ) : (
-            <Button size="sm" variant={deployed && !st.updateAvailable ? 'primary' : 'subtle'} disabled={busy} onClick={() => void act('connect', () => api.connect(c.id))}>
+            <Button size="sm" variant={deployed ? 'primary' : 'subtle'} disabled={busy} onClick={() => void act('connect', () => api.connect(c.id))}>
               <Plug size={12} /> Connect
             </Button>
           )}
@@ -149,11 +159,11 @@ function ServerRow({ view, bundledBuild }: { view: ServerView; bundledBuild: str
       </div>
 
       {(st.message || shownError) && (
-        <p className={cn('mt-1 whitespace-pre-wrap pl-3.5 text-xs', st.phase === 'error' || shownError ? 'text-danger' : 'text-muted')}>{shownError ?? st.message}</p>
+        <p className={cn('mt-1.5 whitespace-pre-wrap pl-[18px] text-xs', st.phase === 'error' || shownError ? 'text-danger' : 'text-muted')}>{shownError ?? st.message}</p>
       )}
 
       {confirmRemove && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-control px-3 py-2 text-xs text-secondary">
+        <div className="ml-[18px] mt-2 flex flex-wrap items-center gap-2 border-l border-danger/60 py-1 pl-3 text-xs text-secondary">
           <span className="mr-auto">Remove <b>{c.name}</b> from Axo?</span>
           <Button size="sm" variant="subtle" onClick={() => void act('remove', () => api.remove(c.id))} title="The node and its agents keep running on the server">Remove, keep node running</Button>
           <Button size="sm" variant="danger" onClick={() => void act('remove', () => api.remove(c.id, { stopNode: true }))}>Remove and stop node</Button>
@@ -162,7 +172,7 @@ function ServerRow({ view, bundledBuild }: { view: ServerView; bundledBuild: str
       )}
 
       {st.preflight && (
-        <div className="mt-1.5 pl-3.5">
+        <div className="mt-1.5 pl-[18px]">
           <button className="flex items-center gap-1 text-2xs text-faint hover:text-secondary cursor-pointer" onClick={() => setShowChecks(!showChecks)}>
             {showChecks ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             Preflight {st.preflight.ok ? 'passed' : 'found problems'} · {new Date(st.preflight.ts).toLocaleTimeString()}
@@ -194,10 +204,10 @@ function VersionTag({ build, stale }: { build?: string; stale: boolean }) {
   if (!build) return null;
   return (
     <span
-      className={cn('rounded px-1 font-mono text-2xs', stale ? 'bg-warning/15 text-warning' : 'bg-control text-faint')}
+      className={cn('font-mono text-2xs', stale ? 'text-secondary' : 'text-faint')}
       title={stale ? 'Running an older build than this app bundles' : 'Running the bundled build'}
     >
-      {build}{stale && ' · update'}
+      {build}{stale && ' · update available'}
     </span>
   );
 }

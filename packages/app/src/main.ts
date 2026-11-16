@@ -101,9 +101,9 @@ async function createWindow(): Promise<void> {
     minWidth: 860,
     minHeight: 520,
     backgroundColor: initialBackground(),
-    // 32px title strip in the renderer; 12px traffic lights centred in it (y = (32 - 12) / 2).
+    // 38px title bar in the renderer (px, not rem); 12px traffic lights centred in it: y = (38 - 12) / 2.
     titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
-    trafficLightPosition: { x: 12, y: 10 },
+    trafficLightPosition: { x: 16, y: 13 },
     show: false,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),

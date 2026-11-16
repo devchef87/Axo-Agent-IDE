@@ -29,7 +29,7 @@ export function ToolGroup({ items, live }: { items: ToolItem[]; live: boolean })
     <div className="my-1.5">
       <button
         onClick={() => setOpen(!open)}
-        className="group flex max-w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-faint hover:bg-hover hover:text-secondary cursor-pointer"
+        className="group -ml-1.5 flex max-w-full items-center gap-2 rounded px-1.5 py-1 font-mono text-2xs text-faint hover:bg-hover hover:text-secondary cursor-pointer"
       >
         <ChevronRight size={12} className={cn('shrink-0 transition-transform', open && 'rotate-90')} />
         {showLive ? (

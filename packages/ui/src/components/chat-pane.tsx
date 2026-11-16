@@ -28,7 +28,6 @@ export function ChatPane({ sel, index = 0, focused = true, multi = false }: { se
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col bg-bg">
       <Header agent={agent} sel={sel} subtitle={`${nodeName} / ${project?.name ?? ''}`} index={index} focused={focused} multi={multi} />
-      <UsageStrip agent={agent} nodeKey={sel.nodeKey} />
       {feed ? (
         <Feed feed={feed} agent={agent} nodeKey={sel.nodeKey} onLoadOlder={() => void loadFeed(sel.nodeKey, sel.agentId, true)} />
       ) : (
@@ -52,26 +51,21 @@ function Header({ agent, sel, subtitle, index, focused, multi }: { agent: Agent;
   const act = async (fn: () => Promise<unknown>) => { setMenu(false); try { await fn(); } catch (e: any) { alert(e.message); } };
 
   return (
-    <div className={cn('flex h-11 shrink-0 items-center gap-3 border-b border-border-subtle px-4',
-      multi && focused && 'shadow-[inset_0_2px_0_var(--accent)]')}>
+    <div className={cn('flex h-10 shrink-0 items-center gap-2.5 border-b border-border-subtle pl-4 pr-2',
+      multi && focused && 'shadow-[inset_0_1px_0_var(--accent)]')}>
       <StatusDot status={agent.status} />
-      <div className="min-w-0">
-        <div className="flex items-baseline gap-2">
-          <span className={cn('truncate text-[13px] font-semibold', multi && !focused ? 'text-secondary' : 'text-primary')}>{agent.name}</span>
-          <span className="hidden text-xs text-faint @md:inline">{agent.role}</span>
-          {refreshing ? (
-            <span className="flex items-center gap-1 text-2xs text-rotating" title="Preparing a fresh context in the background; the agent keeps working">
-              <RefreshCw size={10} className="animate-spin [animation-duration:2s]" /> refreshing…
-            </span>
-          ) : (
-            <span className={cn('text-2xs', agent.status === 'error' ? 'text-danger' : 'text-faint')}>{STATUS_LABEL[agent.status]}</span>
-          )}
-        </div>
-      </div>
-      <div className="ml-auto flex shrink-0 items-center gap-4 text-2xs text-faint">
-        <span className="hidden truncate @3xl:inline">{subtitle}</span>
-        <span className="hidden font-mono @xl:inline">{agent.model}</span>
-        <div className="flex items-center gap-0.5">
+      <span className={cn('truncate text-[13px] font-medium', multi && !focused ? 'text-secondary' : 'text-primary')} title={subtitle}>{agent.name}</span>
+      <span className="hidden shrink-0 font-mono text-2xs text-faint @md:inline">{agent.role}</span>
+      {refreshing ? (
+        <span className="flex shrink-0 items-center gap-1 font-mono text-2xs text-rotating" title="Preparing a fresh context in the background; the agent keeps working">
+          <RefreshCw size={10} className="animate-spin [animation-duration:2s]" /> refreshing
+        </span>
+      ) : (
+        <span className={cn('shrink-0 font-mono text-2xs', agent.status === 'error' ? 'text-danger' : 'text-faint')}>{STATUS_LABEL[agent.status]}</span>
+      )}
+      <div className="ml-auto flex min-w-0 items-center gap-4">
+        <Readouts agent={agent} nodeKey={sel.nodeKey} />
+        <div className="flex shrink-0 items-center gap-0.5">
         <IconButton
           title="Agent settings (⌘I)"
           aria-pressed={drawerOpen && focused}
@@ -101,35 +95,30 @@ function Header({ agent, sel, subtitle, index, focused, multi }: { agent: Agent;
   );
 }
 
-/** Context, session and today's usage for one agent, under the pane header. */
-function UsageStrip({ agent, nodeKey }: { agent: Agent; nodeKey: string }) {
+/** Context, session and today's usage, as compact readouts in the pane header. */
+function Readouts({ agent, nodeKey }: { agent: Agent; nodeKey: string }) {
   const today = useAgentToday(nodeKey, agent.id);
   const pct = agent.contextWindow ? Math.min(100, Math.round((agent.contextTokens / agent.contextWindow) * 100)) : 0;
-  const pctCls = pct >= 80 ? 'bg-danger' : pct >= 60 ? 'bg-warning' : 'bg-muted';
-  const todayTok = totalTokens(today);
+  const tone = pct >= 80 ? 'text-danger' : pct >= 60 ? 'text-warning' : 'text-secondary';
   const cacheHit = today && today.input + today.cacheRead + today.cacheCreation > 0
     ? Math.round((today.cacheRead / (today.input + today.cacheRead + today.cacheCreation)) * 100) : null;
   return (
-    <div className="flex h-7 shrink-0 items-center gap-4 overflow-hidden border-b border-border-subtle px-4 text-2xs text-faint" aria-label="Usage">
+    <div className="flex min-w-0 items-center gap-4 overflow-hidden font-mono text-2xs text-faint" aria-label="Usage">
       <span className="flex shrink-0 items-center gap-1.5"
-        title={`${agent.contextTokens.toLocaleString()} of ${agent.contextWindow.toLocaleString()} context tokens${agent.compactions ? ` · ${agent.compactions} compaction${agent.compactions === 1 ? '' : 's'}` : ''}`}>
-        <span>Context</span>
-        <span className="h-1 w-16 overflow-hidden rounded-full bg-control" role="meter" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Context used">
-          <span className={cn('block h-full rounded-full', pctCls)} style={{ width: `${pct}%` }} />
+        title={`Context: ${agent.contextTokens.toLocaleString()} of ${agent.contextWindow.toLocaleString()} tokens${agent.compactions ? ` · ${agent.compactions} compaction${agent.compactions === 1 ? '' : 's'}` : ''}`}>
+        CTX
+        <span className="relative h-[3px] w-12 bg-control" role="meter" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Context used">
+          <span className={cn('absolute inset-y-0 left-0', pct >= 80 ? 'bg-danger' : pct >= 60 ? 'bg-warning' : 'bg-secondary')} style={{ width: `${pct}%` }} />
         </span>
-        <span className={cn('font-mono', pct >= 80 ? 'text-danger' : pct >= 60 ? 'text-warning' : 'text-muted')}>{pct}%</span>
-        <span className="hidden font-mono @md:inline">{formatTokens(agent.contextTokens)}/{formatTokens(agent.contextWindow)}</span>
+        <span className={tone}>{pct}%</span>
       </span>
-      <span className="hidden shrink-0 font-mono @lg:inline" title="Tokens processed in the current session">session {formatTokens(agent.sessionTokens)}</span>
-      <span className="shrink-0 font-mono" title={today
-        ? `Today: ${today.turns} turn${today.turns === 1 ? '' : 's'} · in ${today.input.toLocaleString()} · out ${today.output.toLocaleString()} · cache read ${today.cacheRead.toLocaleString()} · cache write ${today.cacheCreation.toLocaleString()}`
+      <span className="hidden shrink-0 @lg:inline" title="Tokens processed in the current session">SES <span className="text-secondary">{formatTokens(agent.sessionTokens)}</span></span>
+      <span className="hidden shrink-0 @md:inline" title={today
+        ? `Today: ${today.turns} turn${today.turns === 1 ? '' : 's'} · ${formatTokens(totalTokens(today))} tokens · in ${today.input.toLocaleString()} · out ${today.output.toLocaleString()} · cache read ${today.cacheRead.toLocaleString()} · cache write ${today.cacheCreation.toLocaleString()}${cacheHit !== null ? ` · cache hit ${cacheHit}%` : ''}`
         : 'No turns today'}>
-        today <span className="text-muted">{formatUsd(today?.costUsd ?? 0)}</span>
-        <span className="hidden @md:inline"> · {formatTokens(todayTok)} tok</span>
-        <span className="hidden @xl:inline"> · {today?.turns ?? 0} turn{today?.turns === 1 ? '' : 's'}</span>
+        TODAY <span className="text-secondary">{formatUsd(today?.costUsd ?? 0)}</span>
       </span>
-      {cacheHit !== null && <span className="hidden shrink-0 font-mono @2xl:inline" title="Share of today's input tokens served from the prompt cache">cache {cacheHit}%</span>}
-      {agent.compactions > 0 && <span className="hidden shrink-0 @3xl:inline">{agent.compactions} compaction{agent.compactions === 1 ? '' : 's'}</span>}
+      <span className="hidden shrink-0 @2xl:inline">{agent.model}</span>
     </div>
   );
 }
@@ -180,10 +169,10 @@ function Composer({ agent, sel, autoFocus }: { agent: Agent; sel: Selection; aut
   };
 
   return (
-    <div className="shrink-0 px-6 pb-4">
+    <div className="shrink-0 px-6 pb-4 pt-1">
       <div>
         {error && <div className="mb-1.5 text-xs text-danger">{error}</div>}
-        <div className="rounded-lg border border-border bg-elevated focus-within:border-accent/60">
+        <div className="rounded border border-border bg-panel transition-colors focus-within:border-border-strong">
           <textarea
             ref={ta}
             value={text}
@@ -191,29 +180,29 @@ function Composer({ agent, sel, autoFocus }: { agent: Agent; sel: Selection; aut
             onKeyDown={onKey}
             rows={1}
             placeholder={working ? 'Queue a message (delivered when this turn ends) · Esc to interrupt' : `Message ${agent.name}…`}
-            className="block max-h-72 w-full resize-none bg-transparent px-3.5 pt-2.5 pb-1 text-[13.5px] leading-relaxed text-primary placeholder:text-faint outline-none"
+            className="block max-h-72 w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-[13px] leading-relaxed text-primary placeholder:text-faint outline-none"
           />
-          <div className="flex items-center gap-2 px-2 pb-2">
-            <span className="pl-1.5 text-2xs text-faint">
-              {agent.queued > 0 ? `${agent.queued} queued` : working ? 'working…' : 'Enter to send · Shift+Enter for newline'}
+          <div className="flex items-center gap-2 px-1.5 pb-1.5">
+            <span className="pl-1.5 font-mono text-2xs text-faint">
+              {agent.queued > 0 ? `${agent.queued} queued` : working ? 'working · esc to interrupt' : '↵ send · ⇧↵ newline'}
             </span>
             <div className="ml-auto flex items-center gap-1.5">
               {working && (
                 <button
                   title="Interrupt (Esc)"
                   onClick={() => void client(sel.nodeKey).post(`/agents/${agent.id}/interrupt`)}
-                  className="flex h-7 w-7 items-center justify-center rounded-md bg-control text-secondary hover:bg-danger/25 hover:text-danger cursor-pointer"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-border text-secondary hover:border-danger/50 hover:text-danger cursor-pointer"
                 >
-                  <Square size={11} fill="currentColor" />
+                  <Square size={9} fill="currentColor" />
                 </button>
               )}
               <button
                 title="Send (Enter)"
                 disabled={!text.trim()}
                 onClick={() => void send()}
-                className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-accent-fg hover:bg-accent-hover disabled:bg-control disabled:text-faint cursor-pointer"
+                className="flex h-6 w-6 items-center justify-center rounded bg-accent text-accent-fg hover:bg-accent-hover disabled:bg-control disabled:text-faint cursor-pointer"
               >
-                <ArrowUp size={14} strokeWidth={2.5} />
+                <ArrowUp size={13} strokeWidth={2.25} />
               </button>
             </div>
           </div>
