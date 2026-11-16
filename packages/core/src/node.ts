@@ -17,6 +17,7 @@ import { Headless } from './journalist/headless.ts';
 import { Journalist, type JournalistOptions } from './journalist/journalist.ts';
 import { Rotator, type RotationConfig } from './rotation/rotator.ts';
 import { FileWatcher } from './files/watcher.ts';
+import { Terminals } from './terminal/terminals.ts';
 
 /** One Axo node: store + runtime + API. Same code locally and on servers. */
 export class Node {
@@ -33,6 +34,7 @@ export class Node {
   readonly watches: Watches;
   readonly innerchat: InnerChat;
   readonly fileWatcher: FileWatcher;
+  readonly terminals: Terminals;
   private server: Server | null = null;
 
   constructor(
@@ -67,6 +69,7 @@ export class Node {
     this.journalist = new Journalist(this.runtime, this.store, this.bus, this.headless, extra.journalist);
     this.rotator = new Rotator(this.runtime, this.journalist, this.headless, this.bus, this.cfg, extra.rotation);
     this.runtime.on('renamed', ({ agent, from }) => this.journalist.renameAgent(agent, from));
+    this.terminals = new Terminals();
     this.fileWatcher = new FileWatcher((root, projectId, paths) => this.bus.publish({ type: 'files:changed', projectId, root, paths }));
     this.bus.on('event', (e: any) => { if (e.type === 'project:removed') this.fileWatcher.dropProject(e.projectId); });
   }
@@ -78,7 +81,7 @@ export class Node {
     this.server = await startServer(this.cfg, this.bus, buildRouter(this), () => ({
       type: 'hello', nodeId: this.cfg.nodeId, version: VERSION, seq: this.bus.currentSeq, epoch: this.bus.epoch,
       ts: Date.now(),
-    }) as any);
+    }) as any, this.terminals);
     const addr = this.server.address();
     if (addr && typeof addr === 'object') this.cfg.port = addr.port;
     this.watches.restore(); // after listen: a fired watch may spawn an agent, which needs the port
@@ -86,6 +89,7 @@ export class Node {
   }
 
   async stop(): Promise<void> {
+    this.terminals.shutdown();
     this.fileWatcher.close();
     this.watches.stop();
     this.innerchat.stop();
