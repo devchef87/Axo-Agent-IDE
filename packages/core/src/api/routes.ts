@@ -1,8 +1,10 @@
 import { readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { homedir } from 'node:os';
-import type { CreateAgentReq, CreateProjectReq, ForkReq, FsEntry, MessageReq, NodeState, ProjectContext, RefreshReq, StateDoc, UpdateAgentReq, VersionInfo } from '@axo/protocol';
-import { Router } from './server.ts';
+import type { CreateAgentReq, CreateProjectReq, ForkReq, FsEntry, MessageReq, NodeState, ProjectContext, RefreshReq, StateDoc, UpdateAgentReq, UsageSummary, UsageTotals, VersionInfo } from '@axo/protocol';
+import { RawResponse, Router } from './server.ts';
+import { IMAGE_MIME } from '../runtime/images.ts';
+import { createReadStream, existsSync } from 'node:fs';
 import type { Node } from '../node.ts';
 import { HttpError } from '../util/http-error.ts';
 import { expandHome } from '../projects.ts';
@@ -80,6 +82,28 @@ export function buildRouter(node: Node): Router {
   });
 
   registerFileRoutes(r, node);
+
+  // ── usage + tool-result images (Axo-UI) ──
+  r.get('/usage', ({ query }): UsageSummary => {
+    const since = Number(query.get('since')) || Date.now() - 24 * 3600_000;
+    const zero = (): UsageTotals => ({ input: 0, output: 0, cacheRead: 0, cacheCreation: 0, costUsd: 0, turns: 0 });
+    const total = zero();
+    const agents: Record<string, UsageTotals> = {};
+    for (const { agentId, ...u } of store.usageSince(since)) {
+      agents[agentId] = u;
+      for (const k of Object.keys(total) as (keyof UsageTotals)[]) total[k] += u[k];
+    }
+    return { since, total, agents };
+  });
+  r.get('/agents/:id/images/:imageId', ({ params }) => {
+    const file = runtime.images.path(params.id, params.imageId);
+    if (!file || !existsSync(file)) throw new HttpError(404, 'image not found');
+    const type = IMAGE_MIME[params.imageId.split('.').pop()!];
+    return new RawResponse((_req, res) => {
+      res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'private, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' });
+      createReadStream(file).pipe(res);
+    });
+  });
 
   // ── fs (minimal: directory picker for remote nodes; full file API arrives in phase 4) ──
   r.get('/fs/list', async ({ query }): Promise<{ path: string; parent: string | null; entries: FsEntry[] }> => {

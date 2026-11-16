@@ -6,6 +6,8 @@ import type { Agent, FeedItem } from '@axo/protocol';
 import type { FeedState } from '../../stores/store.ts';
 import { ToolGroup, useTick } from './tool-group.tsx';
 import { cn, formatDuration, REFRESH_REASON } from '../ui.tsx';
+import { Collapsible } from './collapsible.tsx';
+import { FeedContext } from './feed-context.ts';
 
 type ToolItem = Extract<FeedItem, { kind: 'tool' }>;
 type Block =
@@ -28,7 +30,7 @@ function toBlocks(items: FeedItem[], drafts: Record<string, string>): Block[] {
   return out;
 }
 
-export function Feed({ feed, agent, onLoadOlder }: { feed: FeedState; agent: Agent; onLoadOlder: () => void }) {
+export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; agent: Agent; nodeKey: string; onLoadOlder: () => void }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [stick, setStick] = useState(true);
   const blocks = useMemo(() => toBlocks(feed.items, feed.drafts), [feed.items, feed.drafts]);
@@ -46,7 +48,9 @@ export function Feed({ feed, agent, onLoadOlder }: { feed: FeedState; agent: Age
     if (el.scrollTop < 40 && feed.hasMore) onLoadOlder();
   };
 
+  const ctx = useMemo(() => ({ nodeKey, agentId: agent.id }), [nodeKey, agent.id]);
   return (
+    <FeedContext.Provider value={ctx}>
     <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl px-6 py-5">
         {feed.hasMore && <div className="mb-3 text-center text-2xs text-faint">Scroll up for earlier messages</div>}
@@ -61,6 +65,7 @@ export function Feed({ feed, agent, onLoadOlder }: { feed: FeedState; agent: Age
         {working && <Working agent={agent} lastBlock={blocks.at(-1)} />}
       </div>
     </div>
+    </FeedContext.Provider>
   );
 }
 
@@ -89,7 +94,7 @@ function UserMessage({ item }: { item: Extract<FeedItem, { kind: 'user' }> }) {
         )}
       >
         {!fromUser && <div className="mb-0.5 text-2xs font-medium text-innerchat">{item.author}</div>}
-        {item.text}
+        <Collapsible as="div" text={item.text} />
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Fake `claude -p --input-format stream-json` for tests. Behaviour is driven by keywords in the user message:
 //   TOOL   → emits a Bash tool_use + tool_result before replying
+//   IMAGE  → emits a Read tool_use whose tool_result contains a PNG image block
 //   SLOW   → takes 1.5s; honours control_request interrupt
 //   STUCK  → takes 30s and ignores interrupts
 //   CRASH  → exits(1) mid-turn
@@ -81,6 +82,15 @@ async function turn(text) {
   if (/TOOL/.test(text)) {
     out({ type: 'assistant', message: { id, content: [{ type: 'tool_use', id: `tu_${n}`, name: 'Bash', input: { command: 'echo hi', description: 'Say hi' } }], usage } });
     out({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: `tu_${n}`, content: 'hi', is_error: false }] } });
+  }
+
+  if (/IMAGE/.test(text)) {
+    // 1×1 transparent PNG
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    out({ type: 'assistant', message: { id: `${id}_img`, content: [{ type: 'tool_use', id: `tu_img_${n}`, name: 'Read', input: { file_path: process.cwd() + '/shot.png' } }], usage } });
+    out({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: `tu_img_${n}`, is_error: false, content: [
+      { type: 'image', source: { type: 'base64', media_type: 'image/png', data: png } },
+    ] }] } });
   }
 
   let interrupted = false;

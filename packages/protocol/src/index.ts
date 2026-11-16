@@ -76,6 +76,7 @@ export type FeedItem =
       status: 'running' | 'ok' | 'error';
       result?: string;
       durationMs?: number;
+      images?: { id: string; mediaType: string }[]; // [ui] from the tool result; GET /agents/:id/images/:imageId
     })
   | (FeedBase & { kind: 'system'; level: 'info' | 'warn' | 'error'; text: string })
   | (FeedBase & { kind: 'rotation'; generation: number; reason: string; note: string | null }) // context refresh divider
@@ -389,4 +390,10 @@ export interface DiffRes { diffs: FileDiff[] }
 export interface FileWatchRes { watching: boolean; expiresAt: number; truncated: boolean }
 /** GET /projects/:id/files/original?path= — the file at HEAD; null if untracked/new. */
 export interface OriginalRes { path: string; content: string | null }
+
+// ── feed polish + usage (Axo-UI) ────────────────────────────
+
+export interface UsageTotals { input: number; output: number; cacheRead: number; cacheCreation: number; costUsd: number; turns: number }
+/** GET /usage?since=<ms> — totals since `since` (the UI sends local midnight for "today"). */
+export interface UsageSummary { since: number; total: UsageTotals; agents: Record<string, UsageTotals> }
 

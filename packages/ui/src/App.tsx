@@ -7,7 +7,7 @@ import { Sidebar } from './components/sidebar.tsx';
 import { Fleet } from './components/fleet.tsx';
 import { AgentDrawer } from './components/agent-drawer.tsx';
 import { CommandPalette } from './components/palette.tsx';
-import { focusPaneComposer, modalOpen, openNewAgent, openQuickOpen, toggleDrawer, toggleView } from './lib/actions.ts';
+import { focusPaneComposer, focusSidebar, modalOpen, openNewAgent, openQuickOpen, toggleDrawer, toggleView } from './lib/actions.ts';
 import { AddProjectDialog, ForkDialog, NewAgentDialog, RefreshDialog } from './components/dialogs.tsx';
 import { ProjectContextDialog } from './components/project-context.tsx';
 import { cn, ConnDot, formatTokens } from './components/ui.tsx';
@@ -17,6 +17,7 @@ import { startNotifications } from './lib/notifications.ts';
 import { TeamsView } from './components/teams/teams-view.tsx';
 import { WatchesView } from './components/watches/watches-view.tsx';
 import { useActiveWatchCount, useWatchSync } from './stores/watches.ts';
+import { formatUsd, totalTokens, useNodeToday, useUsage, useUsageSync } from './stores/usage.ts';
 
 export function App() {
   const init = useAxo((s) => s.init);
@@ -26,6 +27,7 @@ export function App() {
   useEffect(() => { startNotifications(); }, []);
   useGlobalShortcuts();
   useWatchSync();
+  useUsageSync();
 
   return (
     <div className="flex h-full flex-col">
@@ -120,6 +122,7 @@ function useGlobalShortcuts() {
       if (modalOpen()) return;
       if (k === 'n' && !e.shiftKey) { e.preventDefault(); openNewAgent(); }
       else if (k === 'e' && !e.shiftKey) { e.preventDefault(); toggleView(); }
+      else if (k === 'l' && !e.shiftKey) { e.preventDefault(); focusSidebar(); } // ⌘0 is the menu's reset-zoom
       else if (k === 'p' && !e.shiftKey) { e.preventDefault(); openQuickOpen(); }
       else if (k === 'i' && !e.shiftKey) { e.preventDefault(); useAxo.getState().setView('fleet'); toggleDrawer(); }
       else if (/^[1-3]$/.test(k)) { e.preventDefault(); useAxo.getState().setView('fleet'); focusPaneComposer(Number(k) - 1); }
@@ -176,23 +179,35 @@ function ThemeToggle() {
   );
 }
 
+function NodeStatus({ nodeKey }: { nodeKey: string }) {
+  const node = useAxo((s) => s.nodes[nodeKey]);
+  const today = useNodeToday(nodeKey);
+  const multi = useAxo((s) => s.nodeOrder.length > 1);
+  return (
+    <span className="flex items-center gap-1.5"
+      title={[node.error ?? node.status, node.version ? `v${node.version}` : null,
+        today ? `today: ${formatTokens(totalTokens(today))} tokens, ${formatUsd(today.costUsd)}, ${today.turns} turns` : null].filter(Boolean).join(' · ')}>
+      <ConnDot status={node.status} /> {node.name}
+      {multi && today && <span className="font-mono text-faint">{formatTokens(totalTokens(today))} · {formatUsd(today.costUsd)}</span>}
+      {!multi && node.version && <span className="text-faint">v{node.version}</span>}
+    </span>
+  );
+}
+
 function StatusBar() {
   const nodes = useAxo((s) => s.nodes);
   const order = useAxo((s) => s.nodeOrder);
   const all = order.flatMap((k) => nodes[k].agents);
   const working = all.filter((a) => a.status === 'working' || a.status === 'starting').length;
-  const tokens = all.reduce((n, a) => n + a.sessionTokens, 0);
+  const byNode = useUsage((s) => s.byNode);
+  const todayTok = order.reduce((n, k) => n + totalTokens(byNode[k]?.total), 0);
+  const todayCost = order.reduce((n, k) => n + (byNode[k]?.total.costUsd ?? 0), 0);
   const setUi = useAxo((s) => s.setUi);
   const setView = useAxo((s) => s.setView);
   const activeWatches = useActiveWatchCount();
   return (
     <div className="flex h-6 shrink-0 items-center gap-4 border-t border-border-subtle bg-panel px-3 text-2xs text-muted">
-      {order.map((k) => (
-        <span key={k} className="flex items-center gap-1.5" title={nodes[k].error ?? nodes[k].status}>
-          <ConnDot status={nodes[k].status} /> {nodes[k].name}
-          {nodes[k].version && <span className="text-faint">v{nodes[k].version}</span>}
-        </span>
-      ))}
+      {order.map((k) => <NodeStatus key={k} nodeKey={k} />)}
       <button
         className="flex items-center gap-1 rounded px-1 hover:bg-hover hover:text-secondary cursor-pointer"
         title="Command palette (⌘K)"
@@ -206,7 +221,9 @@ function StatusBar() {
           <Eye size={10} /> {activeWatches} watch{activeWatches === 1 ? '' : 'es'}
         </button>
       )}
-      <span title="Tokens processed across current sessions">{formatTokens(tokens)} tok</span>
+      <span title={`Today across ${order.length === 1 ? 'this node' : 'all nodes'}: ${formatTokens(todayTok)} tokens, ${formatUsd(todayCost)}`}>
+        today {formatTokens(todayTok)} tok · {formatUsd(todayCost)}
+      </span>
       <ThemeToggle />
     </div>
   );

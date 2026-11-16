@@ -246,6 +246,13 @@ export class Store {
     this.db.prepare('INSERT INTO usage VALUES (?,?,?,?,?,?,?,?)')
       .run(agentId, sessionId, Date.now(), u.input, u.output, u.cacheRead, u.cacheCreation, u.costUsd);
   }
+
+  /** Per-agent totals of turns that ended at or after `since` (uses usage_ts). */
+  usageSince(since: number): { agentId: string; input: number; output: number; cacheRead: number; cacheCreation: number; costUsd: number; turns: number }[] {
+    return (this.db.prepare(`SELECT agent_id, SUM(input) i, SUM(output) o, SUM(cache_read) cr, SUM(cache_creation) cc, SUM(cost_usd) c, COUNT(*) n
+      FROM usage WHERE ts >= ? GROUP BY agent_id`).all(since) as Row[])
+      .map((r) => ({ agentId: r.agent_id, input: r.i, output: r.o, cacheRead: r.cr, cacheCreation: r.cc, costUsd: r.c, turns: r.n }));
+  }
 }
 
 // ── row mappers ─────────────────────────────────────────────

@@ -4,6 +4,7 @@ import type { Agent } from '@axo/protocol';
 import { feedKey, useAgent, useAxo, useRefreshing, type Selection } from '../stores/store.ts';
 import { Feed } from './feed/feed.tsx';
 import { cn, formatTokens, IconButton, STATUS_LABEL, StatusDot, useDismiss } from './ui.tsx';
+import { formatUsd, totalTokens, useAgentToday } from '../stores/usage.ts';
 
 export function ChatPane({ sel, index = 0, focused = true, multi = false }: { sel: Selection; index?: number; focused?: boolean; multi?: boolean }) {
   const agent = useAgent(sel);
@@ -24,8 +25,9 @@ export function ChatPane({ sel, index = 0, focused = true, multi = false }: { se
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col bg-bg">
       <Header agent={agent} sel={sel} subtitle={`${nodeName} / ${project?.name ?? ''}`} index={index} focused={focused} multi={multi} />
+      <UsageStrip agent={agent} nodeKey={sel.nodeKey} />
       {feed ? (
-        <Feed feed={feed} agent={agent} onLoadOlder={() => void loadFeed(sel.nodeKey, sel.agentId, true)} />
+        <Feed feed={feed} agent={agent} nodeKey={sel.nodeKey} onLoadOlder={() => void loadFeed(sel.nodeKey, sel.agentId, true)} />
       ) : (
         <div className="flex-1" />
       )}
@@ -43,8 +45,6 @@ function Header({ agent, sel, subtitle, index, focused, multi }: { agent: Agent;
   const menuRef = useRef<HTMLDivElement>(null);
   const refreshing = useRefreshing(sel);
   useDismiss(menuRef, menu, () => setMenu(false));
-  const pct = agent.contextWindow ? Math.min(100, Math.round((agent.contextTokens / agent.contextWindow) * 100)) : 0;
-  const pctColor = pct >= 80 ? 'bg-danger' : pct >= 60 ? 'bg-warning' : 'bg-muted';
 
   const act = async (fn: () => Promise<unknown>) => { setMenu(false); try { await fn(); } catch (e: any) { alert(e.message); } };
 
@@ -68,13 +68,6 @@ function Header({ agent, sel, subtitle, index, focused, multi }: { agent: Agent;
       <div className="ml-auto flex shrink-0 items-center gap-4 text-2xs text-faint">
         <span className="hidden truncate @3xl:inline">{subtitle}</span>
         <span className="hidden font-mono @xl:inline">{agent.model}</span>
-        <span className="hidden items-center gap-1.5 font-mono @lg:flex" title={`${agent.contextTokens.toLocaleString()} / ${agent.contextWindow.toLocaleString()} context tokens · ${agent.compactions} compactions`}>
-          <span className="h-1 w-12 overflow-hidden rounded-full bg-control">
-            <span className={cn('block h-full rounded-full', pctColor)} style={{ width: `${pct}%` }} />
-          </span>
-          {pct}%
-        </span>
-        <span className="hidden font-mono @2xl:inline" title="Tokens processed this session">{formatTokens(agent.sessionTokens)} tok</span>
         <div className="flex items-center gap-0.5">
         <IconButton
           title="Agent settings (⌘I)"
@@ -101,6 +94,39 @@ function Header({ agent, sel, subtitle, index, focused, multi }: { agent: Agent;
         {multi && <IconButton title="Close pane" onClick={() => closePane(index)}><X size={14} /></IconButton>}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Context, session and today's usage for one agent, under the pane header. */
+function UsageStrip({ agent, nodeKey }: { agent: Agent; nodeKey: string }) {
+  const today = useAgentToday(nodeKey, agent.id);
+  const pct = agent.contextWindow ? Math.min(100, Math.round((agent.contextTokens / agent.contextWindow) * 100)) : 0;
+  const pctCls = pct >= 80 ? 'bg-danger' : pct >= 60 ? 'bg-warning' : 'bg-muted';
+  const todayTok = totalTokens(today);
+  const cacheHit = today && today.input + today.cacheRead + today.cacheCreation > 0
+    ? Math.round((today.cacheRead / (today.input + today.cacheRead + today.cacheCreation)) * 100) : null;
+  return (
+    <div className="flex h-7 shrink-0 items-center gap-4 overflow-hidden border-b border-border-subtle px-4 text-2xs text-faint" aria-label="Usage">
+      <span className="flex shrink-0 items-center gap-1.5"
+        title={`${agent.contextTokens.toLocaleString()} of ${agent.contextWindow.toLocaleString()} context tokens${agent.compactions ? ` · ${agent.compactions} compaction${agent.compactions === 1 ? '' : 's'}` : ''}`}>
+        <span>Context</span>
+        <span className="h-1 w-16 overflow-hidden rounded-full bg-control" role="meter" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Context used">
+          <span className={cn('block h-full rounded-full', pctCls)} style={{ width: `${pct}%` }} />
+        </span>
+        <span className={cn('font-mono', pct >= 80 ? 'text-danger' : pct >= 60 ? 'text-warning' : 'text-muted')}>{pct}%</span>
+        <span className="hidden font-mono @md:inline">{formatTokens(agent.contextTokens)}/{formatTokens(agent.contextWindow)}</span>
+      </span>
+      <span className="hidden shrink-0 font-mono @lg:inline" title="Tokens processed in the current session">session {formatTokens(agent.sessionTokens)}</span>
+      <span className="shrink-0 font-mono" title={today
+        ? `Today: ${today.turns} turn${today.turns === 1 ? '' : 's'} · in ${today.input.toLocaleString()} · out ${today.output.toLocaleString()} · cache read ${today.cacheRead.toLocaleString()} · cache write ${today.cacheCreation.toLocaleString()}`
+        : 'No turns today'}>
+        today <span className="text-muted">{formatUsd(today?.costUsd ?? 0)}</span>
+        <span className="hidden @md:inline"> · {formatTokens(todayTok)} tok</span>
+        <span className="hidden @xl:inline"> · {today?.turns ?? 0} turn{today?.turns === 1 ? '' : 's'}</span>
+      </span>
+      {cacheHit !== null && <span className="hidden shrink-0 font-mono @2xl:inline" title="Share of today's input tokens served from the prompt cache">cache {cacheHit}%</span>}
+      {agent.compactions > 0 && <span className="hidden shrink-0 @3xl:inline">{agent.compactions} compaction{agent.compactions === 1 ? '' : 's'}</span>}
     </div>
   );
 }

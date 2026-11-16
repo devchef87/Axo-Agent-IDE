@@ -17,7 +17,7 @@ export type Action =
   | { type: 'session'; sessionId: string; model: string | null }
   | { type: 'feed'; item: FeedItem }
   | { type: 'text-delta'; itemId: string; text: string }
-  | { type: 'tool-result'; toolUseId: string; isError: boolean; content: string; ts: number }
+  | { type: 'tool-result'; toolUseId: string; isError: boolean; content: string; ts: number; images?: ResultImage[] }
   | { type: 'context'; tokens: number }
   | { type: 'compact'; trigger: string | null; preTokens: number | null }
   | { type: 'turn-end'; isError: boolean; subtype: string; durationMs: number; apiDurationMs: number; numTurns: number; usage: TurnUsage; sessionId: string | null }
@@ -101,8 +101,9 @@ export function parseLine(line: string, ctx: ParseContext, now = Date.now()): Ac
       const out: Action[] = [];
       for (const block of content) {
         if (block.type === 'tool_result') {
+          const images = resultImages(block.content);
           out.push({ type: 'tool-result', toolUseId: block.tool_use_id, isError: !!block.is_error,
-            content: clamp(stringifyResult(block.content), MAX_RESULT), ts: now });
+            content: clamp(stringifyResult(block.content), MAX_RESULT), ts: now, ...(images.length ? { images } : {}) });
         }
       }
       return out;
@@ -176,6 +177,23 @@ function oneLine(s: unknown): string {
   if (typeof s !== 'string') return '';
   const line = s.split('\n')[0];
   return line.length > 160 ? line.slice(0, 157) + '…' : line;
+}
+
+/** An image returned by a tool (Read of a PNG, screenshots, …), still base64. */
+export interface ResultImage { mediaType: string; data: string }
+const MAX_IMAGES_PER_RESULT = 4;
+const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+
+export function resultImages(c: unknown): ResultImage[] {
+  if (!Array.isArray(c)) return [];
+  const out: ResultImage[] = [];
+  for (const b of c as any[]) {
+    if (b?.type !== 'image' || b.source?.type !== 'base64' || typeof b.source.data !== 'string') continue;
+    if (!IMAGE_TYPES.has(b.source.media_type)) continue;
+    out.push({ mediaType: b.source.media_type, data: b.source.data });
+    if (out.length >= MAX_IMAGES_PER_RESULT) break;
+  }
+  return out;
 }
 
 function stringifyResult(c: unknown): string {

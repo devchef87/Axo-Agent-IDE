@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { BookOpen, Code2, Eye, GitMerge, FileSearch, Users, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Bell, BellOff, Search, Server, Sun, X, type LucideIcon } from 'lucide-react';
+import { BookOpen, ListTree, Code2, Eye, GitMerge, FileSearch, Users, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Bell, BellOff, Search, Server, Sun, X, type LucideIcon } from 'lucide-react';
 import type { AgentStatus } from '@axo/protocol';
 import { focusedSel, useAxo } from '../stores/store.ts';
 import { useTheme, type ThemePref } from '../lib/theme.ts';
 import { fuzzyFilter } from '../lib/fuzzy.ts';
-import { openNewAgent, openQuickOpen, toggleDrawer, toggleView } from '../lib/actions.ts';
+import { focusSidebar, openNewAgent, openQuickOpen, toggleDrawer, toggleView } from '../lib/actions.ts';
 import { isElectron } from '../lib/bridge.ts';
 import { notificationsEnabled, setNotificationsEnabled } from '../lib/notifications.ts';
 import { cn, Kbd, StatusDot, useModalFocus } from './ui.tsx';
@@ -74,6 +74,7 @@ function useCommands(open: boolean): Command[] {
     out.unshift(s.view === 'editor'
       ? { id: 'view', group: 'Actions', label: 'Back to Fleet', icon: Users, shortcut: '⌘E', run: () => toggleView() }
       : { id: 'view', group: 'Actions', label: 'Open editor', icon: Code2, shortcut: '⌘E', run: () => toggleView() });
+    out.push({ id: 'focus-sidebar', group: 'Actions', label: 'Focus sidebar (arrow keys to move)', icon: ListTree, shortcut: '⌘L', run: () => focusSidebar() });
     out.push({ id: 'view-teams', group: 'Actions', label: 'Teams: review & merge branches', icon: GitMerge, run: () => s.setView('teams') });
     out.push({ id: 'view-watches', group: 'Actions', label: 'Watches', icon: Eye, run: () => s.setView('watches') });
     out.splice(1, 0, { id: 'go-to-file', group: 'Actions', label: 'Go to file…', icon: FileSearch, shortcut: '⌘P', run: () => openQuickOpen() });
