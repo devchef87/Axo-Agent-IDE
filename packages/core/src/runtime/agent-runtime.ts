@@ -30,6 +30,8 @@ interface Live {
   inflight: Queued[];
   /** Assistant prose produced during the current turn (for turn-end listeners). */
   turnText: string[];
+  /** Settings changed mid-turn: restart the process at the next boundary so they apply. */
+  recycle?: boolean;
 }
 
 /**
@@ -207,7 +209,8 @@ export class AgentRuntime extends EventEmitter {
     this.store.saveAgent(a);
     // If idle, recycle the process so new settings take effect on the next message.
     const l = this.live.get(id);
-    if (l && !l.turnActive) this.endProcess(id, 'sleep');
+    if (l && !l.turnActive) void this.endProcess(id, 'sleep');
+    else if (l) l.recycle = true;
     this.emitAgent(a);
     return this.view(a);
   }
@@ -524,6 +527,11 @@ export class AgentRuntime extends EventEmitter {
     };
     try { this.emit('turn-end', ev); } catch (e) { console.error('[runtime] turn-end listener failed', e); }
     this.flushIdleWaiters(a.id);
+    if (live.recycle && this.live.get(a.id) === live) {
+      // New model/effort/instructions take effect now; queued messages go to the fresh process (onExit pumps).
+      void this.endProcess(a.id, 'sleep');
+      return;
+    }
     this.pump(a.id);
     if (!live.turnActive) this.armIdle(a.id);
   }

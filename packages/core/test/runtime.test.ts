@@ -183,3 +183,20 @@ describe('runtime hooks', () => {
     assert.equal(events[0].interrupted, false);
   });
 });
+
+describe('settings changes', () => {
+  it('applies model changes made mid-turn at the next turn boundary', async () => {
+    t = await makeNode();
+    const p = t.node.projects.create(t.project);
+    const a = t.node.runtime.create({ projectId: p.id, task: 'SLOW work', model: 'sonnet' });
+    await t.waitFor(() => t.node.runtime.get(a.id).status === 'working');
+    t.node.runtime.update(a.id, { model: 'haiku' });
+    t.node.runtime.deliver(a.id, 'next');
+    const agentSpawns = () => t.spawns().filter((s) => s.args.includes('--input-format'));
+    await t.waitFor(() => agentSpawns().length === 2);
+    const args = agentSpawns()[1].args;
+    assert.equal(args[args.indexOf('--model') + 1], 'haiku');
+    assert.ok(args.includes('--resume'));
+    await t.waitFor(() => t.feed(a.id).some((i) => i.kind === 'text' && i.text === 'echo: next'));
+  });
+});
