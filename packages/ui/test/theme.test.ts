@@ -28,7 +28,8 @@ export function contrast(a: string, b: string): number {
 const THEMES = { dark: tokens('[data-theme="dark"]'), light: tokens('[data-theme="light"]') };
 const SURFACES = ['bg', 'panel', 'elevated', 'inset', 'hover'];
 const TEXT = ['text-primary', 'text-secondary', 'text-muted', 'text-faint', 'accent',
-  'success', 'warning', 'danger', 'info', 'working', 'rotating', 'innerchat'];
+  'success', 'warning', 'danger', 'info', 'working', 'rotating', 'innerchat',
+  'syn-keyword', 'syn-string', 'syn-number', 'syn-comment', 'syn-function', 'syn-type', 'syn-property', 'syn-tag'];
 
 for (const [name, t] of Object.entries(THEMES)) {
   describe(`${name} theme`, () => {

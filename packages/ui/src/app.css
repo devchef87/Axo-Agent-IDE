@@ -40,6 +40,15 @@
   --working: #4fbbe0;
   --rotating: #b892f2;
   --innerchat: #9097f5;
+  /* syntax (code editor) */
+  --syn-keyword: #d49cf7;
+  --syn-string: #9ccc7a;
+  --syn-number: #f0a868;
+  --syn-comment: #8f95a0;
+  --syn-function: #7cb7f2;
+  --syn-type: #6fcfc2;
+  --syn-property: #e2c07e;
+  --syn-tag: #f2917a;
   /* misc */
   --scrollbar: #3a3e48;
   --scrollbar-hover: #4a4f5b;
@@ -74,6 +83,14 @@
   --working: #0f6a90;
   --rotating: #7445c4;
   --innerchat: #4a51c2;
+  --syn-keyword: #8a3fb8;
+  --syn-string: #376b1b;
+  --syn-number: #a1500a;
+  --syn-comment: #6c675f;
+  --syn-function: #1f62a8;
+  --syn-type: #0d7468;
+  --syn-property: #845600;
+  --syn-tag: #b23c28;
   --scrollbar: #d3ccc1;
   --scrollbar-hover: #bdb5a8;
   --overlay: rgb(40 34 28 / 0.32);
@@ -158,6 +175,13 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 
 @media (prefers-reduced-motion: reduce) {
   .animate-pulse-dot, .animate-fade-in { animation: none; }
+}
+
+/* Transparent-image backdrop in the media viewer. */
+.checkerboard {
+  background-color: var(--inset);
+  background-image: conic-gradient(var(--hover) 25%, transparent 0 50%, var(--hover) 0 75%, transparent 0);
+  background-size: 16px 16px;
 }
 
 /* Markdown (assistant prose) */
