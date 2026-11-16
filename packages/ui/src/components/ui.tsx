@@ -164,7 +164,7 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 }
 
 export const inputCls =
-  'w-full rounded border border-border bg-inset px-2.5 py-1.5 text-[13px] text-primary placeholder:text-faint outline-none transition-colors hover:border-border-strong/60 focus:border-ring';
+  'w-full rounded border border-border bg-inset px-2.5 py-1.5 text-[13px] text-primary placeholder:text-faint outline-none transition-colors hover:border-control-hover focus:border-control-hover';
 
 export function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;

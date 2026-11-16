@@ -1,3 +1,4 @@
+import { ResizeHandle, usePanelWidth } from '../resize.tsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Ban, CheckCircle2, Clock, Eye, Loader2, RotateCcw, XCircle } from 'lucide-react';
 import type { Watch } from '@axo/protocol';
@@ -127,8 +128,11 @@ function WatchDetail({ nodeKey, watch: w }: { nodeKey: string; watch: Watch }) {
     try { await client(nodeKey).post(`/watches/${w.id}/${what}`); } catch (e: any) { setError(e.message); } finally { setBusy(false); }
   };
 
+  const size = usePanelWidth('watch-detail', 520, 320, 960);
+
   return (
-    <aside className="flex w-[46%] min-w-80 shrink-0 flex-col border-l border-border-subtle bg-panel" aria-label="Watch details">
+    <aside style={{ width: size.width }} className="relative flex shrink-0 flex-col border-l border-border-subtle bg-panel" aria-label="Watch details">
+      <ResizeHandle edge="left" width={size.width} onResize={size.set} onReset={size.reset} label="Resize watch details" />
       <div className="shrink-0 border-b border-border-subtle px-4 py-3">
         <div className="flex items-center gap-2">
           <WatchIcon w={w} />

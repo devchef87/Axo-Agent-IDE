@@ -1,3 +1,4 @@
+import { ResizeHandle, usePanelWidth } from './resize.tsx';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { GitFork, Pencil, Power, RefreshCw, Trash2, X } from 'lucide-react';
 import type { Agent, StateDoc } from '@axo/protocol';
@@ -19,13 +20,16 @@ export function AgentDrawer() {
   const setUi = useAxo((s) => s.setUi);
   const [tab, setTab] = useState<Tab>('state');
   const close = () => setUi({ drawer: false });
+  const size = usePanelWidth('drawer', 320, 260, 640);
 
   return (
     <aside
       aria-label="Agent settings"
-      className="flex h-full w-80 shrink-0 flex-col border-l border-border-subtle bg-panel"
+      style={{ width: size.width }}
+      className="relative flex h-full shrink-0 flex-col border-l border-border-subtle bg-panel"
       onKeyDown={(e) => { if (e.key === 'Escape' && !e.nativeEvent.isComposing) { e.stopPropagation(); close(); } }}
     >
+      <ResizeHandle edge="left" width={size.width} onResize={size.set} onReset={size.reset} label="Resize agent settings" />
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border-subtle px-3">
         {agent && <StatusDot status={agent.status} />}
         <span className="truncate text-[13px] font-semibold text-primary">{agent?.name ?? 'No agent'}</span>
