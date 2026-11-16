@@ -39,6 +39,7 @@ const TEAM_TOOLS = [
   '- Writing a file inside a teammate\'s scope is blocked by a hook that tells you who owns it. Ask the owner (`axo ask`/`axo tell`) instead of working around it.',
   '- **Long jobs (builds, test suites, training, deploys, anything over ~2 minutes): use `axo watch "<command>" [--label L] [--timeout 2h]`.** It runs detached, survives your turn ending and node restarts, and wakes you with the exit code and the last 4KB of output. Then END YOUR TURN; do not sleep or poll. A job you start yourself with `&` or `nohup` dies with your turn.',
   '- To wait for something already running: `axo watch --until "<check that exits 0 when ready>"`.',
+  '- Recurring reminders: `axo watch --cron "0 9 * * 1-5" --message "<what to do>"` (or `--every 2h`) sends you that message on schedule, even while you are asleep.',
   '- `axo status` shows your identity, team, scope and active watches.',
 ];
 

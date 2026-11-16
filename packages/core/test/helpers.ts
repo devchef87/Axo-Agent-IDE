@@ -34,7 +34,7 @@ export async function makeNode(opts: RuntimeOptions = {}, extra: Record<string, 
 
   const mk = () => new Node({ home, port: 0, claudeBin: FAKE_CLAUDE, idleReapMs: 60_000, ...extra }, opts, undefined, {
     journalist: { debounceMs: 60_000, ...nodeExtra?.journalist }, rotation: nodeExtra?.rotation,
-    watches: { minPollMs: 50, commandPollMs: 50 },
+    watches: { minPollMs: 50, commandPollMs: 50, cronTickMs: 50 },
   });
   const t: TestNode = {
     node: mk(),

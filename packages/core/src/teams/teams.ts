@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { basename } from 'node:path';
 import type { Agent, ArchiveTeamReq, BranchDiff, CreateAgentReq, CreateTeamReq, MergeRes, Project, Team, TeamMode, UpdateProjectReq } from '@axo/protocol';
@@ -7,7 +7,7 @@ import type { Store } from '../store/db.ts';
 import type { EventBus } from '../events.ts';
 import type { AgentRuntime } from '../runtime/agent-runtime.ts';
 import { ulid } from '../util/ulid.ts';
-import { excludeFromGit } from '../journalist/files.ts';
+import { ContextFiles, excludeFromGit } from '../journalist/files.ts';
 import { HttpError } from '../util/http-error.ts';
 import { branchDiff, currentBranch, mergeBranch } from './merge.ts';
 
@@ -72,6 +72,7 @@ export class Teams {
       team.worktreePath = path;
     }
     store.insertTeam(team);
+    if (req.goal?.trim()) this.writeGoal(project, team, req.goal);
     bus.publish({ type: 'team:upsert', team });
     if (team.worktreePath && project.setupCmd?.trim()) this.d.runSetup?.(team, project.setupCmd.trim());
     return team;
@@ -85,6 +86,14 @@ export class Teams {
       throw new HttpError(409, `a team named ${name} already exists`);
     }
     // Branch and worktree keep their original slug: renaming must not move anyone's workdir.
+    // The team brief is keyed by name, so it follows the rename.
+    const project = this.d.store.getProject(team.projectId)!;
+    const files = new ContextFiles(project);
+    const brief = files.read(files.teamBriefPath(team.name));
+    if (brief && name !== team.name) {
+      files.write(files.teamBriefPath(name), brief.replace(/^# Team .*$/m, `# Team ${name}`));
+      rmSync(files.teamBriefPath(team.name), { force: true });
+    }
     team.name = name;
     this.d.store.saveTeam(team);
     this.d.bus.publish({ type: 'team:upsert', team });
@@ -112,6 +121,43 @@ export class Teams {
     store.saveTeam(team);
     bus.publish({ type: 'team:upsert', team });
     return team;
+  }
+
+  // ── team brief (goal) ────────────────────────────────────
+
+  /** The team brief the journalist feeds every teammate's prompt (`.axo/context/teams/<name>.md`). */
+  brief(teamId: string): string {
+    const team = this.get(teamId);
+    const files = new ContextFiles(this.d.store.getProject(team.projectId)!);
+    return files.read(files.teamBriefPath(team.name));
+  }
+
+  /** Set the goal: replaces the brief's `## Goal` section, keeping anything else in it. */
+  setGoal(teamId: string, goal: string): Team {
+    const team = this.get(teamId);
+    this.writeGoal(this.d.store.getProject(team.projectId)!, team, goal);
+    this.d.bus.publish({ type: 'team:upsert', team });
+    return team;
+  }
+
+  private writeGoal(project: Project, team: Team, goal: string): void {
+    const text = goal.trim();
+    if (text.length > 4000) throw new HttpError(413, 'goal too long (4k chars max); link to a spec file instead');
+    const files = ContextFiles.ensure(project);
+    const path = files.teamBriefPath(team.name);
+    const current = files.read(path);
+    const section = text ? `## Goal\n${text}\n` : '';
+    let next: string;
+    if (!current.trim()) {
+      const where = team.branch ? `\n## Where\nBranch \`${team.branch}\`${team.worktreePath ? ` in \`${team.worktreePath}\`` : ''}.\n` : '';
+      next = `# Team ${team.name}\n\n${section}${where}`;
+    } else if (/^## Goal\s*$/m.test(current)) {
+      next = current.replace(/^## Goal\s*\n[\s\S]*?(?=^## |(?![\s\S]))/m, section ? `${section}\n` : '');
+    } else {
+      next = current.replace(/^(# .*\n)/, `$1\n${section}`);
+      if (next === current) next = `${section}\n${current}`;
+    }
+    files.write(path, next);
   }
 
   updateProject(id: string, req: UpdateProjectReq): Project {
