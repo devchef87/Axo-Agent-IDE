@@ -1,7 +1,7 @@
 import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { AlertTriangle, Info, OctagonAlert } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronUp, Info, OctagonAlert } from 'lucide-react';
 import type { Agent, FeedItem } from '@axo/protocol';
 import type { FeedState } from '../../stores/store.ts';
 import { ToolGroup, useTick } from './tool-group.tsx';
@@ -35,6 +35,7 @@ export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; a
   const [stick, setStick] = useState(true);
   const blocks = useMemo(() => toBlocks(feed.items, feed.drafts), [feed.items, feed.drafts]);
   const working = agent.status === 'working' || agent.status === 'starting';
+  const lastText = blocks.findLastIndex((b) => b.type === 'item' && b.item.kind === 'text');
 
   useLayoutEffect(() => {
     const el = scroller.current;
@@ -61,7 +62,7 @@ export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; a
             Send the first instruction below.
           </div>
         )}
-        {blocks.map((b, i) => <BlockView key={b.type === 'item' ? b.item.id : b.id} block={b} live={working && i >= blocks.length - 2} />)}
+        {blocks.map((b, i) => <BlockView key={b.type === 'item' ? b.item.id : b.id} block={b} live={working && i >= blocks.length - 2} latest={i === lastText} />)}
         {working && <Working agent={agent} lastBlock={blocks.at(-1)} />}
       </div>
     </div>
@@ -69,13 +70,13 @@ export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; a
   );
 }
 
-const BlockView = memo(function BlockView({ block, live }: { block: Block; live: boolean }) {
+const BlockView = memo(function BlockView({ block, live, latest }: { block: Block; live: boolean; latest: boolean }) {
   if (block.type === 'tools') return <ToolGroup items={block.items} live={live} />;
   if (block.type === 'draft') return <Prose text={block.text} />;
   const item = block.item;
   switch (item.kind) {
     case 'user': return <UserMessage item={item} />;
-    case 'text': return <Prose text={item.text} />;
+    case 'text': return <FoldedProse text={item.text} startOpen={latest} />;
     case 'system': return <SystemLine item={item} />;
     case 'turn': return <TurnFooter item={item} />;
     case 'rotation': return <RotationDivider item={item} />;
@@ -84,15 +85,66 @@ const BlockView = memo(function BlockView({ block, live }: { block: Block; live:
 });
 
 function UserMessage({ item }: { item: Extract<FeedItem, { kind: 'user' }> }) {
-  const fromUser = item.author === 'user';
+  if (item.author === 'user') {
+    // Yours: a bubble on the right, so the conversation doesn't read as one wall of text.
+    return (
+      <div className="animate-fade-in mb-3 mt-6 flex justify-end first:mt-0">
+        <div className="max-w-[min(70%,720px)] whitespace-pre-wrap break-words rounded-[8px] rounded-br-[3px] bg-control px-3.5 py-2 text-[13px] leading-relaxed text-primary">
+          <Collapsible as="div" text={item.text} />
+        </div>
+      </div>
+    );
+  }
+  // From another agent: left, with its name and a rule.
   return (
-    // Left-aligned with a rule, so it reads at full width: you in the accent, other agents in grey.
     <div className="animate-fade-in mb-3 mt-6 first:mt-0">
-      <div className="label mb-1">{fromUser ? 'You' : item.author}</div>
-      <div className={cn('whitespace-pre-wrap break-words border-l pl-3 text-[13px] leading-relaxed',
-        fromUser ? 'border-accent text-primary' : 'border-border-strong text-secondary')}>
+      <div className="label mb-1">{item.author}</div>
+      <div className="whitespace-pre-wrap break-words border-l border-border-strong pl-3 text-[13px] leading-relaxed text-secondary">
         <Collapsible as="div" text={item.text} />
       </div>
+    </div>
+  );
+}
+
+const FOLD_OVER = 440;   // px of rendered reply before it folds
+const FOLDED_TO = 260;
+
+/**
+ * A finished reply. Long ones fold to their first ~260px with a fade and Show more / Show less,
+ * measured on the rendered markdown so code blocks and tables aren't cut mid-structure.
+ * The latest reply starts open; older long replies start folded.
+ */
+function FoldedProse({ text, startOpen }: { text: string; startOpen: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [tall, setTall] = useState(false);
+  const [open, setOpen] = useState(startOpen);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setTall(el.scrollHeight > FOLD_OVER);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const folded = tall && !open;
+  const toggle = () => {
+    setOpen(!open);
+    // Collapsing a long reply from below: keep its top in view instead of jumping past it.
+    if (open) requestAnimationFrame(() => ref.current?.scrollIntoView({ block: 'nearest' }));
+  };
+  return (
+    <div className="relative">
+      <div ref={ref} style={folded ? { maxHeight: FOLDED_TO, overflow: 'hidden' } : undefined} className="md my-2 text-[13.5px] leading-[1.65]">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+      </div>
+      {folded && <div className="pointer-events-none absolute inset-x-0 bottom-7 h-16 bg-gradient-to-t from-[var(--bg)] to-transparent" aria-hidden />}
+      {tall && (
+        <button onClick={toggle} aria-expanded={open}
+          className="mb-1 flex h-6 items-center gap-1 rounded-[4px] border border-border px-2 text-2xs text-secondary hover:bg-hover hover:text-primary cursor-pointer">
+          {open ? <><ChevronUp size={11} /> Show less</> : <><ChevronDown size={11} /> Show more</>}
+        </button>
+      )}
     </div>
   );
 }

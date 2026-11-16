@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { ArrowUp, GitFork, ImagePlus, Loader2, MoreHorizontal, Paperclip, PanelRight, Power, RefreshCw, Square, Trash2, X } from 'lucide-react';
+import { ArrowUp, GitFork, Loader2, MoreHorizontal, Paperclip, PanelRight, Power, RefreshCw, Square, Trash2, X } from 'lucide-react';
 import type { Agent } from '@axo/protocol';
 import { feedKey, useAgent, useAxo, useRefreshing, type Selection } from '../stores/store.ts';
 import { Feed } from './feed/feed.tsx';
@@ -241,7 +241,7 @@ function Composer({ agent, sel, autoFocus }: { agent: Agent; sel: Selection; aut
           onKeyDown={onKey}
           onPaste={(e) => { const imgs = [...e.clipboardData.files]; if (imgs.length) { e.preventDefault(); attach(imgs); } }}
           rows={3}
-          placeholder={working ? 'Queue a message (delivered when this turn ends) · Esc to interrupt' : `Message ${agent.name}…`}
+          placeholder={working ? `${agent.name} is working. Queue a follow-up…` : `Message ${agent.name}…`}
           className="block w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-[13px] leading-relaxed text-primary placeholder:text-muted outline-none"
         />
         {files.length > 0 && (
@@ -257,34 +257,38 @@ function Composer({ agent, sel, autoFocus }: { agent: Agent; sel: Selection; aut
             ))}
           </div>
         )}
-        <div className="flex items-center gap-2 px-1.5 pb-1.5">
+        <div className="flex items-center gap-2 px-2 pb-2 pt-1">
           <input ref={picker} type="file" multiple hidden onChange={(e) => { attach([...(e.target.files ?? [])]); e.target.value = ''; }} />
           <button
             title="Attach images or files (or paste / drop them here)"
-            aria-label="Attach files"
             onClick={() => picker.current?.click()}
-            className="flex h-6 w-6 items-center justify-center rounded text-muted hover:bg-hover hover:text-primary cursor-pointer"
+            className="flex h-8 items-center gap-1.5 rounded-[4px] px-2.5 text-xs text-secondary hover:bg-hover hover:text-primary cursor-pointer"
           >
-            <ImagePlus size={14} strokeWidth={1.75} />
+            <Paperclip size={14} strokeWidth={1.75} /> Attach
           </button>
-          {agent.queued > 0 && <span className="font-mono text-2xs text-muted">{agent.queued} queued</span>}
-          <div className="ml-auto flex items-center gap-1.5">
+          {agent.queued > 0 && (
+            <span className="rounded-[4px] bg-control px-2 py-0.5 text-2xs text-secondary" title="Delivered when the current turn ends">
+              {agent.queued} queued
+            </span>
+          )}
+          <div className="ml-auto flex items-center gap-2">
             {working && (
               <button
-                title="Interrupt (Esc)"
+                title="Stop the current turn (Esc)"
                 onClick={() => void client(sel.nodeKey).post(`/agents/${agent.id}/interrupt`)}
-                className="flex h-6 w-6 items-center justify-center rounded border border-border text-secondary hover:border-danger/50 hover:text-danger cursor-pointer"
+                className="flex h-8 items-center gap-2 rounded-[4px] border border-border bg-control px-3 text-xs font-medium text-primary hover:border-danger/60 hover:text-danger cursor-pointer"
               >
-                <Square size={9} fill="currentColor" />
+                <Square size={10} fill="currentColor" /> Stop <kbd className="font-mono text-2xs text-muted">Esc</kbd>
               </button>
             )}
             <button
-              title="Send (Enter)"
+              title={working ? 'Queue for after this turn (Enter)' : 'Send (Enter) · Shift+Enter for a new line'}
               disabled={(!text.trim() && !ready.length) || uploading}
               onClick={() => void send()}
-              className="flex h-6 w-6 items-center justify-center rounded bg-accent text-accent-fg hover:bg-accent-hover disabled:bg-control disabled:text-muted cursor-pointer"
+              className="flex h-8 items-center gap-2 rounded-[4px] bg-accent pl-3 pr-2.5 text-xs font-medium text-accent-fg hover:bg-accent-hover disabled:bg-control disabled:text-muted cursor-pointer disabled:cursor-default"
             >
-              <ArrowUp size={13} strokeWidth={2.25} />
+              {working ? 'Queue' : 'Send'}
+              <ArrowUp size={14} strokeWidth={2.25} />
             </button>
           </div>
         </div>
