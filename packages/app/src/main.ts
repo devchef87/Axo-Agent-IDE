@@ -1,4 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell } from 'electron';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ensureLocalNode, stopLocalNode, type LocalNode } from './local-node.ts';
 
@@ -12,6 +13,28 @@ let local: LocalNode | null = null;
 
 interface NodeConn { key: string; name: string; baseUrl: string; token: string }
 
+// Theme: the renderer owns the preference; we mirror it so the window opens in the
+// right colours next launch and native chrome (traffic lights, dialogs) matches.
+type ThemePref = 'system' | 'light' | 'dark';
+interface WindowTheme { pref: ThemePref; background: string }
+const THEME_FILE = join(app.getPath('userData'), 'window-theme.json');
+const DEFAULT_BG = { dark: '#1b1d22', light: '#faf8f4' };
+
+function loadTheme(): WindowTheme {
+  try {
+    const t = JSON.parse(readFileSync(THEME_FILE, 'utf8'));
+    if (['system', 'light', 'dark'].includes(t.pref) && /^#[0-9a-f]{6}$/i.test(t.background)) return t;
+  } catch { /* first launch */ }
+  return { pref: 'system', background: '' };
+}
+let windowTheme = loadTheme();
+
+function initialBackground(): string {
+  // With "system", the OS may have flipped since last launch; trust it over the saved colour.
+  if (windowTheme.pref === 'system' || !windowTheme.background) return nativeTheme.shouldUseDarkColors ? DEFAULT_BG.dark : DEFAULT_BG.light;
+  return windowTheme.background;
+}
+
 function nodes(): NodeConn[] {
   return local ? [{ key: 'local', name: 'Local', baseUrl: local.baseUrl, token: local.token }] : [];
 }
@@ -22,9 +45,10 @@ async function createWindow(): Promise<void> {
     height: 880,
     minWidth: 860,
     minHeight: 520,
-    backgroundColor: '#24282f',
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    trafficLightPosition: { x: 12, y: 9 },
+    backgroundColor: initialBackground(),
+    // 32px title strip in the renderer; 12px traffic lights centred in it (y = (32 - 12) / 2).
+    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
+    trafficLightPosition: { x: 12, y: 10 },
     show: false,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
@@ -49,6 +73,15 @@ async function createWindow(): Promise<void> {
 }
 
 ipcMain.handle('axo:get-nodes', () => nodes());
+ipcMain.on('axo:set-theme', (_e, t: Partial<WindowTheme>) => {
+  if (!t || !['system', 'light', 'dark'].includes(t.pref as string) || !/^#[0-9a-f]{6}$/i.test(t.background ?? '')) return;
+  const next = { pref: t.pref as ThemePref, background: t.background! };
+  nativeTheme.themeSource = next.pref;
+  win?.setBackgroundColor(next.background);
+  if (next.pref === windowTheme.pref && next.background === windowTheme.background) return;
+  windowTheme = next;
+  try { writeFileSync(THEME_FILE, JSON.stringify(windowTheme)); } catch { /* non-fatal */ }
+});
 ipcMain.handle('axo:pick-folder', async () => {
   const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'] });
   return r.canceled ? null : r.filePaths[0];
@@ -96,6 +129,7 @@ function buildMenu(): void {
 }
 
 app.whenReady().then(async () => {
+  nativeTheme.themeSource = windowTheme.pref;
   buildMenu();
   try {
     local = await ensureLocalNode(NODE_BUNDLE);

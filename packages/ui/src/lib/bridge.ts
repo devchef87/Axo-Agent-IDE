@@ -14,6 +14,8 @@ interface AxoBridge {
   pickFolder(): Promise<string | null>;
   restartLocalNode(): Promise<void>;
   onNodesChanged(cb: (nodes: NodeConn[]) => void): () => void;
+  /** Sync native window chrome with the UI theme. Optional: older preloads lack it. */
+  setTheme?(pref: 'system' | 'light' | 'dark', background: string): void;
   platform: string;
 }
 

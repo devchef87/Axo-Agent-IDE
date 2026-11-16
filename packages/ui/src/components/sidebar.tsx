@@ -8,7 +8,7 @@ export function Sidebar() {
   const nodeOrder = useAxo((s) => s.nodeOrder);
   const nodes = useAxo((s) => s.nodes);
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-border-subtle bg-surface-1">
+    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-border-subtle bg-panel">
       <div className="flex-1 overflow-y-auto py-2">
         {nodeOrder.map((k) => <NodeSection key={k} node={nodes[k]} />)}
       </div>
@@ -21,7 +21,7 @@ function NodeSection({ node }: { node: NodeView }) {
   const setUi = useAxo((s) => s.setUi);
   return (
     <div className="mb-1">
-      <div className="group flex h-7 items-center gap-1.5 px-2 text-xs font-semibold uppercase tracking-wide text-text-3">
+      <div className="group flex h-7 items-center gap-1.5 px-2 text-xs font-semibold uppercase tracking-wide text-faint">
         <button className="flex flex-1 items-center gap-1.5 cursor-pointer" onClick={() => setOpen(!open)}>
           {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           <Server size={12} />
@@ -35,11 +35,11 @@ function NodeSection({ node }: { node: NodeView }) {
       {open && (
         <div>
           {node.status === 'unauthorized' && <p className="px-6 py-1 text-xs text-danger">Bad token for this node.</p>}
-          {node.status === 'offline' && node.projects.length === 0 && <p className="px-6 py-1 text-xs text-text-3">Offline — retrying…</p>}
+          {node.status === 'offline' && node.projects.length === 0 && <p className="px-6 py-1 text-xs text-faint">Offline — retrying…</p>}
           {node.projects.map((p) => <ProjectSection key={p.id} node={node} project={p} />)}
           {node.status === 'online' && node.projects.length === 0 && (
             <button
-              className="mx-3 mt-1 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-xs text-text-3 hover:border-accent/60 hover:text-text-1 cursor-pointer"
+              className="mx-3 mt-1 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-xs text-faint hover:border-accent/60 hover:text-secondary cursor-pointer"
               onClick={() => setUi({ addProject: node.key })}
             >
               <FolderPlus size={13} /> Add a project
@@ -64,9 +64,9 @@ function ProjectSection({ node, project }: { node: NodeView; project: Project })
 
   return (
     <div>
-      <div className="group flex h-7 items-center gap-1 pl-4 pr-2 text-[13px] text-text-1 hover:bg-surface-3">
+      <div className="group flex h-7 items-center gap-1 pl-4 pr-2 text-[13px] text-secondary hover:bg-hover">
         <button className="flex min-w-0 flex-1 items-center gap-1.5 cursor-pointer" onClick={() => setOpen(!open)} title={project.path}>
-          {open ? <ChevronDown size={12} className="text-text-3" /> : <ChevronRight size={12} className="text-text-3" />}
+          {open ? <ChevronDown size={12} className="text-faint" /> : <ChevronRight size={12} className="text-faint" />}
           <span className="truncate font-medium">{project.name}</span>
         </button>
         <IconButton title="Remove project" className="opacity-0 group-hover:opacity-100" onClick={remove}><Trash2 size={12} /></IconButton>
@@ -77,7 +77,7 @@ function ProjectSection({ node, project }: { node: NodeView; project: Project })
       {open && agents.map((a) => <AgentRow key={a.id} nodeKey={node.key} agent={a} />)}
       {open && agents.length === 0 && (
         <button
-          className="flex h-7 w-full items-center gap-1.5 pl-9 text-xs text-text-3 hover:text-text-1 cursor-pointer"
+          className="flex h-7 w-full items-center gap-1.5 pl-9 text-xs text-faint hover:text-secondary cursor-pointer"
           onClick={() => setUi({ newAgent: { nodeKey: node.key, projectId: project.id } })}
         >
           <Plus size={12} /> New agent
@@ -95,12 +95,12 @@ function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
       onClick={() => select({ nodeKey, agentId: agent.id })}
       className={cn(
         'flex h-7 w-full items-center gap-2 pl-9 pr-3 text-left text-[13px] cursor-pointer',
-        selected ? 'bg-accent/12 text-text-0' : 'text-text-2 hover:bg-surface-3 hover:text-text-1',
+        selected ? 'bg-accent/12 text-primary' : 'text-muted hover:bg-hover hover:text-secondary',
       )}
     >
       <StatusDot status={agent.status} />
       <span className="truncate">{agent.name}</span>
-      {agent.queued > 0 && <span className="ml-auto rounded bg-surface-5 px-1 text-2xs text-text-2">{agent.queued}</span>}
+      {agent.queued > 0 && <span className="ml-auto rounded bg-control px-1 text-2xs text-muted">{agent.queued}</span>}
     </button>
   );
 }
