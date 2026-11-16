@@ -108,10 +108,10 @@ function TitleBar() {
             aria-selected={view === id}
             title={id === 'fleet' || id === 'editor' ? `${label} · ⌘E switches Fleet/Editor` : label}
             onClick={() => setView(id)}
-            className={cn('relative flex h-full items-center gap-2 px-3.5 text-[13px] cursor-pointer transition-colors',
+            className={cn('relative flex h-full items-center gap-1.5 px-3 text-xs cursor-pointer transition-colors',
               view === id ? 'font-medium text-primary' : 'text-muted hover:text-primary')}
           >
-            <Icon size={15} strokeWidth={1.75} className={view === id ? 'text-accent' : undefined} /> {label}
+            <Icon size={14} strokeWidth={1.75} className={view === id ? 'text-accent' : undefined} /> {label}
             {id === 'watches' && activeWatches > 0 && <span className="rounded bg-control px-1.5 font-mono text-2xs text-primary">{activeWatches}</span>}
             {view === id && <span className="absolute inset-x-2 bottom-0 h-[2px] rounded-t-sm bg-accent" aria-hidden />}
           </button>

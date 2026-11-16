@@ -19,10 +19,10 @@ export function terminalTheme(theme: Theme): ITheme {
   const v = (name: string) => css.getPropertyValue(name).trim();
   return {
     ...ANSI[theme],
-    background: v('--bg'),
+    background: v('--panel'),
     foreground: v('--text-primary'),
     cursor: v('--accent'),
-    cursorAccent: v('--bg'),
+    cursorAccent: v('--panel'),
     selectionBackground: theme === 'dark' ? 'rgba(250,250,250,0.22)' : 'rgba(10,10,10,0.16)',
     scrollbarSliderBackground: v('--scrollbar'),
     scrollbarSliderHoverBackground: v('--scrollbar-hover'),
