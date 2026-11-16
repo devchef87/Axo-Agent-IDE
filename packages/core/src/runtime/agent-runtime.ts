@@ -60,6 +60,10 @@ export interface RuntimeOptions {
 }
 
 const DEFAULT_MODEL = 'opus';
+const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
+function checkEffort(e: string | null | undefined): void {
+  if (e != null && !EFFORTS.has(e)) throw new HttpError(400, `effort must be one of ${[...EFFORTS].join(', ')}`);
+}
 const STRIP_ENV = /^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CLAUDE_CODE_SSE_PORT|CLAUDE_AGENT_SDK_VERSION|GROOVE_.*|AXO_.*)$/;
 
 /** Clean environment for any claude child process (no inherited agent identity, subscription auth by default). */
@@ -168,6 +172,7 @@ export class AgentRuntime extends EventEmitter {
       name = `${role}-${n}`;
     }
 
+    checkEffort(req.effort);
     const model = req.model || DEFAULT_MODEL;
     const now = Date.now();
     const agent: Agent = {
@@ -196,7 +201,7 @@ export class AgentRuntime extends EventEmitter {
     }
     // Model/effort/instructions apply on the next process start (system prompt and flags are fixed per process).
     if (req.model !== undefined) { a.model = req.model; a.contextWindow = contextWindowFor(req.model); }
-    if (req.effort !== undefined) a.effort = req.effort;
+    if (req.effort !== undefined) { checkEffort(req.effort); a.effort = req.effort; }
     if (req.instructions !== undefined) a.instructions = req.instructions;
     if (req.scopeGlobs !== undefined) a.scopeGlobs = req.scopeGlobs;
     this.store.saveAgent(a);
