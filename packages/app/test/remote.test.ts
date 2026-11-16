@@ -181,6 +181,10 @@ describe('server lifecycle over (fake) ssh', () => {
     const pid1 = JSON.parse(readFileSync(join(remoteHome, '.axo/node.pid'), 'utf8')).pid;
     execFileSync('sh', [join(remoteHome, '.axo/bin/start.sh')], { env: { ...process.env, HOME: remoteHome } });
     assert.equal(JSON.parse(readFileSync(join(remoteHome, '.axo/node.pid'), 'utf8')).pid, pid1);
+    // The node installs the axo CLI next to our files; agents get ~/.axo/bin first on PATH.
+    for (const f of ['axo', 'axo.mjs', 'knock.sh']) assert.ok(existsSync(join(remoteHome, '.axo/bin', f)), f);
+    const help = execFileSync(join(remoteHome, '.axo/bin/axo'), ['help'], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: remoteHome } });
+    assert.match(help, /axo/);
   });
 
   test('connect opens a tunnel and registers the node', async () => {

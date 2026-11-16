@@ -8,13 +8,14 @@
     "build": "node build.mjs",
     "start": "electron .",
     "dev": "AXO_UI_URL=http://localhost:5199 electron .",
-    "test": "node --disable-warning=ExperimentalWarning --test 'test/**/*.test.ts'"
+    "test": "node --disable-warning=ExperimentalWarning --test 'test/**/*.test.ts'",
+    "dist": "npm run build --prefix ../.. && electron-builder --config electron-builder.config.cjs --mac",
+    "dist:dir": "npm run build --prefix ../.. && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config electron-builder.config.cjs --mac --dir"
   },
   "devDependencies": {
-    "electron": "41.2.0"
-  },
-  "type": "module",
-  "dependencies": {
+    "electron": "41.2.0",
+    "electron-builder": "^26.18.0",
     "@axo/protocol": "*"
-  }
+  },
+  "type": "module"
 }
