@@ -39,7 +39,8 @@ interface AxoState {
   view: View;
   setView(view: View): void;
   ui: {
-    newAgent: { nodeKey: string; projectId: string } | null;
+    newAgent: { nodeKey: string; projectId: string; teamId?: string } | null;
+    newTeam: { nodeKey: string; projectId: string } | null;
     addProject: string | null;
     palette: boolean;
     drawer: boolean; // agent config drawer for the focused pane
@@ -276,7 +277,7 @@ export const useAxo = create<AxoState>((set, get) => {
     journalRev: {},
     view: (VIEWS as string[]).includes(localStorage.getItem('axo.view') ?? '') ? localStorage.getItem('axo.view') as View : 'fleet',
     setView(view) { localStorage.setItem('axo.view', view); set({ view }); },
-    ui: { newAgent: null, addProject: null, palette: false, drawer: false, refresh: null, fork: null, context: null, servers: false },
+    ui: { newAgent: null, newTeam: null, addProject: null, palette: false, drawer: false, refresh: null, fork: null, context: null, servers: false },
 
     async init() {
       bridge?.onNodesChanged(syncNodes);

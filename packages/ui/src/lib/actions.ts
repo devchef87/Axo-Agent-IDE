@@ -34,7 +34,7 @@ export function focusPaneComposer(i: number): void {
 export function modalOpen(): boolean {
   const ui = useAxo.getState().ui;
   if (useEditor.getState().quickOpen) return true;
-  return !!ui.newAgent || !!ui.addProject || ui.palette || !!ui.refresh || !!ui.fork || !!ui.context || ui.servers;
+  return !!ui.newAgent || !!ui.newTeam || !!ui.addProject || ui.palette || !!ui.refresh || !!ui.fork || !!ui.context || ui.servers;
 }
 
 /** ⌘L: move keyboard focus to the sidebar (the focused agent's row, else the first row). */

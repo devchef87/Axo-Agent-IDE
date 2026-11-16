@@ -6,7 +6,7 @@ import type { FileEntry, FileTree as TreeRes, GitFileStatus, GitStatusRes, Uploa
 import { basename, dirname, targetKey, type EditorTarget } from '../../lib/editor-model.ts';
 import { fileQuery, useEditor } from '../../stores/editor.ts';
 import { useAxo } from '../../stores/store.ts';
-import { cn, IconButton, useDismiss } from '../ui.tsx';
+import { cn, ContextMenu, IconButton, useDismiss } from '../ui.tsx';
 
 const STATUS_CLS: Record<GitFileStatus, string> = {
   // Changed files read brighter; only deletions and conflicts get colour.
@@ -314,26 +314,3 @@ function NameInput({ depth, dir, initial, onDone }: { depth: number; dir: boolea
   );
 }
 
-function ContextMenu({ menu, items, onClose }: { menu: Menu; items: { icon: typeof File; label: string; run(): void; danger?: boolean }[]; onClose(): void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useDismiss(ref, true, onClose);
-  useEffect(() => { ref.current?.querySelector<HTMLButtonElement>('button')?.focus(); }, []);
-  if (!items.length) return null;
-  const x = Math.min(menu.x, window.innerWidth - 200), y = Math.min(menu.y, window.innerHeight - items.length * 28 - 16);
-  return (
-    <div ref={ref} role="menu" className="fixed z-50 w-48 rounded-md border border-border bg-elevated py-1 shadow-pop" style={{ left: x, top: y }}
-      onKeyDown={(e) => {
-        const btns = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
-        const i = btns.indexOf(document.activeElement as HTMLButtonElement);
-        if (e.key === 'ArrowDown') { e.preventDefault(); btns[(i + 1) % btns.length]?.focus(); }
-        if (e.key === 'ArrowUp') { e.preventDefault(); btns[(i - 1 + btns.length) % btns.length]?.focus(); }
-      }}>
-      {items.map(({ icon: Icon, label, run, danger }) => (
-        <button key={label} role="menuitem" onClick={() => { onClose(); run(); }}
-          className={cn('flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-hover focus-visible:bg-hover outline-none cursor-pointer', danger ? 'text-danger' : 'text-secondary')}>
-          <Icon size={13} /> {label}
-        </button>
-      ))}
-    </div>
-  );
-}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { BookOpen, ListTree, Code2, Eye, FileSearch, Users, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Bell, BellOff, Search, Server, SquareTerminal, Sun, X, type LucideIcon } from 'lucide-react';
+import { BookOpen, ListTree, Code2, Eye, FileSearch, Users, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Bell, BellOff, Search, Server, SquareTerminal, Sun, UsersRound, X, type LucideIcon } from 'lucide-react';
 import type { AgentStatus } from '@axo/protocol';
 import { focusedSel, useAxo } from '../stores/store.ts';
 import { contextPlace, useTerminals } from '../stores/terminals.ts';
@@ -67,6 +67,12 @@ function useCommands(open: boolean): Command[] {
         out.push({
           id: `context:${k}:${p.id}`, group: 'Actions', label: `Project map & decisions: ${p.name}`, detail: multiNode ? nodes[k].name : undefined, icon: BookOpen,
           run: () => s.setUi({ context: { nodeKey: k, projectId: p.id } }),
+        });
+      }
+      for (const p of nodes[k].projects) {
+        out.push({
+          id: `new-team:${k}:${p.id}`, group: 'Actions', label: `New team in ${p.name}`, detail: multiNode ? nodes[k].name : undefined, icon: UsersRound,
+          run: () => s.setUi({ newTeam: { nodeKey: k, projectId: p.id } }),
         });
       }
       out.push({ id: `add-project:${k}`, group: 'Actions', label: `Add project on ${nodes[k].name}`, icon: FolderPlus, run: () => s.setUi({ addProject: k }) });

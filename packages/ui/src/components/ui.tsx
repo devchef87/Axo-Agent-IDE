@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode, type RefObject } from 'react';
+import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ComponentType, type ReactNode, type RefObject } from 'react';
 import { X } from 'lucide-react';
 import type { AgentStatus } from '@axo/protocol';
 import type { ConnStatus } from '../lib/client.ts';
@@ -178,4 +178,32 @@ export function formatDuration(ms: number): string {
   if (s < 60) return `${s.toFixed(s < 10 ? 1 : 0)}s`;
   const m = Math.floor(s / 60);
   return `${m}m ${Math.round(s % 60)}s`;
+}
+
+export interface MenuItem { icon: ComponentType<{ size?: number }>; label: string; run(): void; danger?: boolean; hint?: string }
+
+/** Right-click menu at a point. Arrow keys move, Escape or an outside click closes. */
+export function ContextMenu({ menu, items, onClose }: { menu: { x: number; y: number }; items: MenuItem[]; onClose(): void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDismiss(ref, true, onClose);
+  useEffect(() => { ref.current?.querySelector<HTMLButtonElement>('button')?.focus(); }, []);
+  if (!items.length) return null;
+  const x = Math.min(menu.x, window.innerWidth - 200), y = Math.min(menu.y, window.innerHeight - items.length * 28 - 16);
+  return (
+    <div ref={ref} role="menu" className="fixed z-50 w-48 rounded-md border border-border bg-elevated py-1 shadow-pop" style={{ left: x, top: y }}
+      onKeyDown={(e) => {
+        const btns = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
+        const i = btns.indexOf(document.activeElement as HTMLButtonElement);
+        if (e.key === 'ArrowDown') { e.preventDefault(); btns[(i + 1) % btns.length]?.focus(); }
+        if (e.key === 'ArrowUp') { e.preventDefault(); btns[(i - 1 + btns.length) % btns.length]?.focus(); }
+      }}>
+      {items.map(({ icon: Icon, label, run, danger, hint }) => (
+        <button key={label} role="menuitem" onClick={() => { onClose(); run(); }}
+          className={cn('flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-hover focus-visible:bg-hover outline-none cursor-pointer', danger ? 'text-danger' : 'text-secondary')}>
+          <Icon size={13} /> <span className="flex-1">{label}</span>
+          {hint && <span className="font-mono text-2xs text-faint">{hint}</span>}
+        </button>
+      ))}
+    </div>
+  );
 }
