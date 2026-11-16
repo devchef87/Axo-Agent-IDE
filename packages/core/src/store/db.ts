@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import type { Agent, AgentStatus, FeedItem, Project, Team, TeamMode } from '@axo/protocol';
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 const MIGRATIONS: string[] = [
   /* v1 */ `
@@ -83,6 +83,14 @@ const MIGRATIONS: string[] = [
     from_server TEXT NOT NULL, envelope_id TEXT NOT NULL, received_at INTEGER NOT NULL,
     PRIMARY KEY (from_server, envelope_id)
   );
+  `,
+  /* v5 (core2): cron watches — a schedule that sends an agent a message, repeatedly. */ `
+  ALTER TABLE watches ADD COLUMN schedule TEXT;
+  ALTER TABLE watches ADD COLUMN message TEXT NOT NULL DEFAULT '';
+  ALTER TABLE watches ADD COLUMN next_run_at INTEGER;
+  ALTER TABLE watches ADD COLUMN last_run_at INTEGER;
+  ALTER TABLE watches ADD COLUMN runs INTEGER NOT NULL DEFAULT 0;
+  CREATE INDEX watches_due ON watches(mode, status, next_run_at);
   `,
 ];
 

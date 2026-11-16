@@ -1,5 +1,5 @@
 import type {
-  ArchiveTeamReq, AskReq, MergeReq, PeersReq, RelayAckReq, RelayInReq, CreateTeamReq, CreateWatchReq, KnockReq, KnockRes, MeRes, TellReq, UpdateProjectReq, UpdateTeamReq,
+  ArchiveTeamReq, AskReq, MergeReq, TeamBrief, PeersReq, RelayAckReq, RelayInReq, CreateTeamReq, CreateWatchReq, KnockReq, KnockRes, MeRes, TellReq, UpdateProjectReq, UpdateTeamReq,
 } from '@axo/protocol';
 import { TextResponse, type Caller, type Router } from './server.ts';
 import type { Node } from '../node.ts';
@@ -23,9 +23,12 @@ export function addCoordinationRoutes(r: Router, node: Node): void {
   r.patch('/projects/:id', ({ params, body }) => teams.updateProject(params.id, body as UpdateProjectReq));
   r.post('/teams', ({ body }) => teams.create(body as CreateTeamReq));
   r.patch('/teams/:id', ({ params, body }) => {
-    const b = body as UpdateTeamReq;
-    return b?.name !== undefined ? teams.rename(params.id, String(b.name)) : teams.get(params.id);
+    const b = (body ?? {}) as UpdateTeamReq;
+    if (b.name !== undefined) teams.rename(params.id, String(b.name));
+    if (b.goal !== undefined) teams.setGoal(params.id, String(b.goal));
+    return teams.get(params.id);
   });
+  r.get('/teams/:id/brief', ({ params }): TeamBrief => ({ text: teams.brief(params.id) }));
   r.post('/teams/:id/archive', ({ params, body }) => teams.archive(params.id, body as ArchiveTeamReq));
   r.get('/teams/:id/diff', ({ params }) => teams.diff(params.id));
   r.post('/teams/:id/merge', ({ params, body }) => teams.merge(params.id, (body as MergeReq)?.strategy ?? 'merge'));

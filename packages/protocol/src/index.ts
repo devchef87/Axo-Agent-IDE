@@ -165,8 +165,11 @@ export interface CreateTeamReq {
   name: string;
   mode?: TeamMode;          // default: worktree for git projects, direct otherwise
   base?: string;            // worktree base ref; default project.baseBranch
+  goal?: string;            // written to <project>/.axo/context/teams/<name>.md (the journalist's team brief)
 }
-export interface UpdateTeamReq { name?: string }
+export interface UpdateTeamReq { name?: string; goal?: string }
+/** GET /api/teams/:id/brief */
+export interface TeamBrief { text: string }
 export interface ArchiveTeamReq { removeWorktree?: boolean }
 export interface UpdateProjectReq { name?: string; baseBranch?: string | null; setupCmd?: string | null }
 
@@ -209,7 +212,7 @@ export interface TellRes { delivered: true; threadId: string; exchangesRemaining
 export interface WhoEntry { id: string; name: string; role: string; team: string; status: AgentStatus; scope: string[]; you: boolean }
 export interface WhoRes { you: string | null; agents: WhoEntry[]; servers?: PeerServer[] }  // servers: from the app (name@server)
 
-export type WatchMode = 'command' | 'until';
+export type WatchMode = 'command' | 'until' | 'cron';
 export type WatchStatus = 'active' | 'delivered' | 'undeliverable' | 'cancelled';
 export interface WatchResult {
   outcome: 'success' | 'failure' | 'timeout' | 'error';
@@ -232,6 +235,12 @@ export interface Watch {
   createdAt: number;
   finishedAt: number | null;
   result: WatchResult | null;
+  // cron mode (null/'' / 0 otherwise). A cron watch stays 'active' until cancelled.
+  schedule: string | null;  // '0 9 * * 1-5', '@daily', '@every 30m' (node's local time)
+  message: string;          // sent to the agent on every run
+  nextRunAt: number | null;
+  lastRunAt: number | null;
+  runs: number;
 }
 export interface CreateWatchReq {
   agentId?: string;         // required with the node token; implied by an agent token
@@ -240,6 +249,8 @@ export interface CreateWatchReq {
   label?: string;
   timeoutMs?: number;       // default 30m, max 24h
   intervalMs?: number;      // until-mode poll interval
+  cron?: string;            // cron mode: schedule (5-field cron, @daily…, or '@every 30m')
+  message?: string;         // cron mode: what to send the agent each time
 }
 export interface CreateWatchRes { watch: Watch; reattached: boolean }
 

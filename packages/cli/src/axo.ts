@@ -15,6 +15,9 @@ const HELP = `axo: talk to your team and schedule work from inside an Axo agent
         [--label L] [--timeout 2h]     default timeout 30m, max 24h
   axo watch --until "<check>"          wake me when <check> first exits 0 (polled)
         [--interval 30s]
+  axo watch --cron "0 9 * * 1-5" --message "<text>"
+                                       send yourself <text> on a schedule (node's local time;
+                                       also @daily, @hourly, or --every 2h instead of --cron)
   axo watch ls                         your watches
   axo watch cancel <id>                cancel a watch (kills its job)
   axo status                           who you are, your team, scope, active watches
@@ -162,6 +165,10 @@ async function tell(a: Args): Promise<void> {
 function fmtWatch(w: Watch): string {
   const age = Math.round((Date.now() - w.createdAt) / 60_000);
   const res = w.result ? `, ${w.result.outcome}${w.result.exitCode !== null ? ` (exit ${w.result.exitCode})` : ''}` : '';
+  if (w.mode === 'cron') {
+    const next = w.status === 'active' && w.nextRunAt ? `, next ${new Date(w.nextRunAt).toLocaleString()}` : '';
+    return `  ${w.id}  ${w.status}  every ${w.schedule}: ${w.message.slice(0, 60)}  (${w.runs} run(s)${next})`;
+  }
   return `  ${w.id}  ${w.status}${res}  ${w.mode === 'until' ? 'until' : 'run'}: ${w.label}  (${age}m ago)`;
 }
 
@@ -179,6 +186,15 @@ async function watch(a: Args): Promise<void> {
     return;
   }
   const command = a._.slice(1).join(' ').trim();
+  const cron = typeof a.flags.cron === 'string' ? a.flags.cron : typeof a.flags.every === 'string' ? `@every ${a.flags.every}` : '';
+  if (cron) {
+    if (command || a.flags.until) fail('a scheduled message takes --message, not a command or --until');
+    if (typeof a.flags.message !== 'string' || !a.flags.message.trim()) fail('usage: axo watch --cron "<schedule>" --message "<text>"');
+    const res = await api<CreateWatchRes>('POST', '/watches', { cron, message: a.flags.message, label: typeof a.flags.label === 'string' ? a.flags.label : undefined });
+    const w = res.watch;
+    console.log(`Schedule ${w.id} set (${w.schedule}). Next message: ${w.nextRunAt ? new Date(w.nextRunAt).toLocaleString() : 'never'}. Cancel with: axo watch cancel ${w.id}`);
+    return;
+  }
   const until = typeof a.flags.until === 'string' ? a.flags.until : '';
   if (!command && !until) fail('usage: axo watch "<command>" [--label L] [--timeout 2h]   or   axo watch --until "<check>"');
   if (command && until) fail('give a command OR --until "<check>", not both');

@@ -10,11 +10,13 @@ import type { AgentRuntime } from '../runtime/agent-runtime.ts';
 import { ulid } from '../util/ulid.ts';
 import { HttpError } from '../util/http-error.ts';
 import { shq } from '../teams/bin.ts';
+import { parseSchedule, ScheduleError } from './cron.ts';
 
 const DEFAULT_TIMEOUT_MS = 30 * 60_000;
 const MAX_TIMEOUT_MS = 24 * 60 * 60_000;
 const DEFAULT_POLL_MS = 15_000;
 const MAX_ACTIVE_PER_AGENT = 5;
+const MAX_CRON_PER_AGENT = 10;
 const OUTPUT_TAIL = 4096;
 const KEEP_LOG_BYTES = 64 * 1024;          // a finished job's out.log is trimmed to this
 const HISTORY_MS = 7 * 24 * 60 * 60_000;   // finished watches (and their run dirs) are pruned after this
@@ -31,6 +33,7 @@ function cleanEnv(): NodeJS.ProcessEnv {
 export interface WatchesOptions {
   minPollMs?: number;       // floor for until-mode intervals (tests lower it)
   commandPollMs?: number;   // how often to stat the exit sentinel
+  cronTickMs?: number;      // how often to look for due cron watches
 }
 
 interface Row extends Watch { pollMs: number; pid: number | null }
@@ -56,6 +59,8 @@ export class Watches {
   private readonly minPollMs: number;
   private readonly commandPollMs: number;
   private readonly timers = new Map<string, Timers>();
+  private readonly cronTickMs: number;
+  private cronTimer: NodeJS.Timeout | null = null;
 
   constructor(store: Store, bus: EventBus, runtime: AgentRuntime, home: string, binDir: string | null, opts: WatchesOptions = {}) {
     this.store = store;
@@ -65,6 +70,7 @@ export class Watches {
     this.binDir = binDir;
     this.minPollMs = opts.minPollMs ?? 3000;
     this.commandPollMs = opts.commandPollMs ?? 500;
+    this.cronTickMs = opts.cronTickMs ?? 15_000;
     mkdirSync(this.runsDir, { recursive: true });
     runtime.on('gone', (e: { agentId: string; reason: string }) => {
       if (e.reason === 'delete') this.cancelForAgent(e.agentId);
@@ -74,9 +80,10 @@ export class Watches {
   // ── create / cancel ──────────────────────────────────────
 
   create(req: CreateWatchReq & { teamId?: string; cwd?: string }): { watch: Watch; reattached: boolean } {
+    if (typeof req.cron === 'string' && req.cron.trim()) return this.createCron(req);
     const command = typeof req.command === 'string' ? req.command.trim() : '';
     const until = typeof req.until === 'string' ? req.until.trim() : '';
-    if (!command && !until) throw new HttpError(400, 'give either a command to run or an --until check to poll');
+    if (!command && !until) throw new HttpError(400, 'give either a command to run, an --until check to poll, or a --cron schedule');
     if (command && until) throw new HttpError(400, 'give a command or an --until check, not both');
 
     const agent = req.agentId ? this.runtime.get(req.agentId) : null;
@@ -86,7 +93,7 @@ export class Watches {
     if (!cwd || !existsSync(cwd)) throw new HttpError(400, `working directory missing: ${cwd}`);
 
     if (agent) {
-      const active = this.rows("status = 'active' AND agent_id = ?", agent.id);
+      const active = this.rows("status = 'active' AND agent_id = ? AND mode != 'cron'", agent.id);
       // Re-attach, never re-run: an agent resumed after a restart may re-issue a watch it thinks
       // never completed; a second copy of a long job in the same dir would corrupt the first.
       const dup = command && active.find((w) => w.mode === 'command' && w.command === command && this.jobAlive(w));
@@ -102,6 +109,7 @@ export class Watches {
       label: String(req.label || command || until).slice(0, 120), mode: (command ? 'command' : 'until') as WatchMode,
       command, until, cwd, timeoutMs, status: 'active', createdAt: Date.now(), finishedAt: null, result: null,
       pollMs: Math.max(Number(req.intervalMs) || DEFAULT_POLL_MS, this.minPollMs), pid: null,
+      schedule: null, message: '', nextRunAt: null, lastRunAt: null, runs: 0,
     };
     this.insert(w);
     if (w.mode === 'command') this.launch(w);
@@ -129,6 +137,7 @@ export class Watches {
     return this.create({
       agentId: w.agentId ?? undefined, teamId: w.agentId ? undefined : w.teamId ?? undefined, cwd: w.cwd,
       command: w.command || undefined, until: w.until || undefined, label: w.label, timeoutMs: w.timeoutMs, intervalMs: w.pollMs,
+      cron: w.schedule ?? undefined, message: w.message || undefined,
     });
   }
 
@@ -158,7 +167,8 @@ export class Watches {
   restore(): number {
     this.prune();
     let n = 0;
-    for (const w of this.rows("status = 'active'")) {
+    this.startCron();
+    for (const w of this.rows("status = 'active' AND mode != 'cron'")) {
       if (w.mode === 'command' && !existsSync(this.exitFile(w)) && !this.jobAlive(w)) {
         this.wake(w, {
           outcome: 'error', exitCode: null, output: tailFile(this.outFile(w), OUTPUT_TAIL),
@@ -175,6 +185,68 @@ export class Watches {
   /** Clear timers only: detached jobs must survive the node; restore() reconnects to them. */
   stop(): void {
     for (const id of [...this.timers.keys()]) this.disarm(id);
+    if (this.cronTimer) clearInterval(this.cronTimer);
+    this.cronTimer = null;
+  }
+
+  // ── cron mode ────────────────────────────────────────────
+
+  private createCron(req: CreateWatchReq): { watch: Watch; reattached: boolean } {
+    if (req.command?.trim() || req.until?.trim()) throw new HttpError(400, 'a cron watch sends a message; it takes no command or --until');
+    const message = String(req.message ?? '').trim();
+    if (!message) throw new HttpError(400, 'a cron watch needs a --message to send each time');
+    if (message.length > 8000) throw new HttpError(413, 'message too long (8k chars max); put details in a file and reference it');
+    if (!req.agentId) throw new HttpError(400, 'agentId required');
+    const agent = this.runtime.get(req.agentId);
+    const now = Date.now();
+    let next: number;
+    try { next = parseSchedule(req.cron!, now).next(now); } catch (e) {
+      if (e instanceof ScheduleError) throw new HttpError(400, e.message);
+      throw e;
+    }
+    if (this.rows("status = 'active' AND agent_id = ? AND mode = 'cron'", agent.id).length >= MAX_CRON_PER_AGENT) {
+      throw new HttpError(429, `${agent.name} already has ${MAX_CRON_PER_AGENT} schedules; cancel one first`);
+    }
+    const expr = req.cron!.trim().replace(/\s+/g, ' ');
+    const w: Row = {
+      id: ulid(), agentId: agent.id, agentName: agent.name, teamId: agent.teamId, label: String(req.label || `${expr}: ${message}`).slice(0, 120),
+      mode: 'cron', command: '', until: '', cwd: agent.workdir, timeoutMs: 0, status: 'active', createdAt: now, finishedAt: null,
+      result: null, pollMs: 0, pid: null, schedule: expr, message, nextRunAt: next, lastRunAt: null, runs: 0,
+    };
+    this.insert(w);
+    this.startCron();
+    this.emit(w);
+    return { watch: pub(w), reattached: false };
+  }
+
+  private startCron(): void {
+    if (this.cronTimer) return;
+    this.cronTimer = setInterval(() => this.cronTick(), this.cronTickMs);
+    this.cronTimer.unref();
+  }
+
+  /** Send every due schedule its message. A run missed while the node was down fires once, late. */
+  private cronTick(): void {
+    const now = Date.now();
+    for (const w of this.rows("mode = 'cron' AND status = 'active' AND next_run_at <= ?", now)) {
+      const late = now - (w.nextRunAt ?? now) > Math.max(60_000, this.cronTickMs * 2);
+      const when = new Date(w.nextRunAt!).toLocaleString();
+      const text = [`[Scheduled message (${w.schedule}), run ${w.runs + 1}${late ? `; was due ${when}, the node was down` : ''}]`, '', w.message].join('\n');
+      try {
+        this.runtime.deliver(w.agentId!, text, 'schedule');
+      } catch {
+        this.finish(w, 'undeliverable', null); // agent deleted
+        continue;
+      }
+      let next: number | null;
+      try { next = parseSchedule(w.schedule!, w.createdAt).next(now); } catch { next = null; }
+      w.runs++;
+      w.lastRunAt = now;
+      w.nextRunAt = next;
+      this.store.db.prepare('UPDATE watches SET runs = ?, last_run_at = ?, next_run_at = ? WHERE id = ?').run(w.runs, now, next, w.id);
+      if (next === null) this.finish(w, 'delivered', null);
+      else this.emit(w);
+    }
   }
 
   cancelForAgent(agentId: string): void {
@@ -333,9 +405,9 @@ export class Watches {
 
   private insert(w: Row): void {
     this.store.db.prepare(`INSERT INTO watches (id, agent_id, team_id, label, mode, command, until_cmd, cwd, poll_ms, timeout_ms,
-      status, pid, result, created_at, finished_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      status, pid, result, created_at, finished_at, schedule, message, next_run_at, last_run_at, runs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(w.id, w.agentId, w.teamId, w.label, w.mode, w.command, w.until, w.cwd, w.pollMs, w.timeoutMs, w.status, w.pid,
-        null, w.createdAt, null);
+        null, w.createdAt, null, w.schedule, w.message, w.nextRunAt, w.lastRunAt, w.runs);
   }
   private row(id: string): Row | null { return this.rows('id = ?', id)[0] ?? null; }
   private rows(where: string, ...args: (string | number)[]): Row[] {
@@ -344,6 +416,7 @@ export class Watches {
       teamId: r.team_id, label: r.label, mode: r.mode, command: r.command, until: r.until_cmd, cwd: r.cwd,
       timeoutMs: r.timeout_ms, status: r.status, createdAt: r.created_at, finishedAt: r.finished_at,
       result: r.result ? JSON.parse(r.result) : null, pollMs: r.poll_ms, pid: r.pid,
+      schedule: r.schedule ?? null, message: r.message ?? '', nextRunAt: r.next_run_at ?? null, lastRunAt: r.last_run_at ?? null, runs: r.runs ?? 0,
     }));
   }
   private emit(w: Row): void { this.bus.publish({ type: 'watch:upsert', watch: pub(w) }); }
