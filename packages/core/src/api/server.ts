@@ -8,6 +8,7 @@ import type { NodeConfig } from '../config.ts';
 import type { EventBus } from '../events.ts';
 import { HttpError } from '../util/http-error.ts';
 import { verifyAgentToken } from '../util/agent-token.ts';
+import type { Terminals } from '../terminal/terminals.ts';
 
 /** Who is calling: the node token (app/user, full access) or one agent's token (agentId set). */
 export interface Caller { agentId: string | null }
@@ -62,7 +63,7 @@ const MIME: Record<string, string> = {
   '.png': 'image/png', '.woff2': 'font/woff2', '.json': 'application/json', '.ico': 'image/x-icon',
 };
 
-export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHello: () => EventEnvelope): Promise<Server> {
+export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHello: () => EventEnvelope, terminals?: Terminals): Promise<Server> {
   const tokenBuf = Buffer.from(cfg.token);
   const given = (req: IncomingMessage, url: URL): string => {
     const h = req.headers.authorization;
@@ -118,8 +119,17 @@ export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHe
   });
 
   const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
+  const termWss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
+    // Terminals: node token only (authed() never accepts agent tokens).
+    const term = /^\/ws\/term\/([A-Za-z0-9]+)$/.exec(url.pathname);
+    if (term && terminals) {
+      if (!authed(req, url)) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); socket.destroy(); return; }
+      if (!terminals.has(term[1])) { socket.write('HTTP/1.1 404 Not Found\r\n\r\n'); socket.destroy(); return; }
+      termWss.handleUpgrade(req, socket, head, (ws) => terminals.attach(term[1], ws));
+      return;
+    }
     if (url.pathname !== '/ws' || !authed(req, url)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();

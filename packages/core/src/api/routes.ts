@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { homedir } from 'node:os';
-import type { CreateAgentReq, CreateProjectReq, ForkReq, FsEntry, MessageReq, NodeState, ProjectContext, RefreshReq, StateDoc, UpdateAgentReq, VersionInfo } from '@axo/protocol';
+import type { CreateAgentReq, CreateProjectReq, CreateTerminalReq, ForkReq, FsEntry, MessageReq, NodeState, ProjectContext, RefreshReq, StateDoc, UpdateAgentReq, VersionInfo } from '@axo/protocol';
 import { Router } from './server.ts';
 import type { Node } from '../node.ts';
 import { HttpError } from '../util/http-error.ts';
@@ -33,6 +33,11 @@ export function buildRouter(node: Node): Router {
     for (const a of runtime.list().filter((x) => x.projectId === params.id)) await runtime.remove(a.id);
     projects.remove(params.id);
   });
+
+  // ── terminals (node token only: not in AGENT_ROUTES) ──
+  r.get('/terminals', () => node.terminals.list());
+  r.post('/terminals', ({ body }) => node.terminals.create((body ?? {}) as CreateTerminalReq));
+  r.delete('/terminals/:id', ({ params }) => node.terminals.kill(params.id));
 
   // ── agents ──
   r.post('/agents', ({ body }) => node.teams.createAgent(body as CreateAgentReq)); // [core2] archived check + ownWorktree

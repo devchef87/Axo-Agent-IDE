@@ -93,7 +93,7 @@ describe('preflight evaluation', () => {
     ].join('\n'));
     const r = evaluatePreflight(kv, 31500);
     const by = Object.fromEntries(r.checks.map((c) => [c.id, c.status]));
-    assert.deepEqual(by, { os: 'pass', node: 'warn', claude: 'pass', auth: 'fail', git: 'warn', disk: 'warn', service: 'warn', port: 'pass', groove: 'pass' });
+    assert.deepEqual(by, { os: 'pass', node: 'warn', claude: 'pass', auth: 'fail', git: 'warn', python3: 'warn', disk: 'warn', service: 'warn', port: 'pass', groove: 'pass' });
     assert.equal(r.ok, false);
     assert.deepEqual(r.nodeFlags, ['--experimental-sqlite']);
     assert.equal(r.systemd, true);

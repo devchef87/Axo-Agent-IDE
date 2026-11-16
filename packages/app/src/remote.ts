@@ -48,6 +48,7 @@ fi
 G=$(command -v git 2>/dev/null)
 kv git "$G"
 [ -n "$G" ] && kv git_version "$(git --version 2>&1)"
+command -v python3 >/dev/null 2>&1 && kv python3 "$(python3 -c 'import pty,sys; print(sys.version.split()[0])' 2>/dev/null)"
 kv disk_kb "$(df -Pk "$HOME" 2>/dev/null | awk 'NR==2{print $4}')"
 if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then kv systemd 1; fi
 command -v loginctl >/dev/null 2>&1 && kv linger "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null)"
@@ -113,6 +114,9 @@ export function evaluatePreflight(kv: Record<string, string>, remotePort: number
 
   if (!kv.git) add('git', 'git', 'warn', 'git not found. Worktree teams need git.');
   else add('git', 'git', 'pass', (kv.git_version ?? '').replace(/^git version /, 'v'));
+
+  if (kv.python3) add('python3', 'python3', 'pass', `v${kv.python3} (terminals)`);
+  else add('python3', 'python3', 'warn', 'python3 not found. Agents work, but the terminal panel needs python3 on the server.');
 
   const kb = Number(kv.disk_kb);
   if (!Number.isFinite(kb) || !kv.disk_kb) add('disk', 'Free disk', 'warn', 'unknown');

@@ -390,3 +390,25 @@ export interface FileWatchRes { watching: boolean; expiresAt: number; truncated:
 /** GET /projects/:id/files/original?path= — the file at HEAD; null if untracked/new. */
 export interface OriginalRes { path: string; content: string | null }
 
+
+// ── Terminals ────────────────────────────────────────────
+// PTY shells on a node (local or remote). Node token only; agent tokens are refused.
+// Attach: WS /ws/term/:id?token=… — binary frames are raw PTY bytes both ways; text frames are
+// JSON TermClientMsg (from the UI) / TermServerMsg (from the node). On attach the node replays
+// the last ~256 KB of output, so a session survives sleep, tunnel drops and reloads.
+export interface TerminalInfo {
+  id: string;
+  cwd: string;
+  shell: string;
+  pid: number;
+  createdAt: number;
+  cols: number;
+  rows: number;
+  exited: boolean;
+  exitCode: number | null;
+  attached: number;      // live WS attachments
+}
+/** POST /terminals — cwd defaults to $HOME and must be an existing directory. */
+export interface CreateTerminalReq { cwd?: string; cols?: number; rows?: number }
+export type TermClientMsg = { type: 'resize'; cols: number; rows: number };
+export type TermServerMsg = { type: 'exit'; code: number };
