@@ -16,6 +16,7 @@ import type {
 } from '@axo/protocol';
 import { sshTunnel, validateTarget, parseSshConfig, explainSshError, type SshEnv, type SshTarget } from './ssh.ts';
 import { runPreflight, deploy, startAndReadToken, stopRemote } from './remote.ts';
+import type { RelayEndpoint } from './relay.ts';
 
 export interface NodeConn { key: string; name: string; baseUrl: string; token: string; kind: 'local' | 'remote' }
 
@@ -129,6 +130,17 @@ export class NodeManager extends EventEmitter {
       if (s.want && s.token && s.status.localPort) {
         out.push({ key: s.config.id, name: s.config.name, baseUrl: `http://127.0.0.1:${s.status.localPort}`, token: s.token, kind: 'remote' });
       }
+    }
+    return out;
+  }
+
+  /** Every node InnerChat can relay between: this Mac ('local') and each configured server (offline ones too, so their messages wait). */
+  relayEndpoints(): RelayEndpoint[] {
+    const out: RelayEndpoint[] = [];
+    if (this.local) out.push({ id: 'local', name: 'Local', baseUrl: this.local.baseUrl, token: this.local.token, connected: true });
+    for (const s of this.servers.values()) {
+      const up = s.status.phase === 'connected' && !!s.token && !!s.status.localPort;
+      out.push({ id: s.config.id, name: s.config.name, baseUrl: up ? `http://127.0.0.1:${s.status.localPort}` : '', token: s.token ?? '', connected: up });
     }
     return out;
   }
