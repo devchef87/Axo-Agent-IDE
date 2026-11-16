@@ -20,6 +20,7 @@ export function NewAgentDialog() {
   const nodes = useAxo((s) => s.nodes);
   const nodeOrder = useAxo((s) => s.nodeOrder);
   const [dest, setDest] = useState('');
+  const [teamId, setTeamId] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('fullstack');
   const [model, setModel] = useState('opus');
@@ -27,8 +28,10 @@ export function NewAgentDialog() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { if (target) { setName(''); setTask(''); setError(null); setDest(`${target.nodeKey}|${target.projectId}`); } }, [target]);
+  useEffect(() => { if (target) { setName(''); setTask(''); setError(null); setDest(`${target.nodeKey}|${target.projectId}`); setTeamId(target.teamId ?? ''); } }, [target]);
   const close = () => setUi({ newAgent: null });
+  const [destNode, destProject] = dest.split('|');
+  const teams = (nodes[destNode]?.teams ?? []).filter((t) => t.projectId === destProject && !t.archivedAt).sort((a, b) => a.createdAt - b.createdAt);
   const projects = nodeOrder.flatMap((k) => nodes[k].projects.map((p) => ({ value: `${k}|${p.id}`, label: nodeOrder.length > 1 ? `${nodes[k].name} / ${p.name}` : p.name })));
 
   const submit = async (e: FormEvent) => {
@@ -39,7 +42,7 @@ export function NewAgentDialog() {
     setError(null);
     try {
       const agent = await client(nodeKey).post<Agent>('/agents', {
-        projectId, name: name.trim() || undefined, role, model, task: task.trim() || undefined,
+        projectId, teamId: teams.some((t) => t.id === teamId) ? teamId : undefined, name: name.trim() || undefined, role, model, task: task.trim() || undefined,
       });
       close();
       select({ nodeKey, agentId: agent.id });
@@ -65,10 +68,18 @@ export function NewAgentDialog() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Project">
-            <select className={inputCls} value={dest} onChange={(e) => setDest(e.target.value)}>
+            <select className={inputCls} value={dest} onChange={(e) => { setDest(e.target.value); setTeamId(''); }}>
               {projects.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </Field>
+          <Field label="Team">
+            <select className={inputCls} value={teamId} onChange={(e) => setTeamId(e.target.value)} disabled={teams.length === 0}>
+              <option value="">{teams.length ? 'Default team' : 'No teams yet'}</option>
+              {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <Field label="Model">
             <select className={inputCls} value={model} onChange={(e) => setModel(e.target.value)}>
               {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}

@@ -39,7 +39,7 @@ interface AxoState {
   view: View;
   setView(view: View): void;
   ui: {
-    newAgent: { nodeKey: string; projectId: string } | null;
+    newAgent: { nodeKey: string; projectId: string; teamId?: string } | null;
     addProject: string | null;
     palette: boolean;
     drawer: boolean; // agent config drawer for the focused pane
