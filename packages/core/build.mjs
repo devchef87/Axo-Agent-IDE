@@ -19,6 +19,7 @@ function hashTree(h, dir) {
 const h = createHash('sha256').update(pkg.version);
 hashTree(h, new URL('./src', import.meta.url).pathname);
 hashTree(h, new URL('../protocol/src', import.meta.url).pathname);
+h.update(cli);
 const buildId = h.digest('hex').slice(0, 12);
 
 await build({
