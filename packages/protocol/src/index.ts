@@ -264,7 +264,8 @@ export type CoordinationEvent =
   | { type: 'knock:denied'; agentId: string; agentName: string; tool: string; path: string; owner: string | null; reason: string }
   | { type: 'innerchat:turn'; thread: ChatThread; turn: ChatTurn }
   | { type: 'watch:upsert'; watch: Watch }
-  | { type: 'watch:removed'; watchId: string };
+  | { type: 'watch:removed'; watchId: string }
+  | { type: 'team:merged'; teamId: string; agentId: string | null; base: string; branch: string; commit: string; strategy: 'merge' | 'squash' };
 
 // ── Remote nodes / servers (Axo-Remote) ─────────────────────
 // Served by every node at GET /api/version. `build` is a content hash of the
@@ -322,6 +323,3 @@ export interface ServersSnapshot {
   local: LocalNodeStatus;
   servers: ServerView[];
 }
-
-  | { type: 'watch:removed'; watchId: string }
-  | { type: 'team:merged'; teamId: string; agentId: string | null; base: string; branch: string; commit: string; strategy: 'merge' | 'squash' };
