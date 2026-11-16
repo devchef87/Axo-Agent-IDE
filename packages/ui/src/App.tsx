@@ -12,11 +12,13 @@ import { ProjectContextDialog } from './components/project-context.tsx';
 import { cn, ConnDot, formatTokens } from './components/ui.tsx';
 import { useTheme, type ThemePref } from './lib/theme.ts';
 import { ServersPanel } from './components/servers/servers-panel.tsx';
+import { startNotifications } from './lib/notifications.ts';
 
 export function App() {
   const init = useAxo((s) => s.init);
   const drawer = useAxo((s) => s.ui.drawer);
   useEffect(() => { void init(); }, [init]);
+  useEffect(() => { startNotifications(); }, []);
   useGlobalShortcuts();
 
   return (

@@ -78,6 +78,11 @@ function loadLayout(): Layout {
 /** The agent in the focused pane, if any. */
 export const focusedSel = (s: { layout: Layout }): Selection | null => s.layout.panes[s.layout.focused] ?? null;
 
+/** Read-only listeners for every node event, called before the store applies it (so state still shows the "before"). Used by notifications. */
+export type EventTap = (nodeKey: string, ev: EventEnvelope) => void;
+const taps = new Set<EventTap>();
+export function tapEvents(fn: EventTap): () => void { taps.add(fn); return () => taps.delete(fn); }
+
 export const useAxo = create<AxoState>((set, get) => {
   const patchNode = (key: string, fn: (n: NodeView) => Partial<NodeView>) =>
     set((s) => (s.nodes[key] ? { nodes: { ...s.nodes, [key]: { ...s.nodes[key], ...fn(s.nodes[key]) } } } : {}));
@@ -111,6 +116,7 @@ export const useAxo = create<AxoState>((set, get) => {
   };
 
   const onEvent = (key: string, ev: EventEnvelope) => {
+    for (const t of taps) { try { t(key, ev); } catch (e) { console.error('[axo] event tap', e); } }
     switch (ev.type) {
       case 'project:upsert': patchNode(key, (n) => ({ projects: upsert(n.projects, ev.project) })); break;
       case 'project:removed': patchNode(key, (n) => ({

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, powerMonitor, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, powerMonitor, shell } from 'electron';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
@@ -32,6 +32,41 @@ const manager = new NodeManager({
 });
 manager.on('nodes', (conns: NodeConn[]) => win?.webContents.send('axo:nodes-changed', conns));
 manager.on('snapshot', (snap) => win?.webContents.send('axo:servers-changed', snap));
+
+// ── Notifications ───────────────────────────────────────────
+// The renderer decides which agent events notify (it holds the node connections);
+// main shows them and routes clicks back. Keep references: a GC'd Notification loses its click handler.
+type NotifyTarget = { kind: 'agent'; nodeKey: string; agentId: string } | { kind: 'servers' };
+const shown = new Set<Notification>();
+function notify(title: string, body: string, target: NotifyTarget): void {
+  if (!Notification.isSupported()) return;
+  const n = new Notification({ title, body });
+  shown.add(n);
+  const done = () => shown.delete(n);
+  n.on('click', () => {
+    done();
+    if (!win) void createWindow().then(() => win?.webContents.send('axo:notification-click', target)); // resolves after the page loaded
+    else {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+      win.webContents.send('axo:notification-click', target);
+    }
+  });
+  n.on('close', done);
+  n.on('failed', done);
+  n.show();
+}
+ipcMain.on('axo:notify', (_e, n: { title: string; body: string; target: NotifyTarget }) => {
+  if (typeof n?.title === 'string' && typeof n.body === 'string') notify(n.title.slice(0, 200), n.body.slice(0, 500), n.target);
+});
+manager.on('server-lost', (cfg: { name: string }, message: string) => {
+  const title = `${cfg.name} disconnected`;
+  const body = `${message}. Agents on the server keep running; Axo keeps reconnecting.`;
+  // With a window, the renderer applies the user's notification setting and focus rules.
+  if (win) win.webContents.send('axo:server-lost', { title, body });
+  else notify(title, body, { kind: 'servers' });
+});
 
 // Theme: the renderer owns the preference; we mirror it so the window opens in the
 // right colours next launch and native chrome (traffic lights, dialogs) matches.

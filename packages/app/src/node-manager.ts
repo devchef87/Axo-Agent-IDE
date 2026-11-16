@@ -29,6 +29,8 @@ export interface NodeManagerOptions {
   /** Restart the local node with the bundled build. Returns the new connection. */
   restartLocal?: () => Promise<LocalNodeRef>;
   sshConfigPath?: string;
+  /** A connected server that stays unreachable this long emits 'server-lost' (default 15s). */
+  lostAfterMs?: number;
   /** Test hooks */
   healthTimeoutMs?: number;
   idlePollMs?: number;
@@ -44,6 +46,7 @@ interface ServerEntry {
   loop: Promise<void> | null;
   busy: boolean;             // preflight/deploy in progress
   cancelUpdate: boolean;
+  lostTimer: ReturnType<typeof setTimeout> | null; // pending 'server-lost' after a drop
 }
 
 const BUSY: Agent['status'][] = ['working', 'starting', 'rotating'];
@@ -103,7 +106,7 @@ export class NodeManager extends EventEmitter {
 
   private entry(config: ServerConfig): ServerEntry {
     return {
-      config, want: false, child: null, wake: null, loop: null, busy: false, cancelUpdate: false,
+      config, want: false, child: null, wake: null, loop: null, busy: false, cancelUpdate: false, lostTimer: null,
       status: { phase: 'idle', updateAvailable: false, updateWaiting: false },
     };
   }
@@ -143,7 +146,19 @@ export class NodeManager extends EventEmitter {
   }
 
   private setStatus(s: ServerEntry, patch: Partial<ServerStatus>): void {
+    const was = s.status.phase;
     s.status = { ...s.status, ...patch };
+    const now = s.status.phase;
+    // A drop the user didn't ask for, that doesn't heal quickly (a wake-up reconnect usually does).
+    if (was === 'connected' && now === 'reconnecting' && s.want && !s.lostTimer) {
+      s.lostTimer = setTimeout(() => {
+        s.lostTimer = null;
+        if (s.want && s.status.phase !== 'connected') this.emit('server-lost', { ...s.config }, s.status.message ?? 'connection lost');
+      }, this.o.lostAfterMs ?? 15_000);
+    } else if ((now === 'connected' || !s.want) && s.lostTimer) {
+      clearTimeout(s.lostTimer);
+      s.lostTimer = null;
+    }
     this.changed();
   }
 
@@ -293,6 +308,7 @@ export class NodeManager extends EventEmitter {
     const s = this.get(id);
     if (s.config.autoConnect) { s.config.autoConnect = false; this.save(); }
     s.want = false;
+    if (s.lostTimer) { clearTimeout(s.lostTimer); s.lostTimer = null; }
     s.child?.kill();
     s.wake?.();
     await s.loop;
@@ -313,7 +329,12 @@ export class NodeManager extends EventEmitter {
   }
 
   async shutdown(): Promise<void> {
-    for (const s of this.servers.values()) { s.want = false; s.child?.kill(); s.wake?.(); }
+    for (const s of this.servers.values()) {
+      s.want = false;
+      if (s.lostTimer) { clearTimeout(s.lostTimer); s.lostTimer = null; }
+      s.child?.kill();
+      s.wake?.();
+    }
     await Promise.all([...this.servers.values()].map((s) => s.loop));
   }
 
