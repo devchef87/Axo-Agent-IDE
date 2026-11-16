@@ -11,5 +11,10 @@ export default defineConfig({
   ],
   base: './',
   server: { port: 5199, strictPort: true },
-  build: { outDir: 'dist', emptyOutDir: true, chunkSizeWarningLimit: 1500 },
+  // One bundle, no lazy chunks: Electron loads the UI from file://, where dynamic import()
+  // of sibling chunks is not reliable. It's read from local disk, so size matters little.
+  build: {
+    outDir: 'dist', emptyOutDir: true, chunkSizeWarningLimit: 6000, modulePreload: false,
+    rollupOptions: { output: { inlineDynamicImports: true } },
+  },
 });

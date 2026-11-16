@@ -69,3 +69,23 @@ describe('api', () => {
     assert.equal((await call('/agents/nope/message', { method: 'POST', body: JSON.stringify({ text: 'x' }) })).status, 404);
   });
 });
+
+describe('agent token boundaries', () => {
+  it('agent tokens cannot use the file API (header or ?token=)', async () => {
+    t = await makeNode();
+    const { agentToken } = await import('../src/util/agent-token.ts');
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync(`${t.project}/secret.txt`, 'top secret');
+    const p = t.node.projects.create(t.project);
+    const a = t.node.runtime.create({ projectId: p.id, name: 'snoop' });
+    const tok = agentToken(t.node.cfg.token, a.id);
+    const base = `http://127.0.0.1:${t.node.cfg.port}/api/projects/${p.id}/files`;
+    const viaHeader = await fetch(`${base}/read?path=secret.txt`, { headers: { Authorization: `Bearer ${tok}` } });
+    assert.equal(viaHeader.status, 401);
+    const viaQuery = await fetch(`${base}/raw?path=secret.txt&token=${encodeURIComponent(tok)}`);
+    assert.equal(viaQuery.status, 401);
+    const owner = await fetch(`${base}/raw?path=secret.txt&token=${encodeURIComponent(t.node.cfg.token)}`);
+    assert.equal(owner.status, 200);
+    assert.equal(await owner.text(), 'top secret');
+  });
+});

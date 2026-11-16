@@ -105,6 +105,7 @@ describe('server lifecycle over (fake) ssh', () => {
   let lastSnap: ServersSnapshot | null = null;
 
   before(async () => {
+    execFileSync(process.execPath, ['build.mjs'], { cwd: join(CORE, '..', 'cli'), stdio: 'ignore' }); // core embeds the CLI
     execFileSync(process.execPath, ['build.mjs'], { cwd: CORE, stdio: 'ignore' });
     root = mkdtempSync(join(tmpdir(), 'axo-remote-'));
     remoteHome = join(root, 'remote-home');

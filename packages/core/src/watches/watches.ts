@@ -19,7 +19,14 @@ const OUTPUT_TAIL = 4096;
 const KEEP_LOG_BYTES = 64 * 1024;          // a finished job's out.log is trimmed to this
 const HISTORY_MS = 7 * 24 * 60 * 60_000;   // finished watches (and their run dirs) are pruned after this
 const MAX_HISTORY = 500;
-const STRIP_ENV = /^(CLAUDECODE|CLAUDE_CODE_.*|AXO_TOKEN|AXO_AGENT_.*)$/;
+const STRIP_ENV = /^(CLAUDECODE|CLAUDE_CODE_.*|AXO_TOKEN|AXO_AGENT_.*|ELECTRON_RUN_AS_NODE)$/;
+
+/** Environment for watch commands: the node's env minus agent identity and Electron's run-as-node flag. */
+function cleanEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(process.env)) if (!STRIP_ENV.test(k)) env[k] = v;
+  return env;
+}
 
 export interface WatchesOptions {
   minPollMs?: number;       // floor for until-mode intervals (tests lower it)
@@ -200,8 +207,7 @@ export class Watches {
     ].join('\n');
     const runSh = join(dir, 'run.sh');
     writeFileSync(runSh, script, { mode: 0o700 });
-    const env: NodeJS.ProcessEnv = {};
-    for (const [k, v] of Object.entries(process.env)) if (!STRIP_ENV.test(k)) env[k] = v;
+    const env = cleanEnv();
     env.AXO_WATCH_ID = w.id;
     if (this.binDir) env.PATH = `${this.binDir}:${env.PATH ?? ''}`;
     try {
@@ -255,7 +261,7 @@ export class Watches {
     if (t.checking) return; // previous check still running
     t.checking = true;
     const chunks: Buffer[] = [];
-    const check = spawn('/bin/sh', ['-c', w.until], { cwd: w.cwd, env: process.env, timeout: Math.max(w.pollMs, 5000) });
+    const check = spawn('/bin/sh', ['-c', w.until], { cwd: w.cwd, env: { ...cleanEnv(), ...(this.binDir ? { PATH: `${this.binDir}:${process.env.PATH ?? ''}` } : {}) }, timeout: Math.max(w.pollMs, 5000) });
     check.stdout.on('data', (b: Buffer) => chunks.push(b));
     check.stderr.on('data', (b: Buffer) => chunks.push(b));
     check.on('error', () => { t.checking = false; });

@@ -8,6 +8,7 @@ import { HttpError } from '../util/http-error.ts';
 import { expandHome } from '../projects.ts';
 import { BUILD, VERSION } from '../config.ts';
 import { addCoordinationRoutes } from './coordination-routes.ts';
+import { registerFileRoutes } from '../files/routes.ts';
 
 export function buildRouter(node: Node): Router {
   const { store, bus, runtime, projects, cfg, journalist, rotator } = node;
@@ -34,11 +35,7 @@ export function buildRouter(node: Node): Router {
   });
 
   // ── agents ──
-  r.post('/agents', ({ body }) => {
-    const b = body as CreateAgentReq;
-    if (b?.teamId && store.getTeam(b.teamId)?.archivedAt) throw new HttpError(400, 'team is archived'); // [core2]
-    return runtime.create(b);
-  });
+  r.post('/agents', ({ body }) => node.teams.createAgent(body as CreateAgentReq)); // [core2] archived check + ownWorktree
   r.patch('/agents/:id', ({ params, body }) => runtime.update(params.id, body as UpdateAgentReq));
   r.delete('/agents/:id', ({ params }) => runtime.remove(params.id));
   r.post('/agents/:id/message', ({ params, body }) => {
@@ -81,6 +78,8 @@ export function buildRouter(node: Node): Router {
     await journalist.refreshMap(p);
     return journalist.projectContext(p);
   });
+
+  registerFileRoutes(r, node);
 
   // ── fs (minimal: directory picker for remote nodes; full file API arrives in phase 4) ──
   r.get('/fs/list', async ({ query }): Promise<{ path: string; parent: string | null; entries: FsEntry[] }> => {

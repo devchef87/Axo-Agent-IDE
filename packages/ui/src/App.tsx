@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
-import { Monitor, Moon, Search, Sun } from 'lucide-react';
+import { lazy, Suspense } from 'react';
+import { Code2, Monitor, Moon, Search, Sun, Users } from 'lucide-react';
 import { focusedSel, useAxo } from './stores/store.ts';
 import { isElectron, isMac } from './lib/bridge.ts';
 import { Sidebar } from './components/sidebar.tsx';
 import { Fleet } from './components/fleet.tsx';
 import { AgentDrawer } from './components/agent-drawer.tsx';
 import { CommandPalette } from './components/palette.tsx';
-import { focusPaneComposer, modalOpen, openNewAgent, toggleDrawer } from './lib/actions.ts';
+import { focusPaneComposer, modalOpen, openNewAgent, openQuickOpen, toggleDrawer, toggleView } from './lib/actions.ts';
 import { AddProjectDialog, ForkDialog, NewAgentDialog, RefreshDialog } from './components/dialogs.tsx';
 import { ProjectContextDialog } from './components/project-context.tsx';
 import { cn, ConnDot, formatTokens } from './components/ui.tsx';
@@ -17,6 +18,7 @@ import { startNotifications } from './lib/notifications.ts';
 export function App() {
   const init = useAxo((s) => s.init);
   const drawer = useAxo((s) => s.ui.drawer);
+  const view = useAxo((s) => s.view);
   useEffect(() => { void init(); }, [init]);
   useEffect(() => { startNotifications(); }, []);
   useGlobalShortcuts();
@@ -26,8 +28,19 @@ export function App() {
       {isElectron && isMac && <TitleStrip />}
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <Fleet />
-        {drawer && <AgentDrawer />}
+        <main className="flex min-w-0 flex-1 flex-col">
+          <ViewBar />
+          <div className="flex min-h-0 flex-1">
+            {view === 'editor' ? (
+              <Suspense fallback={<div className="flex-1 bg-bg" />}><EditorView /></Suspense>
+            ) : (
+              <>
+                <Fleet />
+                {drawer && <AgentDrawer />}
+              </>
+            )}
+          </div>
+        </main>
       </div>
       <StatusBar />
       <NewAgentDialog />
@@ -46,6 +59,40 @@ export function App() {
  * first 80px, so that area stays empty. Nothing in here is clickable; never put .drag on
  * anything larger — Electron swallows clicks over drag regions, even under modals.
  */
+// The editor (CodeMirror, language data) loads on first use; pdf.js loads only for PDFs.
+const EditorView = lazy(() => import('./components/editor/editor-view.tsx').then((m) => ({ default: m.EditorView })));
+const EditorTargetPicker = lazy(() => import('./components/editor/editor-view.tsx').then((m) => ({ default: m.EditorTargetPicker })));
+
+const VIEWS = [
+  { id: 'fleet' as const, label: 'Fleet', icon: Users },
+  { id: 'editor' as const, label: 'Editor', icon: Code2 },
+];
+
+function ViewBar() {
+  const view = useAxo((s) => s.view);
+  const setView = useAxo((s) => s.setView);
+  return (
+    <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border-subtle bg-panel px-2">
+      <div role="tablist" aria-label="View" className="flex items-center gap-0.5">
+        {VIEWS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={view === id}
+            title={`${label} (⌘E to switch)`}
+            onClick={() => setView(id)}
+            className={cn('flex h-6 items-center gap-1.5 rounded px-2 text-xs font-medium cursor-pointer',
+              view === id ? 'bg-control text-primary' : 'text-muted hover:bg-hover hover:text-secondary')}
+          >
+            <Icon size={12} /> {label}
+          </button>
+        ))}
+      </div>
+      {view === 'editor' && <div className="ml-2"><Suspense fallback={null}><EditorTargetPicker /></Suspense></div>}
+    </div>
+  );
+}
+
 function useGlobalShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -60,8 +107,10 @@ function useGlobalShortcuts() {
       }
       if (modalOpen()) return;
       if (k === 'n' && !e.shiftKey) { e.preventDefault(); openNewAgent(); }
-      else if (k === 'i' && !e.shiftKey) { e.preventDefault(); toggleDrawer(); }
-      else if (/^[1-3]$/.test(k)) { e.preventDefault(); focusPaneComposer(Number(k) - 1); }
+      else if (k === 'e' && !e.shiftKey) { e.preventDefault(); toggleView(); }
+      else if (k === 'p' && !e.shiftKey) { e.preventDefault(); openQuickOpen(); }
+      else if (k === 'i' && !e.shiftKey) { e.preventDefault(); useAxo.getState().setView('fleet'); toggleDrawer(); }
+      else if (/^[1-3]$/.test(k)) { e.preventDefault(); useAxo.getState().setView('fleet'); focusPaneComposer(Number(k) - 1); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

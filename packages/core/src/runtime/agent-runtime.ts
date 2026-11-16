@@ -74,7 +74,9 @@ const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
 function checkEffort(e: string | null | undefined): void {
   if (e != null && !EFFORTS.has(e)) throw new HttpError(400, `effort must be one of ${[...EFFORTS].join(', ')}`);
 }
-const STRIP_ENV = /^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CLAUDE_CODE_SSE_PORT|CLAUDE_AGENT_SDK_VERSION|GROOVE_.*|AXO_.*)$/;
+// ELECTRON_RUN_AS_NODE: the local node runs on Electron's binary; never leak that into agents
+// (any Electron app an agent launched would silently run as plain node).
+const STRIP_ENV = /^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CLAUDE_CODE_SSE_PORT|CLAUDE_AGENT_SDK_VERSION|GROOVE_.*|AXO_.*|ELECTRON_RUN_AS_NODE)$/;
 
 /** Clean environment for any claude child process (no inherited agent identity, subscription auth by default). */
 export function claudeEnv(cfg: { authMode: 'subscription' | 'api' }): NodeJS.ProcessEnv {
@@ -201,6 +203,19 @@ export class AgentRuntime extends EventEmitter {
     this.emitAgent(agent);
     if (req.task?.trim()) this.deliver(agent.id, req.task, 'user');
     return this.view(agent);
+  }
+
+  /**
+   * [core2] Point a not-yet-started agent at another directory (its own worktree). Only before the
+   * first session: claude keys sessions by cwd, so moving later would break --resume.
+   */
+  setWorkdir(id: string, workdir: string): Agent {
+    const a = this.get(id);
+    if (a.sessionId || this.live.has(id)) throw new HttpError(409, 'workdir can only be set before the agent first runs');
+    a.workdir = workdir;
+    this.store.saveAgent(a);
+    this.emitAgent(a);
+    return this.view(a);
   }
 
   update(id: string, req: UpdateAgentReq): Agent {

@@ -1,13 +1,15 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ArchiveTeamReq, CreateTeamReq, Project, Team, TeamMode, UpdateProjectReq } from '@axo/protocol';
+import { basename } from 'node:path';
+import type { Agent, ArchiveTeamReq, BranchDiff, CreateAgentReq, CreateTeamReq, MergeRes, Project, Team, TeamMode, UpdateProjectReq } from '@axo/protocol';
 import type { Store } from '../store/db.ts';
 import type { EventBus } from '../events.ts';
 import type { AgentRuntime } from '../runtime/agent-runtime.ts';
 import { ulid } from '../util/ulid.ts';
 import { excludeFromGit } from '../journalist/files.ts';
 import { HttpError } from '../util/http-error.ts';
+import { branchDiff, currentBranch, mergeBranch } from './merge.ts';
 
 const NAME_RE = /^[\w][\w .-]{0,39}$/;
 
@@ -22,6 +24,11 @@ function git(cwd: string, args: string[], timeout = 60_000): string {
 }
 function gitOk(cwd: string, args: string[]): boolean {
   try { execFileSync('git', args, { cwd, stdio: 'ignore', timeout: 10_000 }); return true; } catch { return false; }
+}
+
+function checkStrategy(s: unknown): 'merge' | 'squash' {
+  if (s === 'merge' || s === 'squash') return s;
+  throw new HttpError(400, `strategy must be 'merge' or 'squash'`);
 }
 
 export function slugify(name: string): string {
@@ -125,6 +132,85 @@ export class Teams {
     this.d.store.saveProject(p);
     this.d.bus.publish({ type: 'project:upsert', project: p });
     return p;
+  }
+
+  // ── per-agent worktrees ──────────────────────────────────
+
+  /**
+   * Create an agent, optionally in its own worktree `.axo/worktrees/<team>--<agent>` on branch
+   * `axo/<team>--<agent>` off the team branch (SPEC §6: a risky task in parallel). The task is
+   * delivered only once the agent sits in its final workdir.
+   */
+  createAgent(req: CreateAgentReq): Agent {
+    const { runtime, store } = this.d;
+    if (req.teamId && store.getTeam(req.teamId)?.archivedAt) throw new HttpError(400, 'team is archived');
+    if (!req.ownWorktree) return runtime.create(req);
+    const project = store.getProject(req.projectId);
+    if (!project) throw new HttpError(404, 'project not found');
+    if (!project.isGit) throw new HttpError(400, 'a per-agent worktree needs a git project');
+    const agent = runtime.create({ ...req, task: undefined });
+    try {
+      const team = this.get(agent.teamId);
+      const base = team.mode === 'worktree' ? team.branch! : (project.baseBranch ?? 'HEAD');
+      const teamSlug = team.worktreePath ? basename(team.worktreePath) : slugify(team.name);
+      const { path } = this.addWorktree(project, `${teamSlug}--${slugify(agent.name)}`, base);
+      const moved = runtime.setWorkdir(agent.id, path);
+      if (req.task?.trim()) runtime.deliver(agent.id, req.task, 'user');
+      return moved;
+    } catch (e) {
+      void runtime.remove(agent.id);
+      throw e;
+    }
+  }
+
+  // ── merge view ───────────────────────────────────────────
+
+  /** Team branch vs the project's base branch. */
+  diff(teamId: string): BranchDiff {
+    const { project, team } = this.teamBranch(teamId);
+    return branchDiff(project.path, project.baseBranch!, team.branch!, team.worktreePath);
+  }
+
+  /** Merge the team branch into the project's base branch. */
+  merge(teamId: string, strategy: 'merge' | 'squash' = 'merge'): MergeRes {
+    const { project, team } = this.teamBranch(teamId);
+    const res = mergeBranch(project.path, project.baseBranch!, team.branch!, checkStrategy(strategy), team.worktreePath, `team ${team.name}`);
+    this.d.bus.publish({ type: 'team:merged', teamId, agentId: null, base: res.base, branch: res.branch, commit: res.commit, strategy: res.strategy });
+    return res;
+  }
+
+  /** A per-agent worktree branch vs its team branch. */
+  agentDiff(agentId: string): BranchDiff {
+    const { project, agent, base, branch } = this.agentBranch(agentId);
+    return branchDiff(project.path, base, branch, agent.workdir);
+  }
+
+  /** Merge a per-agent worktree branch into its team branch. */
+  mergeAgent(agentId: string, strategy: 'merge' | 'squash' = 'merge'): MergeRes {
+    const { project, agent, base, branch } = this.agentBranch(agentId);
+    const res = mergeBranch(project.path, base, branch, checkStrategy(strategy), agent.workdir, `${agent.name}'s work`);
+    this.d.bus.publish({ type: 'team:merged', teamId: agent.teamId, agentId, base: res.base, branch: res.branch, commit: res.commit, strategy: res.strategy });
+    return res;
+  }
+
+  private teamBranch(teamId: string): { project: Project; team: Team } {
+    const team = this.get(teamId);
+    const project = this.d.store.getProject(team.projectId)!;
+    if (team.mode !== 'worktree' || !team.branch) throw new HttpError(400, `team ${team.name} works on the main checkout (${team.mode} mode); there is no team branch to merge`);
+    if (!project.baseBranch) throw new HttpError(400, 'the project has no base branch set');
+    return { project, team };
+  }
+
+  private agentBranch(agentId: string): { project: Project; agent: Agent; base: string; branch: string } {
+    const agent = this.d.runtime.get(agentId);
+    const team = this.get(agent.teamId);
+    const project = this.d.store.getProject(agent.projectId)!;
+    const teamDir = team.worktreePath ?? project.path;
+    const branch = agent.workdir !== teamDir ? currentBranch(agent.workdir) : null;
+    if (!branch?.startsWith('axo/')) throw new HttpError(400, `${agent.name} works in the team checkout, not its own worktree`);
+    const base = team.mode === 'worktree' ? team.branch : currentBranch(project.path) ?? project.baseBranch;
+    if (!base) throw new HttpError(400, 'cannot tell which branch to merge into');
+    return { project, agent, base, branch };
   }
 
   get(id: string): Team {
