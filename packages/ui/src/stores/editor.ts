@@ -135,6 +135,7 @@ export function defaultTarget(): EditorTarget | null {
   const agent = sel ? s.nodes[sel.nodeKey]?.agents.find((a) => a.id === sel.agentId) : undefined;
   if (sel && agent) {
     const team = s.nodes[sel.nodeKey].teams.find((t) => t.id === agent.teamId);
+    if (team?.worktreePath && agent.workdir !== team.worktreePath) return { nodeKey: sel.nodeKey, projectId: agent.projectId, team: null, agent: agent.id };
     return { nodeKey: sel.nodeKey, projectId: agent.projectId, team: team?.worktreePath ? team.id : null };
   }
   for (const k of s.nodeOrder) {
@@ -147,7 +148,8 @@ export function defaultTarget(): EditorTarget | null {
 /** Query string for the file API (`path` + optional `team`). */
 export function fileQuery(target: EditorTarget, params: Record<string, string> = {}): string {
   const q = new URLSearchParams(params);
-  if (target.team) q.set('team', target.team);
+  if (target.agent) q.set('agent', target.agent);
+  else if (target.team) q.set('team', target.team);
   const s = q.toString();
   return s ? `?${s}` : '';
 }
@@ -156,6 +158,7 @@ export function fileQuery(target: EditorTarget, params: Record<string, string> =
 export function rawUrl(target: EditorTarget, path: string): string {
   const conn = useAxo.getState().client(target.nodeKey).conn;
   const q = new URLSearchParams({ path, token: conn.token });
-  if (target.team) q.set('team', target.team);
+  if (target.agent) q.set('agent', target.agent);
+  else if (target.team) q.set('team', target.team);
   return `${conn.baseUrl}/api/projects/${target.projectId}/files/raw?${q}`;
 }

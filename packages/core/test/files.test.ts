@@ -164,6 +164,17 @@ describe('files api', () => {
     assert.equal((await call(`${f}/original?path=new.txt`)).body.content, null);
   });
 
+  it('targets an agent\'s workdir with ?agent= and refuses agents from other projects', async () => {
+    const f = await setup();
+    const projectId = f.split('/')[2];
+    const a = await post('/agents', { projectId, name: 'files-agent' });
+    assert.equal(a.status, 200);
+    const tree = await call(`${f}/tree?agent=${a.body.id}`);
+    assert.equal(tree.status, 200);
+    assert.equal(tree.body.root, a.body.workdir);
+    assert.equal((await call(`${f}/tree?agent=nope`)).status, 404);
+  });
+
   it('is not a repo outside git', async () => {
     const f = await setup();
     assert.deepEqual((await call(`${f}/git-status`)).body, { isRepo: false, branch: null, entries: [] });

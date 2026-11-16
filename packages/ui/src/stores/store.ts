@@ -36,8 +36,13 @@ interface AxoState {
   /** Bumped on journalist:updated so open views refetch. Keys: feedKey for agent state, `${nodeKey}:project:${id}` for map/decisions. */
   journalRev: Record<string, number>;
   /** Main area view. Persisted. */
-  view: 'fleet' | 'editor';
-  setView(view: 'fleet' | 'editor'): void;
+  view: View;
+  setView(view: View): void;
+  /** Team shown in the Teams view. Persisted. */
+  team: { nodeKey: string; teamId: string } | null;
+  selectTeam(t: { nodeKey: string; teamId: string } | null): void;
+  /** Bumped on team:merged so open reviews refetch. Key: `${nodeKey}:${teamId}`. */
+  teamRev: Record<string, number>;
   ui: {
     newAgent: { nodeKey: string; projectId: string } | null;
     addProject: string | null;
@@ -67,9 +72,19 @@ export const feedKey = (nodeKey: string, agentId: string) => `${nodeKey}:${agent
 const emptyFeed = (): FeedState => ({ items: [], hasMore: false, loaded: false, drafts: {} });
 
 const clients = new Map<string, NodeClient>();
+export type View = 'fleet' | 'editor' | 'teams' | 'watches';
+const VIEWS: View[] = ['fleet', 'editor', 'teams', 'watches'];
 
 type FilesListener = (nodeKey: string, ev: Extract<EventEnvelope, { type: 'files:changed' }>) => void;
 const filesListeners = new Set<FilesListener>();
+type EventListener = (nodeKey: string, ev: EventEnvelope) => void;
+const eventListeners = new Set<EventListener>();
+/** Subscribe to every event from every node (for views that keep their own state). */
+export function onNodeEvent(fn: EventListener): () => void {
+  eventListeners.add(fn);
+  return () => { eventListeners.delete(fn); };
+}
+
 /** Subscribe to files:changed from any node. Returns an unsubscribe function. */
 export function onFilesChanged(fn: FilesListener): () => void {
   filesListeners.add(fn);
@@ -128,6 +143,7 @@ export const useAxo = create<AxoState>((set, get) => {
 
   const onEvent = (key: string, ev: EventEnvelope) => {
     for (const t of taps) { try { t(key, ev); } catch (e) { console.error('[axo] event tap', e); } }
+    for (const fn of eventListeners) { try { fn(key, ev); } catch (e) { console.error('[axo] event listener', e); } }
     switch (ev.type) {
       case 'project:upsert': patchNode(key, (n) => ({ projects: upsert(n.projects, ev.project) })); break;
       case 'project:removed': patchNode(key, (n) => ({
@@ -182,6 +198,11 @@ export const useAxo = create<AxoState>((set, get) => {
       case 'journalist:updated': {
         const rk = ev.doc === 'state' && ev.agentId ? feedKey(key, ev.agentId) : `${key}:project:${ev.projectId}`;
         set((s) => ({ journalRev: { ...s.journalRev, [rk]: (s.journalRev[rk] ?? 0) + 1 } }));
+        break;
+      }
+      case 'team:merged': {
+        const k = `${key}:${ev.teamId}`;
+        set((s) => ({ teamRev: { ...s.teamRev, [k]: (s.teamRev[k] ?? 0) + 1 } }));
         break;
       }
       case 'files:changed':
@@ -258,8 +279,11 @@ export const useAxo = create<AxoState>((set, get) => {
     layout: loadLayout(),
     refreshing: {},
     journalRev: {},
-    view: localStorage.getItem('axo.view') === 'editor' ? 'editor' : 'fleet',
+    view: (VIEWS as string[]).includes(localStorage.getItem('axo.view') ?? '') ? localStorage.getItem('axo.view') as View : 'fleet',
     setView(view) { localStorage.setItem('axo.view', view); set({ view }); },
+    team: (() => { try { const t = JSON.parse(localStorage.getItem('axo.team') ?? 'null'); return t?.nodeKey && t?.teamId ? t : null; } catch { return null; } })(),
+    selectTeam(team) { localStorage.setItem('axo.team', JSON.stringify(team)); set({ team }); },
+    teamRev: {},
     ui: { newAgent: null, addProject: null, palette: false, drawer: false, refresh: null, fork: null, context: null, servers: false },
 
     async init() {

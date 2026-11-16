@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { AlertTriangle, FileDiff, FileText, MessageSquarePlus, Search, X } from 'lucide-react';
-import type { FileContent, FileSearchRes, WriteFileRes } from '@axo/protocol';
+import type { FileContent, FileSearchRes, FileWatchRes, WriteFileRes } from '@axo/protocol';
 import { basename, dirname, fileKind, selectionMessage, tabKey, targetKey, type EditorTab, type EditorTarget } from '../../lib/editor-model.ts';
 import { defaultTarget, fileQuery, isDirty, rawUrl, useEditor } from '../../stores/editor.ts';
 import { focusedSel, onFilesChanged, useAxo } from '../../stores/store.ts';
@@ -10,7 +10,8 @@ import { DiffView } from './diff-view.tsx';
 import { FileTree } from './file-tree.tsx';
 import { Centered, MediaViewer } from './media-viewer.tsx';
 
-const POLL_MS = 4000;
+const POLL_MS = 4000;        // fallback only, when the node can't watch
+const LEASE_RENEW_MS = 60_000; // node lease lasts 5 minutes
 
 export function EditorView() {
   const target = useEditor((s) => s.target);
@@ -19,7 +20,9 @@ export function EditorView() {
 
   // Pick a sensible project the first time, and drop targets whose project is gone.
   useEffect(() => {
-    const exists = target && nodes[target.nodeKey]?.projects.some((p) => p.id === target.projectId);
+    const node = target ? nodes[target.nodeKey] : undefined;
+    const exists = target && node?.projects.some((p) => p.id === target.projectId)
+      && (!target.agent || node.agents.some((a) => a.id === target.agent));
     if (!exists) {
       const t = defaultTarget();
       if (t || (target && nodes[target.nodeKey]?.status === 'online')) setTarget(t);
@@ -32,7 +35,8 @@ export function EditorView() {
   const node = nodes[target.nodeKey];
   const project = node?.projects.find((p) => p.id === target.projectId);
   const team = target.team ? node?.teams.find((t) => t.id === target.team) : undefined;
-  const label = [project?.name, team?.name].filter(Boolean).join(' · ') || 'Files';
+  const ownAgent = target.agent ? node?.agents.find((a) => a.id === target.agent) : undefined;
+  const label = [project?.name, team?.name, ownAgent ? `${ownAgent.name}'s worktree` : null].filter(Boolean).join(' · ') || 'Files';
 
   return (
     <div className="flex h-full min-w-0 flex-1">
@@ -55,17 +59,22 @@ export function EditorTargetPicker() {
   const nodes = useAxo((s) => s.nodes);
   const order = useAxo((s) => s.nodeOrder);
   const options = order.flatMap((k) => nodes[k].projects.flatMap((p) => [
-    { value: `${k}|${p.id}|`, label: order.length > 1 ? `${nodes[k].name} / ${p.name}` : p.name },
-    ...nodes[k].teams.filter((t) => t.projectId === p.id && t.worktreePath && !t.archivedAt)
-      .map((t) => ({ value: `${k}|${p.id}|${t.id}`, label: `${order.length > 1 ? `${nodes[k].name} / ` : ''}${p.name} · ${t.name} (worktree)` })),
+    // value = node|project|team|agent
+    { value: `${k}|${p.id}||`, label: order.length > 1 ? `${nodes[k].name} / ${p.name}` : p.name },
+    ...nodes[k].teams.filter((t) => t.projectId === p.id && t.worktreePath && !t.archivedAt).flatMap((t) => [
+      { value: `${k}|${p.id}|${t.id}|`, label: `${order.length > 1 ? `${nodes[k].name} / ` : ''}${p.name} · ${t.name} (team worktree)` },
+      // Agents with their own worktree (own branch off the team branch).
+      ...nodes[k].agents.filter((a) => a.teamId === t.id && a.workdir !== t.worktreePath)
+        .map((a) => ({ value: `${k}|${p.id}||${a.id}`, label: `${order.length > 1 ? `${nodes[k].name} / ` : ''}${p.name} · ${t.name} · ${a.name} (own worktree)` })),
+    ]),
   ]));
   if (!options.length) return null;
-  const value = target ? `${target.nodeKey}|${target.projectId}|${target.team ?? ''}` : '';
+  const value = target ? `${target.nodeKey}|${target.projectId}|${target.agent ? '' : target.team ?? ''}|${target.agent ?? ''}` : '';
   return (
     <select
       aria-label="Project"
       value={value}
-      onChange={(e) => { const [nodeKey, projectId, team] = e.target.value.split('|'); setTarget({ nodeKey, projectId, team: team || null }); }}
+      onChange={(e) => { const [nodeKey, projectId, team, agent] = e.target.value.split('|'); setTarget({ nodeKey, projectId, team: team || null, agent: agent || null }); }}
       className="h-6 max-w-64 rounded border border-border bg-bg px-1.5 text-xs text-secondary outline-none focus:border-accent cursor-pointer"
     >
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -73,7 +82,7 @@ export function EditorTargetPicker() {
   );
 }
 
-/** Keep open buffers in step with disk: files:changed events, a light poll of the active file, and window focus. */
+/** Keep open buffers in step with disk: files:changed (pushed by the node's watcher) and window focus. */
 function useEditorSync(target: EditorTarget | null) {
   const client = useAxo((s) => s.client);
   const view = useAxo((s) => s.view);
@@ -94,27 +103,45 @@ function useEditorSync(target: EditorTarget | null) {
 
   useEffect(() => {
     if (!target) return;
-    return onFilesChanged((nodeKey, ev) => {
+    // Agents can write many files in a burst: refresh open buffers at once, the tree at most once a second.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const off = onFilesChanged((nodeKey, ev) => {
       if (nodeKey !== target.nodeKey || ev.projectId !== target.projectId) return;
-      useEditor.getState().bump();
       void refresh(ev.paths);
+      timer ??= setTimeout(() => { timer = null; useEditor.getState().bump(); }, 1000);
     });
+    return () => { off(); if (timer) clearTimeout(timer); };
   }, [target, refresh]);
 
-  // Agents edit files directly (not through this API), so poll the active file while visible.
+  // Agents edit files directly, not through the file API. The node watches the root while we hold
+  // a lease (renewed every minute) and pushes files:changed; if it can't watch, poll the active file.
   useEffect(() => {
     if (!target || view !== 'editor') return;
-    const tick = () => {
-      if (document.hidden) return;
-      const s = useEditor.getState();
-      const tab = s.tabs[s.active];
-      if (tab) void refresh([tab.path]);
+    let poll: ReturnType<typeof setInterval> | null = null;
+    let live = true;
+    const startPolling = () => {
+      if (poll) return;
+      poll = setInterval(() => {
+        if (document.hidden) return;
+        const s = useEditor.getState();
+        const tab = s.tabs[s.active];
+        if (tab) void refresh([tab.path]);
+      }, POLL_MS);
     };
+    const renew = () => client(target.nodeKey)
+      .post<FileWatchRes>(`/projects/${target.projectId}/files/watch${fileQuery(target)}`)
+      .then((r) => { if (live && !r.watching) startPolling(); }, () => { if (live) startPolling(); });
+    void renew();
+    const lease = setInterval(() => void renew(), LEASE_RENEW_MS);
     const onFocus = () => { useEditor.getState().bump(); void refresh(Object.keys(useEditor.getState().buffers)); };
-    const t = setInterval(tick, POLL_MS);
     window.addEventListener('focus', onFocus);
-    return () => { clearInterval(t); window.removeEventListener('focus', onFocus); };
-  }, [target, view, refresh]);
+    return () => {
+      live = false;
+      clearInterval(lease);
+      if (poll) clearInterval(poll);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [target, view, refresh, client]);
 }
 
 function TabBar() {
