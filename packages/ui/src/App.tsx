@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { lazy, Suspense } from 'react';
-import { Code2, Eye, GitMerge, Monitor, Moon, Search, Sun, Users } from 'lucide-react';
+import { Code2, Eye, Monitor, SquareTerminal, Moon, Search, Sun, Users } from 'lucide-react';
 import { focusedSel, useAxo } from './stores/store.ts';
 import { isElectron, isMac } from './lib/bridge.ts';
 import { Sidebar } from './components/sidebar.tsx';
@@ -15,7 +15,8 @@ import { cn, ConnDot, formatTokens } from './components/ui.tsx';
 import { useTheme, type ThemePref } from './lib/theme.ts';
 import { ServersPanel } from './components/servers/servers-panel.tsx';
 import { startNotifications } from './lib/notifications.ts';
-import { TeamsView } from './components/teams/teams-view.tsx';
+import { TerminalPanel } from './components/terminal/terminal-panel.tsx';
+import { startTerminalSync, useTerminals } from './stores/terminals.ts';
 import { WatchesView } from './components/watches/watches-view.tsx';
 import { useActiveWatchCount, useWatchSync } from './stores/watches.ts';
 import { formatUsd, totalTokens, useNodeToday, useUsage, useUsageSync } from './stores/usage.ts';
@@ -26,6 +27,7 @@ export function App() {
   const view = useAxo((s) => s.view);
   useEffect(() => { void init(); }, [init]);
   useEffect(() => { startNotifications(); }, []);
+  useEffect(() => startTerminalSync(), []);
   useGlobalShortcuts();
   useWatchSync();
   useUsageSync();
@@ -40,8 +42,6 @@ export function App() {
             <ErrorBoundary resetKey={view} label={view === 'fleet' ? 'Fleet' : view[0].toUpperCase() + view.slice(1)} onReset={view === 'fleet' ? undefined : () => useAxo.getState().setView('fleet')}>
             {view === 'editor' ? (
               <Suspense fallback={<div className="flex-1 bg-bg" />}><EditorView /></Suspense>
-            ) : view === 'teams' ? (
-              <TeamsView />
             ) : view === 'watches' ? (
               <WatchesView />
             ) : (
@@ -52,6 +52,9 @@ export function App() {
             )}
             </ErrorBoundary>
           </div>
+          <ErrorBoundary label="Terminal" onReset={() => useTerminals.getState().setOpen(false)}>
+            <TerminalPanel />
+          </ErrorBoundary>
         </main>
       </div>
       <StatusBar />
@@ -72,7 +75,6 @@ const EditorView = lazy(() => import('./components/editor/editor-view.tsx').then
 const VIEWS = [
   { id: 'fleet' as const, label: 'Fleet', icon: Users },
   { id: 'editor' as const, label: 'Editor', icon: Code2 },
-  { id: 'teams' as const, label: 'Teams', icon: GitMerge },
   { id: 'watches' as const, label: 'Watches', icon: Eye },
 ];
 
@@ -96,9 +98,9 @@ function TitleBar() {
     return [node.name, node.projects.find((p) => p.id === agent.projectId)?.name, agent.name].filter(Boolean).join(' / ');
   });
   return (
-    <header className={cn('relative flex h-[38px] shrink-0 select-none items-center gap-3 border-b border-border-subtle bg-panel pr-2', mac ? 'drag pl-[84px]' : 'pl-3')}>
-      <span className="label !text-primary !tracking-[0.18em]">Axo</span>
-      <nav role="tablist" aria-label="View" className="no-drag flex items-center">
+    <header className={cn('relative flex h-[44px] shrink-0 select-none items-center gap-4 border-b border-border bg-panel pr-3', mac ? 'drag pl-[88px]' : 'pl-4')}>
+      <span className="font-mono text-[12px] font-semibold uppercase tracking-[0.2em] text-primary">Axo</span>
+      <nav role="tablist" aria-label="View" className="no-drag flex h-full items-center gap-1">
         {VIEWS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -106,22 +108,22 @@ function TitleBar() {
             aria-selected={view === id}
             title={id === 'fleet' || id === 'editor' ? `${label} · ⌘E switches Fleet/Editor` : label}
             onClick={() => setView(id)}
-            className={cn('relative flex h-[38px] items-center gap-1.5 px-2.5 text-xs cursor-pointer transition-colors',
-              view === id ? 'text-primary' : 'text-faint hover:text-secondary')}
+            className={cn('relative flex h-full items-center gap-2 px-3.5 text-[13px] cursor-pointer transition-colors',
+              view === id ? 'font-medium text-primary' : 'text-muted hover:text-primary')}
           >
-            <Icon size={13} strokeWidth={1.75} /> {label}
-            {id === 'watches' && activeWatches > 0 && <span className="font-mono text-2xs text-secondary">{activeWatches}</span>}
-            {view === id && <span className="absolute inset-x-2.5 bottom-0 h-px bg-accent" aria-hidden />}
+            <Icon size={15} strokeWidth={1.75} className={view === id ? 'text-accent' : undefined} /> {label}
+            {id === 'watches' && activeWatches > 0 && <span className="rounded bg-control px-1.5 font-mono text-2xs text-primary">{activeWatches}</span>}
+            {view === id && <span className="absolute inset-x-2 bottom-0 h-[2px] rounded-t-sm bg-accent" aria-hidden />}
           </button>
         ))}
       </nav>
-      <span className="min-w-0 flex-1 truncate text-center font-mono text-2xs text-faint">{crumbs}</span>
+      <span className="min-w-0 flex-1 truncate text-center font-mono text-xs text-muted">{crumbs}</span>
       <button
         onClick={() => setUi({ palette: true })}
         title="Search agents, projects and commands"
-        className="no-drag flex h-6 w-56 shrink items-center gap-2 rounded border border-border bg-bg px-2 text-xs text-faint hover:border-border-strong hover:text-secondary cursor-pointer"
+        className="no-drag flex h-7 w-64 shrink items-center gap-2 rounded border border-border bg-inset px-2.5 text-xs text-muted hover:border-border-strong hover:text-primary cursor-pointer"
       >
-        <Search size={12} /> Search or jump to…
+        <Search size={13} /> Search or jump to…
         <span className="ml-auto font-mono text-2xs">⌘K</span>
       </button>
     </header>
@@ -131,7 +133,10 @@ function TitleBar() {
 function useGlobalShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.key === '`') { e.preventDefault(); useTerminals.getState().toggle(); return; }
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.isComposing) return;
+      // Control keys belong to the shell (⌃C, ⌃L, ⌃E…) while a terminal has focus.
+      if (!e.metaKey && (e.target as Element | null)?.closest?.('.xterm')) return;
       const k = e.key.toLowerCase();
       if (k === 'k' && !e.shiftKey) {
         const s = useAxo.getState();
@@ -144,6 +149,7 @@ function useGlobalShortcuts() {
       if (k === 'n' && !e.shiftKey) { e.preventDefault(); openNewAgent(); }
       else if (k === 'e' && !e.shiftKey) { e.preventDefault(); toggleView(); }
       else if (k === 'l' && !e.shiftKey) { e.preventDefault(); focusSidebar(); } // ⌘0 is the menu's reset-zoom
+      else if (k === 'j' && !e.shiftKey) { e.preventDefault(); useTerminals.getState().toggle(); }
       else if (k === 'p' && !e.shiftKey) { e.preventDefault(); openQuickOpen(); }
       else if (k === 'i' && !e.shiftKey) { e.preventDefault(); useAxo.getState().setView('fleet'); toggleDrawer(); }
       else if (/^[1-3]$/.test(k)) { e.preventDefault(); useAxo.getState().setView('fleet'); focusPaneComposer(Number(k) - 1); }
@@ -195,6 +201,17 @@ function NodeStatus({ nodeKey }: { nodeKey: string }) {
   );
 }
 
+function TerminalToggle({ className }: { className: string }) {
+  const open = useTerminals((s) => s.open);
+  const count = useTerminals((s) => s.tabs.filter((t) => !t.exited).length);
+  return (
+    <button className={cn(className, 'hover:bg-hover hover:text-secondary cursor-pointer', open && 'text-secondary')}
+      title={`${open ? 'Hide' : 'Show'} terminal (⌃\` or ⌘J)`} aria-pressed={open} onClick={() => useTerminals.getState().toggle()}>
+      <SquareTerminal size={10} /> terminal{count > 0 && <span className="text-secondary">{count}</span>}
+    </button>
+  );
+}
+
 function StatusBar() {
   const nodes = useAxo((s) => s.nodes);
   const order = useAxo((s) => s.nodeOrder);
@@ -224,6 +241,7 @@ function StatusBar() {
         <span className={seg} title={`Today across ${order.length === 1 ? 'this node' : 'all nodes'}`}>
           today <span className="text-secondary">{formatTokens(todayTok)}</span> tok <span className="text-secondary">{formatUsd(todayCost)}</span>
         </span>
+        <TerminalToggle className={seg} />
         <span className={cn(seg, 'pr-2')}><ThemeToggle /></span>
       </div>
     </footer>

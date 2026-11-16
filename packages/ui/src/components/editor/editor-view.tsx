@@ -303,7 +303,7 @@ function TextTab({ target, tab }: { target: EditorTarget; tab: EditorTab }) {
       <Centered>
         <div className="flex flex-col items-center gap-2">
           <span>{meta.binary ? 'This looks like a binary file.' : 'This file is too large to edit here (over 5 MB).'}</span>
-          <a className="text-accent underline" href={`${rawUrl(target, tab.path)}&download=1`} download>Download</a>
+          <a className="text-primary underline" href={`${rawUrl(target, tab.path)}&download=1`} download>Download</a>
         </div>
       </Centered>
     );

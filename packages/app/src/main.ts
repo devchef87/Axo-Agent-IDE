@@ -73,7 +73,7 @@ manager.on('server-lost', (cfg: { name: string }, message: string) => {
 type ThemePref = 'system' | 'light' | 'dark';
 interface WindowTheme { pref: ThemePref; background: string }
 const THEME_FILE = join(app.getPath('userData'), 'window-theme.json');
-const DEFAULT_BG = { dark: '#161616', light: '#fafafa' };
+const DEFAULT_BG = { dark: '#32424F', light: '#fafafa' };
 
 function loadTheme(): WindowTheme {
   try {
@@ -101,9 +101,9 @@ async function createWindow(): Promise<void> {
     minWidth: 860,
     minHeight: 520,
     backgroundColor: initialBackground(),
-    // 38px title bar in the renderer (px, not rem); 12px traffic lights centred in it: y = (38 - 12) / 2.
+    // 44px title bar in the renderer (px, not rem); 12px traffic lights centred in it: y = (44 - 12) / 2.
     titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
-    trafficLightPosition: { x: 16, y: 13 },
+    trafficLightPosition: { x: 16, y: 16 },
     show: false,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),

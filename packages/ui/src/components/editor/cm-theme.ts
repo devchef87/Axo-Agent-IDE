@@ -54,7 +54,7 @@ export const axoHighlight = syntaxHighlighting(HighlightStyle.define([
   { tag: [t.heading], color: 'var(--text-primary)', fontWeight: '600' },
   { tag: [t.emphasis], fontStyle: 'italic' },
   { tag: [t.strong], fontWeight: '600' },
-  { tag: [t.link, t.url], color: 'var(--accent)', textDecoration: 'underline' },
+  { tag: [t.link, t.url], color: 'var(--syn-function)', textDecoration: 'underline' },
   { tag: [t.invalid], color: 'var(--danger)' },
   { tag: [t.meta, t.processingInstruction], color: 'var(--text-muted)' },
 ]));
