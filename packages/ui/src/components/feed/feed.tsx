@@ -85,13 +85,21 @@ const BlockView = memo(function BlockView({ block, live, latest }: { block: Bloc
 });
 
 function UserMessage({ item }: { item: Extract<FeedItem, { kind: 'user' }> }) {
-  const fromUser = item.author === 'user';
+  if (item.author === 'user') {
+    // Yours: a bubble on the right, so the conversation doesn't read as one wall of text.
+    return (
+      <div className="animate-fade-in mb-3 mt-6 flex justify-end first:mt-0">
+        <div className="max-w-[min(70%,720px)] whitespace-pre-wrap break-words rounded-[8px] rounded-br-[3px] bg-control px-3.5 py-2 text-[13px] leading-relaxed text-primary">
+          <Collapsible as="div" text={item.text} />
+        </div>
+      </div>
+    );
+  }
+  // From another agent: left, with its name and a rule.
   return (
-    // Left-aligned with a rule, so it reads at full width: you in the accent, other agents in grey.
     <div className="animate-fade-in mb-3 mt-6 first:mt-0">
-      <div className="label mb-1">{fromUser ? 'You' : item.author}</div>
-      <div className={cn('whitespace-pre-wrap break-words border-l pl-3 text-[13px] leading-relaxed',
-        fromUser ? 'border-accent text-primary' : 'border-border-strong text-secondary')}>
+      <div className="label mb-1">{item.author}</div>
+      <div className="whitespace-pre-wrap break-words border-l border-border-strong pl-3 text-[13px] leading-relaxed text-secondary">
         <Collapsible as="div" text={item.text} />
       </div>
     </div>
