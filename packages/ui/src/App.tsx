@@ -5,6 +5,7 @@ import { focusedSel, useAxo } from './stores/store.ts';
 import { isElectron, isMac } from './lib/bridge.ts';
 import { Sidebar } from './components/sidebar.tsx';
 import { Fleet } from './components/fleet.tsx';
+import { ErrorBoundary } from './components/error-boundary.tsx';
 import { AgentDrawer } from './components/agent-drawer.tsx';
 import { CommandPalette } from './components/palette.tsx';
 import { focusPaneComposer, focusSidebar, modalOpen, openNewAgent, openQuickOpen, toggleDrawer, toggleView } from './lib/actions.ts';
@@ -37,6 +38,7 @@ export function App() {
         <main className="flex min-w-0 flex-1 flex-col">
           <ViewBar />
           <div className="flex min-h-0 flex-1">
+            <ErrorBoundary resetKey={view} label={view === 'fleet' ? 'Fleet' : view[0].toUpperCase() + view.slice(1)} onReset={view === 'fleet' ? undefined : () => useAxo.getState().setView('fleet')}>
             {view === 'editor' ? (
               <Suspense fallback={<div className="flex-1 bg-bg" />}><EditorView /></Suspense>
             ) : view === 'teams' ? (
@@ -49,6 +51,7 @@ export function App() {
                 {drawer && <AgentDrawer />}
               </>
             )}
+            </ErrorBoundary>
           </div>
         </main>
       </div>

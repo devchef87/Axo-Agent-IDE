@@ -11,13 +11,16 @@ export function ChatPane({ sel, index = 0, focused = true, multi = false }: { se
   const feed = useAxo((s) => s.feeds[feedKey(sel.nodeKey, sel.agentId)]);
   const loadFeed = useAxo((s) => s.loadFeed);
   const nodeName = useAxo((s) => s.nodes[sel.nodeKey]?.name);
+  const nodeStatus = useAxo((s) => s.nodes[sel.nodeKey]?.status);
   const project = useAxo((s) => s.nodes[sel.nodeKey]?.projects.find((p) => p.id === agent?.projectId));
 
   const closePane = useAxo((s) => s.closePane);
 
   if (!agent) {
+    // A server that hasn't connected (yet) isn't the same as a deleted agent.
+    const waiting = nodeStatus !== 'online';
     return (
-      <Empty text="This agent no longer exists.">
+      <Empty text={waiting ? `Waiting for ${nodeName ?? sel.nodeKey} to connect…` : 'This agent no longer exists.'}>
         {multi && <button className="text-xs text-muted underline hover:text-primary cursor-pointer" onClick={() => closePane(index)}>Close pane</button>}
       </Empty>
     );

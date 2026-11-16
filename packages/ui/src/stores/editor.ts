@@ -4,7 +4,7 @@ import {
   closeTab, openTab, parseTabs, removeFromTabs, renameInTabs, tabKey, targetKey,
   type EditorTab, type EditorTarget, type Tabs,
 } from '../lib/editor-model.ts';
-import { focusedSel, useAxo } from './store.ts';
+import { focusedSel, tryClient, useAxo } from './store.ts';
 
 /** An open text file: what's on disk (`saved`, `mtime`) and what's in the editor (`content`). */
 export interface Buffer {
@@ -156,7 +156,9 @@ export function fileQuery(target: EditorTarget, params: Record<string, string> =
 
 /** URL for <img>/<video>/pdf.js: tokens go in the query because media elements can't send headers. */
 export function rawUrl(target: EditorTarget, path: string): string {
-  const conn = useAxo.getState().client(target.nodeKey).conn;
+  const c = tryClient(target.nodeKey);
+  if (!c) return '';
+  const conn = c.conn;
   const q = new URLSearchParams({ path, token: conn.token });
   if (target.agent) q.set('agent', target.agent);
   else if (target.team) q.set('team', target.team);

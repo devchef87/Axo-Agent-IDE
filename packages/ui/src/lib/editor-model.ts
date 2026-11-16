@@ -7,6 +7,20 @@ export interface EditorTab { kind: TabKind; path: string }
 export interface Tabs { tabs: EditorTab[]; active: number } // active = -1 when empty
 
 export const MAX_TABS = 20;
+
+/**
+ * Can the editor use this target right now? 'waiting' = its server isn't connected (keep the
+ * target; it may connect any moment), 'gone' = connected but the project/agent no longer exists.
+ */
+export function targetStatus(
+  target: EditorTarget,
+  node: { status: string; projects: { id: string }[]; agents: { id: string }[] } | undefined,
+): 'ok' | 'waiting' | 'gone' {
+  if (!node || node.status !== 'online') return 'waiting';
+  if (!node.projects.some((p) => p.id === target.projectId)) return 'gone';
+  if (target.agent && !node.agents.some((a) => a.id === target.agent)) return 'gone';
+  return 'ok';
+}
 export const tabKey = (t: EditorTab) => `${t.kind}:${t.path}`;
 export const targetKey = (t: EditorTarget) => `${t.nodeKey}:${t.projectId}:${t.team ?? ''}${t.agent ? `:a:${t.agent}` : ''}`;
 

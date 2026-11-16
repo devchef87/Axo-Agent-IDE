@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { AlertTriangle, FileDiff, FileText, MessageSquarePlus, Search, X } from 'lucide-react';
 import type { FileContent, FileSearchRes, FileWatchRes, WriteFileRes } from '@axo/protocol';
-import { basename, dirname, fileKind, selectionMessage, tabKey, targetKey, type EditorTab, type EditorTarget } from '../../lib/editor-model.ts';
+import { basename, dirname, fileKind, selectionMessage, tabKey, targetKey, targetStatus, type EditorTab, type EditorTarget } from '../../lib/editor-model.ts';
 import { defaultTarget, fileQuery, isDirty, rawUrl, useEditor } from '../../stores/editor.ts';
-import { focusedSel, onFilesChanged, useAxo } from '../../stores/store.ts';
+import { focusedSel, onFilesChanged, tryClient, useAxo } from '../../stores/store.ts';
 import { Button, cn, Kbd, useModalFocus } from '../ui.tsx';
 import { CodeEditor, type Selection } from './code-editor.tsx';
 import { DiffView } from './diff-view.tsx';
@@ -17,20 +17,31 @@ export function EditorView() {
   const target = useEditor((s) => s.target);
   const setTarget = useEditor((s) => s.setTarget);
   const nodes = useAxo((s) => s.nodes);
+  const status = target ? targetStatus(target, nodes[target.nodeKey]) : null;
 
-  // Pick a sensible project the first time, and drop targets whose project is gone.
+  // Pick a project the first time; replace a target whose project is gone. A target on a
+  // server that isn't connected yet is kept: it may connect any moment.
   useEffect(() => {
-    const node = target ? nodes[target.nodeKey] : undefined;
-    const exists = target && node?.projects.some((p) => p.id === target.projectId)
-      && (!target.agent || node.agents.some((a) => a.id === target.agent));
-    if (!exists) {
-      const t = defaultTarget();
-      if (t || (target && nodes[target.nodeKey]?.status === 'online')) setTarget(t);
-    }
-  }, [target, nodes, setTarget]);
+    if (status === 'waiting' || status === 'ok') return;
+    const t = defaultTarget();
+    if (t && (!target || targetKey(t) !== targetKey(target))) setTarget(t);
+    else if (status === 'gone') setTarget(null);
+  }, [status, target, setTarget]);
 
-  useEditorSync(target);
+  // Only talk to the node once it's reachable.
+  useEditorSync(status === 'ok' ? target : null);
 
+  if (target && status === 'waiting') {
+    const name = nodes[target.nodeKey]?.name ?? target.nodeKey;
+    return (
+      <Centered>
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-secondary">{name} isn't connected.</span>
+          <span>Its files will show here when it reconnects, or pick another project above.</span>
+        </div>
+      </Centered>
+    );
+  }
   if (!target) return <Centered>Add a project to browse its files.</Centered>;
   const node = nodes[target.nodeKey];
   const project = node?.projects.find((p) => p.id === target.projectId);
@@ -229,14 +240,13 @@ function ActiveTab({ target }: { target: EditorTarget }) {
 }
 
 function TextTab({ target, tab }: { target: EditorTarget; tab: EditorTab }) {
-  const client = useAxo((s) => s.client);
   const buffer = useEditor((s) => s.buffers[tab.path]);
   const { loaded, edit, saved, open } = useEditor.getState();
   const [meta, setMeta] = useState<{ binary: boolean; tooLarge: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [selection, setSelection] = useState<Selection | null>(null);
-  const api = client(target.nodeKey);
+  const api = tryClient(target.nodeKey)!; // EditorView only renders tabs for a connected target
   const base = `/projects/${target.projectId}/files`;
 
   useEffect(() => {

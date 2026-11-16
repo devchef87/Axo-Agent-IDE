@@ -60,3 +60,17 @@ describe('files', () => {
     assert.ok(selectionMessage('a.md', 1, 1, '```js\n```', 'markdown').includes('````markdown'));
   });
 });
+
+describe('editor target status', async () => {
+  const { targetStatus } = await import('../src/lib/editor-model.ts');
+  const t = { nodeKey: 'spark', projectId: 'p1', team: null };
+  it('waits for a server that is unknown or not online, instead of dropping the target', () => {
+    assert.equal(targetStatus(t, undefined), 'waiting');
+    assert.equal(targetStatus(t, { status: 'connecting', projects: [], agents: [] }), 'waiting');
+  });
+  it('is gone only when the connected node no longer has the project or agent', () => {
+    assert.equal(targetStatus(t, { status: 'online', projects: [], agents: [] }), 'gone');
+    assert.equal(targetStatus({ ...t, agent: 'a1' }, { status: 'online', projects: [{ id: 'p1' }], agents: [] }), 'gone');
+    assert.equal(targetStatus(t, { status: 'online', projects: [{ id: 'p1' }], agents: [] }), 'ok');
+  });
+});

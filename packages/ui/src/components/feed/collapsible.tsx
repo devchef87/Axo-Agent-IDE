@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { foldText } from '../../lib/collapse.ts';
-import { useAxo } from '../../stores/store.ts';
+import { tryClient } from '../../stores/store.ts';
 import { cn, useModalFocus } from '../ui.tsx';
 import { useFeedContext } from './feed-context.ts';
 
@@ -29,7 +29,9 @@ export function Collapsible({ text, className, as = 'pre' }: { text: string; cla
 }
 
 export function imageUrl(nodeKey: string, agentId: string, imageId: string): string {
-  const conn = useAxo.getState().client(nodeKey).conn;
+  const c = tryClient(nodeKey);
+  if (!c) return '';
+  const conn = c.conn;
   return `${conn.baseUrl}/api/agents/${agentId}/images/${encodeURIComponent(imageId)}?token=${encodeURIComponent(conn.token)}`;
 }
 

@@ -101,6 +101,11 @@ function loadLayout(): Layout {
   return old;
 }
 
+/** The client for a node, or null if that node isn't known yet (e.g. a server that hasn't connected). */
+export function tryClient(nodeKey: string): NodeClient | null {
+  return clients.get(nodeKey) ?? null;
+}
+
 /** The agent in the focused pane, if any. */
 export const focusedSel = (s: { layout: Layout }): Selection | null => s.layout.panes[s.layout.focused] ?? null;
 
