@@ -63,6 +63,19 @@ describe('api', () => {
     assert.equal(after.reset, true);
   });
 
+  it('stops promptly while the app still holds a live WebSocket and a keep-alive connection', async () => {
+    t = await makeNode();
+    const ws = new WebSocket(`ws://127.0.0.1:${t.node.cfg.port}/ws?token=${t.node.cfg.token}`);
+    await new Promise((r) => ws.once('open', r));
+    const closed = new Promise((r) => ws.once('close', r));
+    await call('/version'); // fetch keeps this socket alive
+    const start = Date.now();
+    await t.stop();
+    t = undefined as any;
+    await closed;
+    assert.ok(Date.now() - start < 3000, `stop took ${Date.now() - start}ms`);
+  });
+
   it('returns 400s for bad input', async () => {
     t = await makeNode();
     assert.equal((await call('/projects', { method: 'POST', body: JSON.stringify({ path: '/definitely/not/here' }) })).status, 400);

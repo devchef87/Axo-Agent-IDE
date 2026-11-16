@@ -97,7 +97,6 @@ export class Node {
     this.journalist.stop();
     await this.runtime.shutdown();
     await new Promise<void>((res) => (this.server ? this.server.close(() => res()) : res()));
-    this.server?.closeAllConnections?.();
     this.store.close();
     rmSync(join(this.cfg.home, 'node.pid'), { force: true });
   }

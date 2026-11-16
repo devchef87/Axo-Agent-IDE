@@ -156,6 +156,15 @@ export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHe
   }, 20_000);
   ping.unref();
   server.on('close', () => clearInterval(ping));
+  // http.Server#close waits for every socket, and upgraded WebSockets (the app's live feed, terminals)
+  // never end on their own, so a stop would hang forever. Drop them first.
+  const close = server.close.bind(server);
+  server.close = ((cb?: (err?: Error) => void) => {
+    for (const c of [...wss.clients, ...termWss.clients]) c.terminate();
+    close(cb);
+    server.closeAllConnections();
+    return server;
+  }) as typeof server.close;
 
   return new Promise((resolve, reject) => {
     server.once('error', reject);

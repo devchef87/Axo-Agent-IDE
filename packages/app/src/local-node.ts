@@ -76,8 +76,14 @@ export async function stopLocalNode(): Promise<void> {
   try {
     const { pid } = JSON.parse(readFileSync(f, 'utf8'));
     process.kill(pid, 'SIGTERM');
-    const deadline = Date.now() + 8000;
+    const deadline = Date.now() + 15_000; // agents get time to stop cleanly (they resume by session)
     while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 200));
+      try { process.kill(pid, 0); } catch { return; }
+    }
+    // A wedged node would otherwise keep the port and the database while a new one starts.
+    process.kill(pid, 'SIGKILL');
+    for (let i = 0; i < 25; i++) {
       await new Promise((r) => setTimeout(r, 200));
       try { process.kill(pid, 0); } catch { return; }
     }
