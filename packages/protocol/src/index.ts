@@ -134,3 +134,60 @@ export interface MessageReq { text: string; author?: string }
 export interface FeedPage { items: FeedItem[]; hasMore: boolean }
 export interface EventsPage { events: EventEnvelope[]; reset: boolean; seq: number; epoch: number }
 export interface FsEntry { name: string; path: string; dir: boolean }
+
+// ── Remote nodes / servers (Axo-Remote) ─────────────────────
+// Served by every node at GET /api/version. `build` is a content hash of the
+// bundle ('dev' from source) — it, not `version`, decides whether a node is stale.
+
+export interface VersionInfo { version: string; build: string; nodeId: string; hostname: string }
+
+/** A server the app manages over SSH. Persisted by the app (servers.json). No secrets:
+ *  keys and passphrases stay with ssh-agent / Keychain / ~/.ssh/config. */
+export interface ServerConfig {
+  id: string;              // also the renderer's nodeKey
+  name: string;
+  host: string;            // hostname or ~/.ssh/config alias
+  user?: string;
+  port?: number;
+  identityFile?: string;
+  remotePort: number;      // node port on the server (default 31500, bound to 127.0.0.1)
+  autoConnect: boolean;    // connect on app start
+}
+export type ServerInput = Omit<ServerConfig, 'id' | 'remotePort' | 'autoConnect'> & Partial<Pick<ServerConfig, 'remotePort' | 'autoConnect'>>;
+
+/** Host block from ~/.ssh/config (wildcard patterns skipped). */
+export interface SshHostEntry { alias: string; hostName?: string; user?: string; port?: number; identityFile?: string }
+
+export type CheckStatus = 'pass' | 'warn' | 'fail';
+export interface PreflightCheck { id: string; label: string; status: CheckStatus; detail: string }
+export interface PreflightResult {
+  ok: boolean;             // no 'fail' checks
+  ts: number;
+  checks: PreflightCheck[];
+  nodePath?: string;       // absolute path of node on the server
+  nodeFlags: string[];     // e.g. ['--experimental-sqlite'] on node 22.5–22.12
+  pathEnv?: string;        // login-shell PATH on the server (given to the node)
+  systemd: boolean;        // `systemctl --user` usable
+  linger: boolean;
+  deployedBuild?: string;
+}
+
+export type ServerPhase = 'idle' | 'preflight' | 'deploying' | 'connecting' | 'connected' | 'reconnecting' | 'updating' | 'error';
+export interface ServerStatus {
+  phase: ServerPhase;
+  message?: string;        // progress or last error
+  localPort?: number;      // tunnel endpoint on this Mac
+  node?: VersionInfo;      // the running node, once reachable
+  deployMode?: 'systemd' | 'nohup';
+  updateAvailable: boolean;  // node.build !== bundled build
+  updateWaiting: boolean;    // update requested, waiting for agents to finish their turns
+  preflight?: PreflightResult;
+}
+export interface ServerView { config: ServerConfig; status: ServerStatus }
+
+export interface LocalNodeStatus { node?: VersionInfo; updateAvailable: boolean; updateWaiting: boolean; message?: string }
+export interface ServersSnapshot {
+  bundled: { version: string; build: string };
+  local: LocalNodeStatus;
+  servers: ServerView[];
+}
