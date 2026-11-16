@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowUp, GitFork, MoreHorizontal, PanelRight, Power, RefreshCw, Square, Trash2, X } from 'lucide-react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { ArrowUp, GitFork, ImagePlus, Loader2, MoreHorizontal, Paperclip, PanelRight, Power, RefreshCw, Square, Trash2, X } from 'lucide-react';
 import type { Agent } from '@axo/protocol';
 import { feedKey, useAgent, useAxo, useRefreshing, type Selection } from '../stores/store.ts';
 import { Feed } from './feed/feed.tsx';
 import { cn, formatTokens, IconButton, STATUS_LABEL, StatusDot, useDismiss } from './ui.tsx';
 import { formatUsd, totalTokens, useAgentToday } from '../stores/usage.ts';
+import { uploadAttachments, withAttachments } from '../lib/attachments.ts';
 
 export function ChatPane({ sel, index = 0, focused = true, multi = false }: { sel: Selection; index?: number; focused?: boolean; multi?: boolean }) {
   const agent = useAgent(sel);
@@ -131,34 +132,62 @@ function MenuItem({ icon: Icon, children, onClick, danger, disabled }: { icon: t
   );
 }
 
+const COMPOSER_MIN = 72;      // ~3 lines
+const COMPOSER_AUTO_MAX = 280;
+const HEIGHT_KEY = 'axo.composerHeight';
+
+interface Attachment { id: string; name: string; path: string | null; error?: string }
+
 function Composer({ agent, sel, autoFocus }: { agent: Agent; sel: Selection; autoFocus: boolean }) {
   const client = useAxo((s) => s.client);
   const key = `axo.draft.${sel.nodeKey}.${sel.agentId}`;
   const [text, setText] = useState(() => localStorage.getItem(key) ?? '');
   const [error, setError] = useState<string | null>(null);
+  const [files, setFiles] = useState<Attachment[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  // Height set by dragging the top edge; null = grow with the text.
+  const [manual, setManual] = useState<number | null>(() => { const v = Number(localStorage.getItem(HEIGHT_KEY)); return v >= COMPOSER_MIN ? v : null; });
   const ta = useRef<HTMLTextAreaElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
   const working = agent.status === 'working' || agent.status === 'starting';
+  const uploading = files.some((f) => !f.path && !f.error);
+  const ready = files.filter((f) => f.path).map((f) => f.path!);
 
   // Focus on open only for the focused pane, so opening several panes doesn't fight over focus.
-  useEffect(() => { setText(localStorage.getItem(key) ?? ''); if (autoFocus) ta.current?.focus(); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setText(localStorage.getItem(key) ?? ''); setFiles([]); if (autoFocus) ta.current?.focus(); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const el = ta.current;
     if (!el) return;
+    if (manual) { el.style.height = manual + 'px'; return; }
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 280) + 'px';
-  }, [text]);
+    el.style.height = Math.min(Math.max(el.scrollHeight, COMPOSER_MIN), COMPOSER_AUTO_MAX) + 'px';
+  }, [text, manual]);
 
   const update = (v: string) => { setText(v); if (v) localStorage.setItem(key, v); else localStorage.removeItem(key); };
 
+  const attach = (list: File[]) => {
+    if (!list.length) return;
+    const batch = list.map((f) => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name: f.name || 'pasted image', path: null }));
+    setFiles((cur) => [...cur, ...batch]);
+    uploadAttachments(client(sel.nodeKey), agent, list).then(
+      (paths) => setFiles((cur) => cur.map((f) => { const i = batch.findIndex((b) => b.id === f.id); return i < 0 ? f : { ...f, path: paths[i] ?? null, error: paths[i] ? undefined : 'upload failed' }; })),
+      (e: any) => setFiles((cur) => cur.map((f) => (batch.some((b) => b.id === f.id) ? { ...f, error: e?.message ?? 'upload failed' } : f))),
+    );
+  };
+
   const send = async () => {
     const t = text.trim();
-    if (!t) return;
+    if ((!t && !ready.length) || uploading) return;
+    const body = withAttachments(t, ready);
+    const kept = files;
     update('');
+    setFiles([]);
     setError(null);
     try {
-      await client(sel.nodeKey).post(`/agents/${agent.id}/message`, { text: t });
+      await client(sel.nodeKey).post(`/agents/${agent.id}/message`, { text: body });
     } catch (e: any) {
       update(t);
+      setFiles(kept);
       setError(e.message);
     }
   };
@@ -168,43 +197,95 @@ function Composer({ agent, sel, autoFocus }: { agent: Agent; sel: Selection; aut
     if (e.key === 'Escape' && working) void client(sel.nodeKey).post(`/agents/${agent.id}/interrupt`);
   };
 
+  const startResize = (e: ReactPointerEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = ta.current?.offsetHeight ?? COMPOSER_MIN;
+    const max = Math.max(COMPOSER_MIN, window.innerHeight * 0.6);
+    let h = startH;
+    const move = (ev: PointerEvent) => { h = Math.round(Math.min(max, Math.max(COMPOSER_MIN, startH + startY - ev.clientY))); setManual(h); };
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      document.body.style.cursor = '';
+      localStorage.setItem(HEIGHT_KEY, String(h));
+    };
+    document.body.style.cursor = 'row-resize';
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  const resetHeight = () => { setManual(null); localStorage.removeItem(HEIGHT_KEY); };
+
   return (
     <div className="shrink-0 px-6 pb-4 pt-1">
-      <div>
-        {error && <div className="mb-1.5 text-xs text-danger">{error}</div>}
-        <div className="rounded border border-border bg-panel transition-colors focus-within:border-ring">
-          <textarea
-            ref={ta}
-            value={text}
-            onChange={(e) => update(e.target.value)}
-            onKeyDown={onKey}
-            rows={1}
-            placeholder={working ? 'Queue a message (delivered when this turn ends) · Esc to interrupt' : `Message ${agent.name}…`}
-            className="block max-h-72 w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-[13px] leading-relaxed text-primary placeholder:text-faint outline-none"
-          />
-          <div className="flex items-center gap-2 px-1.5 pb-1.5">
-            <span className="pl-1.5 font-mono text-2xs text-faint">
-              {agent.queued > 0 ? `${agent.queued} queued` : working ? 'working · esc to interrupt' : '↵ send · ⇧↵ newline'}
-            </span>
-            <div className="ml-auto flex items-center gap-1.5">
-              {working && (
-                <button
-                  title="Interrupt (Esc)"
-                  onClick={() => void client(sel.nodeKey).post(`/agents/${agent.id}/interrupt`)}
-                  className="flex h-6 w-6 items-center justify-center rounded border border-border text-secondary hover:border-danger/50 hover:text-danger cursor-pointer"
-                >
-                  <Square size={9} fill="currentColor" />
-                </button>
-              )}
+      {error && <div className="mb-1.5 text-xs text-danger">{error}</div>}
+      <div
+        onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragOver(true); } }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => { if (!e.dataTransfer.files.length) return; e.preventDefault(); setDragOver(false); attach([...e.dataTransfer.files]); }}
+        className={cn('relative rounded border bg-panel transition-colors focus-within:border-border-strong', dragOver ? 'border-accent' : 'border-border')}
+      >
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize message box"
+          title="Drag to resize · double-click to fit text"
+          tabIndex={-1}
+          onPointerDown={startResize}
+          onDoubleClick={resetHeight}
+          className="absolute inset-x-0 -top-[4px] z-10 h-[8px] cursor-row-resize"
+        />
+        <textarea
+          ref={ta}
+          value={text}
+          onChange={(e) => update(e.target.value)}
+          onKeyDown={onKey}
+          onPaste={(e) => { const imgs = [...e.clipboardData.files]; if (imgs.length) { e.preventDefault(); attach(imgs); } }}
+          rows={3}
+          placeholder={working ? 'Queue a message (delivered when this turn ends) · Esc to interrupt' : `Message ${agent.name}…`}
+          className="block w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-[13px] leading-relaxed text-primary placeholder:text-muted outline-none"
+        />
+        {files.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-3 pb-1.5">
+            {files.map((f) => (
+              <span key={f.id} title={f.error ?? f.path ?? 'uploading…'}
+                className={cn('flex max-w-60 items-center gap-1.5 rounded bg-control py-0.5 pl-2 pr-1 text-xs', f.error ? 'text-danger' : 'text-primary')}>
+                {f.path || f.error ? <Paperclip size={11} className="shrink-0" /> : <Loader2 size={11} className="shrink-0 animate-spin" />}
+                <span className="truncate">{f.name}</span>
+                <button title="Remove" aria-label={`Remove ${f.name}`} onClick={() => setFiles((cur) => cur.filter((x) => x.id !== f.id))}
+                  className="flex h-4 w-4 items-center justify-center rounded text-muted hover:bg-hover hover:text-primary cursor-pointer"><X size={10} /></button>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center gap-2 px-1.5 pb-1.5">
+          <input ref={picker} type="file" multiple hidden onChange={(e) => { attach([...(e.target.files ?? [])]); e.target.value = ''; }} />
+          <button
+            title="Attach images or files (or paste / drop them here)"
+            aria-label="Attach files"
+            onClick={() => picker.current?.click()}
+            className="flex h-6 w-6 items-center justify-center rounded text-muted hover:bg-hover hover:text-primary cursor-pointer"
+          >
+            <ImagePlus size={14} strokeWidth={1.75} />
+          </button>
+          {agent.queued > 0 && <span className="font-mono text-2xs text-muted">{agent.queued} queued</span>}
+          <div className="ml-auto flex items-center gap-1.5">
+            {working && (
               <button
-                title="Send (Enter)"
-                disabled={!text.trim()}
-                onClick={() => void send()}
-                className="flex h-6 w-6 items-center justify-center rounded bg-accent text-accent-fg hover:bg-accent-hover disabled:bg-control disabled:text-faint cursor-pointer"
+                title="Interrupt (Esc)"
+                onClick={() => void client(sel.nodeKey).post(`/agents/${agent.id}/interrupt`)}
+                className="flex h-6 w-6 items-center justify-center rounded border border-border text-secondary hover:border-danger/50 hover:text-danger cursor-pointer"
               >
-                <ArrowUp size={13} strokeWidth={2.25} />
+                <Square size={9} fill="currentColor" />
               </button>
-            </div>
+            )}
+            <button
+              title="Send (Enter)"
+              disabled={(!text.trim() && !ready.length) || uploading}
+              onClick={() => void send()}
+              className="flex h-6 w-6 items-center justify-center rounded bg-accent text-accent-fg hover:bg-accent-hover disabled:bg-control disabled:text-muted cursor-pointer"
+            >
+              <ArrowUp size={13} strokeWidth={2.25} />
+            </button>
           </div>
         </div>
       </div>

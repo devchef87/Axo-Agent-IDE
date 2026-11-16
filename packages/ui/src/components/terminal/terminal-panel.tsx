@@ -36,7 +36,7 @@ export function TerminalPanel() {
       aria-label="Terminal"
       hidden={!open}
       style={{ height }}
-      className="relative flex shrink-0 flex-col border-t border-border bg-bg"
+      className="relative flex shrink-0 flex-col border-t border-border bg-panel shadow-[0_-6px_16px_rgb(8_16_22/0.25)]"
     >
       <div
         role="separator"

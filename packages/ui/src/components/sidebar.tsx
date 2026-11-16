@@ -34,7 +34,9 @@ export function Sidebar() {
   return (
     <aside className="flex h-full w-[232px] shrink-0 flex-col border-r border-border-subtle bg-panel">
       <div ref={list} id="axo-sidebar" aria-label="Servers, projects and agents" onKeyDown={onKeyDown} className="flex-1 overflow-y-auto py-1.5">
-        {nodeOrder.map((k) => <NodeSection key={k} node={nodes[k]} />)}
+        {/* A server that's down with nothing cached stays out of the way; the status bar shows its state. */}
+        {nodeOrder.filter((k) => nodes[k].status === 'online' || nodes[k].status === 'unauthorized' || nodes[k].projects.length > 0)
+          .map((k) => <NodeSection key={k} node={nodes[k]} />)}
       </div>
       <ServersSidebarEntry />
     </aside>
@@ -60,7 +62,6 @@ function NodeSection({ node }: { node: NodeView }) {
       {open && (
         <div>
           {node.status === 'unauthorized' && <p className="px-3 py-1 text-xs text-danger">Bad token for this node.</p>}
-          {node.status === 'offline' && node.projects.length === 0 && <p className="px-3 py-1 text-xs text-faint">Offline · retrying</p>}
           {node.projects.map((p) => <ProjectSection key={p.id} node={node} project={p} />)}
           {node.status === 'online' && node.projects.length === 0 && (
             <button
@@ -90,7 +91,7 @@ function ProjectSection({ node, project }: { node: NodeView; project: Project })
 
   return (
     <div>
-      <div className="group flex h-7 items-center gap-0.5 pl-1.5 pr-1.5 text-[13px] text-secondary hover:bg-hover">
+      <div className="group flex h-7 items-center gap-0.5 pl-1.5 pr-1.5 text-[13px] text-primary hover:bg-hover">
         <button data-nav data-level={2} data-label={project.name} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-1 rounded-sm outline-none focus-visible:bg-hover cursor-pointer" onClick={() => setOpen(!open)} title={project.path}>
           {open ? <ChevronDown size={12} className="shrink-0 text-faint" /> : <ChevronRight size={12} className="shrink-0 text-faint" />}
           <span className="truncate">{project.name}</span>
@@ -137,7 +138,7 @@ function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
       aria-current={focused ? 'true' : undefined}
       className={cn(
         'relative flex h-7 w-full items-center gap-2.5 pl-[28px] pr-3 text-left text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent cursor-pointer',
-        focused ? 'bg-control text-primary' : visible ? 'bg-hover text-secondary' : 'text-muted hover:bg-hover hover:text-secondary',
+        focused ? 'bg-control text-primary' : visible ? 'bg-hover text-primary' : 'text-secondary hover:bg-hover hover:text-primary',
       )}
     >
       {focused && <span className="absolute inset-y-0 left-0 w-px bg-accent" aria-hidden />}
