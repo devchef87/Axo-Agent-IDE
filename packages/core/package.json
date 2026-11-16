@@ -1,0 +1,13 @@
+{
+  "name": "@axo/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --disable-warning=ExperimentalWarning --test 'test/**/*.test.ts'",
+    "start": "node --disable-warning=ExperimentalWarning src/main.ts"
+  },
+  "dependencies": { "ws": "^8.18.0", "@axo/protocol": "*" },
+  "devDependencies": { "@types/ws": "^8.5.12" }
+}

@@ -1,0 +1,86 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+/* Design tokens carried over from Groove (One Dark + teal). */
+@theme {
+  --color-surface-0: #1a1e25;
+  --color-surface-1: #1e2127;
+  --color-surface-2: #24282f;
+  --color-surface-3: #282c34;
+  --color-surface-4: #2c313a;
+  --color-surface-5: #333842;
+  --color-surface-6: #3a3f4b;
+
+  --color-text-0: #e6e6e6;
+  --color-text-1: #bcc2cd;
+  --color-text-2: #8b929e;
+  --color-text-3: #6e7681;
+  --color-text-4: #6b7280;
+
+  --color-border: #3e4451;
+  --color-border-subtle: #2c313a;
+
+  --color-accent: #33afbc;
+  --color-success: #73c991;
+  --color-warning: #cda869;
+  --color-danger: #d4736e;
+  --color-info: #7ab0df;
+  --color-purple: #b07fd5;
+  --color-indigo: #7c86e0; /* InnerChat */
+
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.6875rem;
+  --text-xs--line-height: 1rem;
+}
+
+html { font-size: 15px; }
+body {
+  font-family: var(--font-sans);
+  background: var(--color-surface-2);
+  color: var(--color-text-1);
+  font-size: 0.875rem;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+}
+#root { width: 100vw; height: 100vh; overflow: hidden; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-surface-5); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-surface-6); }
+::selection { background: rgba(51, 175, 188, 0.25); }
+
+/* Electron window drag region (macOS hidden titlebar) */
+.drag { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }
+
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.animate-pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+
+@keyframes fade-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+.animate-fade-in { animation: fade-in 0.2s ease-out; }
+
+/* Markdown (assistant prose) */
+.md { line-height: 1.6; color: var(--color-text-1); word-wrap: break-word; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md p { margin: 0.5em 0; }
+.md h1, .md h2, .md h3, .md h4 { color: var(--color-text-0); font-weight: 600; margin: 1em 0 0.4em; line-height: 1.3; }
+.md h1 { font-size: 1.25em; } .md h2 { font-size: 1.12em; } .md h3, .md h4 { font-size: 1em; }
+.md ul, .md ol { margin: 0.4em 0; padding-left: 1.4em; }
+.md ul { list-style: disc; } .md ol { list-style: decimal; }
+.md li { margin: 0.15em 0; }
+.md a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 2px; }
+.md strong { color: var(--color-text-0); font-weight: 600; }
+.md code { font-family: var(--font-mono); font-size: 0.86em; background: var(--color-surface-4); padding: 0.1em 0.35em; border-radius: 4px; color: var(--color-text-0); }
+.md pre { background: var(--color-surface-0); border: 1px solid var(--color-border-subtle); border-radius: 6px; padding: 0.7em 0.9em; overflow-x: auto; margin: 0.6em 0; }
+.md pre code { background: none; padding: 0; font-size: 0.82em; line-height: 1.5; }
+.md blockquote { border-left: 2px solid var(--color-border); padding-left: 0.8em; color: var(--color-text-2); margin: 0.5em 0; }
+.md table { border-collapse: collapse; margin: 0.6em 0; font-size: 0.92em; }
+.md th, .md td { border: 1px solid var(--color-border-subtle); padding: 0.3em 0.6em; text-align: left; }
+.md th { background: var(--color-surface-3); color: var(--color-text-0); font-weight: 600; }
+.md hr { border: none; border-top: 1px solid var(--color-border-subtle); margin: 1em 0; }

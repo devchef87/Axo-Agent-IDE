@@ -1,0 +1,15 @@
+{
+  "name": "@axo/app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Axo — agent OS for Claude Code teams",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "electron .",
+    "dev": "AXO_UI_URL=http://localhost:5199 electron ."
+  },
+  "devDependencies": {
+    "electron": "41.2.0"
+  }
+}

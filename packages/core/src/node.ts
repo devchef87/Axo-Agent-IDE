@@ -1,0 +1,47 @@
+import type { Server } from 'node:http';
+import { writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { loadConfig, VERSION, type NodeConfig } from './config.ts';
+import { Store } from './store/db.ts';
+import { EventBus } from './events.ts';
+import { Projects } from './projects.ts';
+import { AgentRuntime, type RuntimeOptions } from './runtime/agent-runtime.ts';
+import { startServer } from './api/server.ts';
+import { buildRouter } from './api/routes.ts';
+
+/** One Axo node: store + runtime + API. Same code locally and on servers. */
+export class Node {
+  readonly cfg: NodeConfig;
+  readonly store: Store;
+  readonly bus: EventBus;
+  readonly projects: Projects;
+  readonly runtime: AgentRuntime;
+  private server: Server | null = null;
+
+  constructor(overrides: Partial<NodeConfig> = {}, runtimeOpts: RuntimeOptions = {}, dbFile?: string) {
+    this.cfg = loadConfig(overrides);
+    this.store = new Store(this.cfg.home, dbFile);
+    this.bus = new EventBus(this.cfg.nodeId);
+    this.projects = new Projects(this.store, this.bus);
+    this.runtime = new AgentRuntime(this.store, this.bus, this.cfg, this.projects, runtimeOpts);
+  }
+
+  async start(): Promise<void> {
+    this.runtime.startup();
+    this.server = await startServer(this.cfg, this.bus, buildRouter(this), () => ({
+      type: 'hello', nodeId: this.cfg.nodeId, version: VERSION, seq: this.bus.currentSeq, epoch: this.bus.epoch,
+      ts: Date.now(),
+    }) as any);
+    const addr = this.server.address();
+    if (addr && typeof addr === 'object') this.cfg.port = addr.port;
+    writeFileSync(join(this.cfg.home, 'node.pid'), JSON.stringify({ pid: process.pid, port: this.cfg.port, version: VERSION }));
+  }
+
+  async stop(): Promise<void> {
+    await this.runtime.shutdown();
+    await new Promise<void>((res) => (this.server ? this.server.close(() => res()) : res()));
+    this.server?.closeAllConnections?.();
+    this.store.close();
+    rmSync(join(this.cfg.home, 'node.pid'), { force: true });
+  }
+}
