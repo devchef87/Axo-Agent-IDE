@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { AlertTriangle, FileDiff, FileText, MessageSquarePlus, Search, X } from 'lucide-react';
-import type { FileContent, FileSearchRes, WriteFileRes } from '@axo/protocol';
+import type { FileContent, FileSearchRes, FileWatchRes, WriteFileRes } from '@axo/protocol';
 import { basename, dirname, fileKind, selectionMessage, tabKey, targetKey, type EditorTab, type EditorTarget } from '../../lib/editor-model.ts';
 import { defaultTarget, fileQuery, isDirty, rawUrl, useEditor } from '../../stores/editor.ts';
 import { focusedSel, onFilesChanged, useAxo } from '../../stores/store.ts';
@@ -10,7 +10,8 @@ import { DiffView } from './diff-view.tsx';
 import { FileTree } from './file-tree.tsx';
 import { Centered, MediaViewer } from './media-viewer.tsx';
 
-const POLL_MS = 4000;
+const POLL_MS = 4000;        // fallback only, when the node can't watch
+const LEASE_RENEW_MS = 60_000; // node lease lasts 5 minutes
 
 export function EditorView() {
   const target = useEditor((s) => s.target);
@@ -73,7 +74,7 @@ export function EditorTargetPicker() {
   );
 }
 
-/** Keep open buffers in step with disk: files:changed events, a light poll of the active file, and window focus. */
+/** Keep open buffers in step with disk: files:changed (pushed by the node's watcher) and window focus. */
 function useEditorSync(target: EditorTarget | null) {
   const client = useAxo((s) => s.client);
   const view = useAxo((s) => s.view);
@@ -94,27 +95,45 @@ function useEditorSync(target: EditorTarget | null) {
 
   useEffect(() => {
     if (!target) return;
-    return onFilesChanged((nodeKey, ev) => {
+    // Agents can write many files in a burst: refresh open buffers at once, the tree at most once a second.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const off = onFilesChanged((nodeKey, ev) => {
       if (nodeKey !== target.nodeKey || ev.projectId !== target.projectId) return;
-      useEditor.getState().bump();
       void refresh(ev.paths);
+      timer ??= setTimeout(() => { timer = null; useEditor.getState().bump(); }, 1000);
     });
+    return () => { off(); if (timer) clearTimeout(timer); };
   }, [target, refresh]);
 
-  // Agents edit files directly (not through this API), so poll the active file while visible.
+  // Agents edit files directly, not through the file API. The node watches the root while we hold
+  // a lease (renewed every minute) and pushes files:changed; if it can't watch, poll the active file.
   useEffect(() => {
     if (!target || view !== 'editor') return;
-    const tick = () => {
-      if (document.hidden) return;
-      const s = useEditor.getState();
-      const tab = s.tabs[s.active];
-      if (tab) void refresh([tab.path]);
+    let poll: ReturnType<typeof setInterval> | null = null;
+    let live = true;
+    const startPolling = () => {
+      if (poll) return;
+      poll = setInterval(() => {
+        if (document.hidden) return;
+        const s = useEditor.getState();
+        const tab = s.tabs[s.active];
+        if (tab) void refresh([tab.path]);
+      }, POLL_MS);
     };
+    const renew = () => client(target.nodeKey)
+      .post<FileWatchRes>(`/projects/${target.projectId}/files/watch${fileQuery(target)}`)
+      .then((r) => { if (live && !r.watching) startPolling(); }, () => { if (live) startPolling(); });
+    void renew();
+    const lease = setInterval(() => void renew(), LEASE_RENEW_MS);
     const onFocus = () => { useEditor.getState().bump(); void refresh(Object.keys(useEditor.getState().buffers)); };
-    const t = setInterval(tick, POLL_MS);
     window.addEventListener('focus', onFocus);
-    return () => { clearInterval(t); window.removeEventListener('focus', onFocus); };
-  }, [target, view, refresh]);
+    return () => {
+      live = false;
+      clearInterval(lease);
+      if (poll) clearInterval(poll);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [target, view, refresh, client]);
 }
 
 function TabBar() {

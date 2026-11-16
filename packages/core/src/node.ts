@@ -16,6 +16,7 @@ import { agentToken } from './util/agent-token.ts';
 import { Headless } from './journalist/headless.ts';
 import { Journalist, type JournalistOptions } from './journalist/journalist.ts';
 import { Rotator, type RotationConfig } from './rotation/rotator.ts';
+import { FileWatcher } from './files/watcher.ts';
 
 /** One Axo node: store + runtime + API. Same code locally and on servers. */
 export class Node {
@@ -31,6 +32,7 @@ export class Node {
   readonly teams: Teams;
   readonly watches: Watches;
   readonly innerchat: InnerChat;
+  readonly fileWatcher: FileWatcher;
   private server: Server | null = null;
 
   constructor(
@@ -65,6 +67,8 @@ export class Node {
     this.journalist = new Journalist(this.runtime, this.store, this.bus, this.headless, extra.journalist);
     this.rotator = new Rotator(this.runtime, this.journalist, this.headless, this.bus, this.cfg, extra.rotation);
     this.runtime.on('renamed', ({ agent, from }) => this.journalist.renameAgent(agent, from));
+    this.fileWatcher = new FileWatcher((root, projectId, paths) => this.bus.publish({ type: 'files:changed', projectId, root, paths }));
+    this.bus.on('event', (e: any) => { if (e.type === 'project:removed') this.fileWatcher.dropProject(e.projectId); });
   }
 
   async start(): Promise<void> {
@@ -82,6 +86,7 @@ export class Node {
   }
 
   async stop(): Promise<void> {
+    this.fileWatcher.close();
     this.watches.stop();
     this.innerchat.stop();
     this.rotator.stop();

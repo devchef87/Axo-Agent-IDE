@@ -360,6 +360,9 @@ export interface GitStatusRes { isRepo: boolean; branch: string | null; entries:
 export interface FileDiff { path: string; status: 'added' | 'modified' | 'deleted'; additions: number; deletions: number; patch: string }
 /** GET /projects/:id/files/diff?path= (omit path for the whole working tree) */
 export interface DiffRes { diffs: FileDiff[] }
+/** POST /projects/:id/files/watch — lease live files:changed for this root (5 min; renew every minute
+ *  while viewing). watching=false means the node can't watch here; fall back to polling. */
+export interface FileWatchRes { watching: boolean; expiresAt: number; truncated: boolean }
 /** GET /projects/:id/files/original?path= — the file at HEAD; null if untracked/new. */
 export interface OriginalRes { path: string; content: string | null }
 

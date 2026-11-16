@@ -22,6 +22,8 @@ export function registerFileRoutes(r: Router, node: Node): void {
   const q = (query: URLSearchParams, k: string) => query.get(k) ?? '';
 
   const base = '/projects/:id/files';
+  // Lease live files:changed for this root (renew every minute while viewing; expires after 5).
+  r.post(`${base}/watch`, ({ params, query }) => node.fileWatcher.lease(rootFor(params.id, query), params.id));
   r.get(`${base}/tree`, ({ params, query }) => F.tree(rootFor(params.id, query), q(query, 'path')));
   r.get(`${base}/read`, ({ params, query }) => F.read(rootFor(params.id, query), q(query, 'path')));
   r.get(`${base}/raw`, ({ params, query }) => {
