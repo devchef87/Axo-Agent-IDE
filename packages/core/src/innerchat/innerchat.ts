@@ -405,23 +405,9 @@ export class InnerChat {
     if (!ok) this.relayUndeliverable(toEnvelope(row), error ?? 'unknown error');
   }
 
-  /**
-   * An envelope from another node, delivered by the app. Idempotent by envelope id:
-   * the app may crash between relay-in and ack and retry, so a repeat is acknowledged
-   * without being applied twice. Only successfully applied envelopes are remembered.
-   */
+  /** An envelope from another node, delivered by the app. */
   relayIn(env: RelayEnvelope, fromServer: string): { ok: true } {
     if (!env || typeof env !== 'object' || !env.id || !env.from?.name || !fromServer) throw new HttpError(400, 'envelope and fromServer required');
-    const db = this.store.db;
-    if (db.prepare('SELECT 1 FROM ic_relay_seen WHERE id = ?').get(env.id)) return { ok: true };
-    const res = this.applyRelayed(env, fromServer);
-    const now = Date.now();
-    db.prepare('INSERT OR IGNORE INTO ic_relay_seen (id, ts) VALUES (?, ?)').run(env.id, now);
-    db.prepare('DELETE FROM ic_relay_seen WHERE ts < ?').run(now - 48 * 3600_000);
-    return res;
-  }
-
-  private applyRelayed(env: RelayEnvelope, fromServer: string): { ok: true } {
     const sender: Party = { id: `remote:${env.from.name}@${fromServer}`, name: `${env.from.name}@${fromServer}`, role: env.from.role || 'agent' };
     if (env.kind === 'answer') {
       let r = env.replyTo ? this.remotePending.get(env.replyTo) : undefined;

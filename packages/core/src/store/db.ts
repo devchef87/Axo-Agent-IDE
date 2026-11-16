@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import type { Agent, AgentStatus, FeedItem, Project, Team, TeamMode } from '@axo/protocol';
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 3;
 
 const MIGRATIONS: string[] = [
   /* v1 */ `
@@ -77,10 +77,6 @@ const MIGRATIONS: string[] = [
     status TEXT NOT NULL, fail_reason TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
   );
   CREATE INDEX ic_outbox_status ON ic_outbox(status, created_at);
-  `,
-  /* v4: relayed envelopes already applied here, so app retries are idempotent (innerchat/). */ `
-  CREATE TABLE ic_relay_seen (id TEXT PRIMARY KEY, ts INTEGER NOT NULL);
-  CREATE INDEX ic_relay_seen_ts ON ic_relay_seen(ts);
   `,
 ];
 
