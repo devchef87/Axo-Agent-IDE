@@ -168,3 +168,18 @@ describe('agent runtime', () => {
     assert.throws(() => t.node.runtime.create({ projectId: p.id, name: 'backend-1' }), /already exists/);
   });
 });
+
+describe('runtime hooks', () => {
+  it('emits turn-end with the turn text and inputs', async () => {
+    t = await makeNode();
+    const p = t.node.projects.create(t.project);
+    const events: any[] = [];
+    t.node.runtime.on('turn-end', (e) => events.push(e));
+    const a = t.node.runtime.create({ projectId: p.id, task: 'ping' });
+    await t.waitFor(() => events.length === 1);
+    assert.equal(events[0].agentId, a.id);
+    assert.equal(events[0].lastText, 'echo: ping');
+    assert.deepEqual(events[0].inputs, [{ text: 'ping', author: 'user' }]);
+    assert.equal(events[0].interrupted, false);
+  });
+});

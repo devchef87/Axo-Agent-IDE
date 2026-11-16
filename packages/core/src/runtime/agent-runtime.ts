@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import type { Agent, CreateAgentReq, FeedItem, UpdateAgentReq } from '@axo/protocol';
 import type { Store } from '../store/db.ts';
 import type { EventBus } from '../events.ts';
@@ -26,6 +27,24 @@ interface Live {
   toolStarts: Map<string, number>;
   /** Messages sent for the current turn; re-queued if the process dies before Claude starts. */
   inflight: Queued[];
+  /** Assistant prose produced during the current turn (for turn-end listeners). */
+  turnText: string[];
+}
+
+/**
+ * Hooks for other subsystems (InnerChat, journalist, rotator). Subscribe via
+ * `runtime.on('turn-end', (e: TurnEndEvent) => …)`; never reach into internals.
+ */
+export interface TurnEndEvent {
+  agentId: string;
+  sessionId: string | null;
+  /** Prose from this turn, joined; the last block is usually the answer. */
+  text: string;
+  lastText: string;
+  isError: boolean;
+  interrupted: boolean;
+  /** Messages that started this turn. */
+  inputs: { text: string; author: string }[];
 }
 
 export interface RuntimeOptions {
@@ -37,7 +56,7 @@ export interface RuntimeOptions {
 const DEFAULT_MODEL = 'opus';
 const STRIP_ENV = /^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CLAUDE_CODE_SSE_PORT|CLAUDE_AGENT_SDK_VERSION|GROOVE_.*|AXO_.*)$/;
 
-export class AgentRuntime {
+export class AgentRuntime extends EventEmitter {
   private readonly agents = new Map<string, Agent>();
   private readonly live = new Map<string, Live>();
   private readonly queues = new Map<string, Queued[]>();
@@ -51,6 +70,8 @@ export class AgentRuntime {
   private readonly projects: Projects;
 
   constructor(store: Store, bus: EventBus, cfg: NodeConfig, projects: Projects, opts: RuntimeOptions = {}) {
+    super();
+    this.setMaxListeners(50);
     this.store = store;
     this.bus = bus;
     this.cfg = cfg;
@@ -203,6 +224,7 @@ export class AgentRuntime {
     if (!ok) { q.unshift(...msgs); return; }
     this.clearIdle(id);
     live.inflight = msgs;
+    live.turnText = [];
     live.turnActive = true;
     live.turnStartedAt = Date.now();
     live.interruptRequested = false;
@@ -283,7 +305,7 @@ export class AgentRuntime {
     const proc = new ClaudeProcess({ bin: this.cfg.claudeBin, args, cwd: a.workdir, env });
     const live: Live = {
       proc, ctx: new ParseContext(a.workdir), turnActive: false, turnStartedAt: 0, sawInit: false,
-      interruptRequested: false, interruptTimers: [], ending: null, toolStarts: new Map(), inflight: [],
+      interruptRequested: false, interruptTimers: [], ending: null, toolStarts: new Map(), inflight: [], turnText: [],
     };
     this.live.set(a.id, live);
     proc.on('line', (line: string) => this.onLine(a.id, live, line));
@@ -325,6 +347,7 @@ export class AgentRuntime {
 
       case 'feed':
         if (act.item.kind === 'tool') live.toolStarts.set(act.item.id, act.item.ts);
+        if (act.item.kind === 'text') live.turnText.push(act.item.text);
         this.addFeed(a, act.item);
         break;
 
@@ -369,6 +392,7 @@ export class AgentRuntime {
   private onTurnEnd(a: Agent, live: Live, act: Extract<Action, { type: 'turn-end' }>): void {
     if (!live.turnActive) return; // spurious result (e.g. emitted on --resume with no turn)
     live.turnActive = false;
+    const inputs = live.inflight;
     live.inflight = [];
     for (const t of live.interruptTimers) clearTimeout(t);
     live.interruptTimers = [];
@@ -387,11 +411,17 @@ export class AgentRuntime {
       durationMs: act.durationMs, costUsd: u.costUsd, numTurns: act.numTurns,
       interrupted: live.interruptRequested || undefined,
     });
+    const interrupted = live.interruptRequested;
     live.interruptRequested = false;
     a.status = 'idle';
     this.store.saveAgent(a);
     this.store.pruneFeed(a.id);
     this.emitAgent(a);
+    const ev: TurnEndEvent = {
+      agentId: a.id, sessionId: a.sessionId, text: live.turnText.join('\n\n'), lastText: live.turnText.at(-1) ?? '',
+      isError: act.isError && !interrupted, interrupted, inputs,
+    };
+    try { this.emit('turn-end', ev); } catch (e) { console.error('[runtime] turn-end listener failed', e); }
     this.pump(a.id);
     if (!live.turnActive) this.armIdle(a.id);
   }
