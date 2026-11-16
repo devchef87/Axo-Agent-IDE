@@ -98,9 +98,9 @@ function TitleBar() {
     return [node.name, node.projects.find((p) => p.id === agent.projectId)?.name, agent.name].filter(Boolean).join(' / ');
   });
   return (
-    <header className={cn('relative flex h-[38px] shrink-0 select-none items-center gap-3 border-b border-border-subtle bg-panel pr-2', mac ? 'drag pl-[84px]' : 'pl-3')}>
-      <span className="label !text-primary !tracking-[0.18em]">Axo</span>
-      <nav role="tablist" aria-label="View" className="no-drag flex items-center">
+    <header className={cn('relative flex h-[44px] shrink-0 select-none items-center gap-4 border-b border-border bg-panel pr-3', mac ? 'drag pl-[88px]' : 'pl-4')}>
+      <span className="font-mono text-[12px] font-semibold uppercase tracking-[0.2em] text-primary">Axo</span>
+      <nav role="tablist" aria-label="View" className="no-drag flex h-full items-center gap-1">
         {VIEWS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -108,22 +108,22 @@ function TitleBar() {
             aria-selected={view === id}
             title={id === 'fleet' || id === 'editor' ? `${label} · ⌘E switches Fleet/Editor` : label}
             onClick={() => setView(id)}
-            className={cn('relative flex h-[38px] items-center gap-1.5 px-2.5 text-xs cursor-pointer transition-colors',
-              view === id ? 'text-primary' : 'text-faint hover:text-secondary')}
+            className={cn('relative flex h-full items-center gap-2 px-3.5 text-[13px] cursor-pointer transition-colors',
+              view === id ? 'font-medium text-primary' : 'text-muted hover:text-primary')}
           >
-            <Icon size={13} strokeWidth={1.75} /> {label}
-            {id === 'watches' && activeWatches > 0 && <span className="font-mono text-2xs text-secondary">{activeWatches}</span>}
-            {view === id && <span className="absolute inset-x-2.5 bottom-0 h-px bg-accent" aria-hidden />}
+            <Icon size={15} strokeWidth={1.75} className={view === id ? 'text-accent' : undefined} /> {label}
+            {id === 'watches' && activeWatches > 0 && <span className="rounded bg-control px-1.5 font-mono text-2xs text-primary">{activeWatches}</span>}
+            {view === id && <span className="absolute inset-x-2 bottom-0 h-[2px] rounded-t-sm bg-accent" aria-hidden />}
           </button>
         ))}
       </nav>
-      <span className="min-w-0 flex-1 truncate text-center font-mono text-2xs text-faint">{crumbs}</span>
+      <span className="min-w-0 flex-1 truncate text-center font-mono text-xs text-muted">{crumbs}</span>
       <button
         onClick={() => setUi({ palette: true })}
         title="Search agents, projects and commands"
-        className="no-drag flex h-6 w-56 shrink items-center gap-2 rounded border border-border bg-bg px-2 text-xs text-faint hover:border-border-strong hover:text-secondary cursor-pointer"
+        className="no-drag flex h-7 w-64 shrink items-center gap-2 rounded border border-border bg-inset px-2.5 text-xs text-muted hover:border-border-strong hover:text-primary cursor-pointer"
       >
-        <Search size={12} /> Search or jump to…
+        <Search size={13} /> Search or jump to…
         <span className="ml-auto font-mono text-2xs">⌘K</span>
       </button>
     </header>

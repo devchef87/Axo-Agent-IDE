@@ -7,54 +7,52 @@
  */
 
 /*
- * Monochrome on purpose: near-black zinc greys on dark, clean neutrals on light, a white accent on dark and a black accent on light.
- * Colour is reserved for what needs it: danger (errors), warning (context filling up),
- * diff additions/removals, and quiet syntax highlighting. Status is shown with shade and
- * motion (working pulses in the accent, idle is grey, asleep is a hollow ring).
+ * Dark: slate blue surfaces with one blue accent (#28ACE6) for buttons, focus, selection and the
+ * working pulse. Light: clean neutrals with a black accent. Text greys are lighter than the base
+ * slate grey (#70818A, kept for scrollbars) so every text colour passes AA on every surface.
+ * Other colour is reserved for danger, warning, diff lines and syntax.
  */
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #09090b;            /* main canvas (chat) */
-  --panel: #0c0c0e;         /* sidebar, title strip, status bar */
-  --elevated: #111113;      /* modals, menus, composer */
-  --inset: #060607;         /* code blocks, tool output */
-  --hover: #17171a;
-  --control: #1c1c1f;       /* subtle fills: buttons, badges, user bubble, tracks */
-  --control-hover: #26262a;
-  --border: #1f1f23;
-  --border-subtle: #161619;
-  --border-strong: #66666f; /* hover outlines, dividers that must read (≥3:1) */
-  --ring: #71717a;          /* focus: visible (≥3:1), not glaring */
-  --text-primary: #fafafa;
-  --text-secondary: #a1a1aa;
-  --text-muted: #8d8d97;
-  --text-faint: #84848c;
-  --accent: #fafafa;
-  --accent-hover: #ffffff;
-  --accent-fg: #09090b;
-  /* colour, used sparingly */
-  --success: #5fb87f;       /* diff additions */
-  --warning: #d9a74a;
-  --danger: #ef6f62;
-  /* neutral roles (kept as tokens so components stay semantic) */
-  --info: #8d8d97;
-  --working: #fafafa;
-  --rotating: #8d8d97;
-  --innerchat: #a1a1aa;
-  /* syntax: low-chroma so code reads as text first */
-  --syn-keyword: #c8b6e2;
-  --syn-string: #a9c7a0;
-  --syn-number: #d8b48a;
-  --syn-comment: #84848c;
-  --syn-function: #a8c4e0;
-  --syn-type: #9fd0c8;
-  --syn-property: #cfc29a;
-  --syn-tag: #e0a598;
-  --scrollbar: #232327;
-  --scrollbar-hover: #34343a;
-  --overlay: rgb(0 0 0 / 0.6);
-  --shadow: 0 8px 28px rgb(0 0 0 / 0.5), 0 1px 3px rgb(0 0 0 / 0.4);
+  --bg: #32424F;            /* main body (chat, editor) */
+  --panel: #24353D;         /* sidebar, title bar, status bar, composer */
+  --elevated: #2a3a45;      /* modals, menus */
+  --inset: #24353D;         /* inputs, code blocks, tool output */
+  --hover: #3a4b58;
+  --control: #38505B;       /* buttons, badges, tracks */
+  --control-hover: #405965;
+  --border: #38505B;
+  --border-subtle: #2d3d48;
+  --border-strong: #7d929c; /* hover outlines, dividers that must read (≥3:1) */
+  --ring: #28ACE6;          /* focus */
+  --text-primary: #eef3f5;
+  --text-secondary: #cbd5da;
+  --text-muted: #b8c5cb;
+  --text-faint: #b0bec5;
+  --accent: #28ACE6;
+  --accent-hover: #4cc0f0;
+  --accent-fg: #0d1b22;
+  --success: #7fd69a;       /* diff additions */
+  --warning: #f0c36a;
+  --danger: #ffa197;
+  --info: #b8c5cb;
+  --working: #28ACE6;
+  --rotating: #b8c5cb;
+  --innerchat: #cbd5da;
+  /* syntax: soft pastels that read on slate */
+  --syn-keyword: #d4c2f0;
+  --syn-string: #b5dca9;
+  --syn-number: #f0c49a;
+  --syn-comment: #b0bec5;
+  --syn-function: #9fd2f5;
+  --syn-type: #9fe0d6;
+  --syn-property: #e3d5a6;
+  --syn-tag: #f2b2a6;
+  --scrollbar: #4a5f6b;
+  --scrollbar-hover: #70818A;
+  --overlay: rgb(10 20 26 / 0.55);
+  --shadow: 0 8px 28px rgb(8 16 22 / 0.45), 0 1px 3px rgb(8 16 22 / 0.35);
 }
 
 [data-theme="light"] {

@@ -27,8 +27,8 @@ export function contrast(a: string, b: string): number {
 
 const THEMES = { dark: tokens('[data-theme="dark"]'), light: tokens('[data-theme="light"]') };
 const SURFACES = ['bg', 'panel', 'elevated', 'inset', 'hover'];
-const TEXT = ['text-primary', 'text-secondary', 'text-muted', 'text-faint', 'accent',
-  'success', 'warning', 'danger', 'info', 'working', 'rotating', 'innerchat',
+const TEXT = ['text-primary', 'text-secondary', 'text-muted', 'text-faint',
+  'success', 'warning', 'danger', 'info', 'rotating', 'innerchat',
   'syn-keyword', 'syn-string', 'syn-number', 'syn-comment', 'syn-function', 'syn-type', 'syn-property', 'syn-tag'];
 
 for (const [name, t] of Object.entries(THEMES)) {
@@ -58,6 +58,8 @@ for (const [name, t] of Object.entries(THEMES)) {
       for (const bg of ['bg', 'elevated', 'panel']) {
         assert.ok(contrast(t['border-strong'], bg === 'bg' ? t.bg : t[bg]) >= 3, `border-strong on ${bg}`);
         assert.ok(contrast(t.ring, t[bg]) >= 3, `focus ring on ${bg}`);
+        assert.ok(contrast(t.accent, t[bg]) >= 3, `accent (buttons, indicators) on ${bg}`);
+        assert.ok(contrast(t.working, t[bg]) >= 3, `working dot/spinner on ${bg}`);
       }
     });
   });
@@ -68,17 +70,16 @@ const chroma = (hex: string) => {
   return Math.max(r, g, b) - Math.min(r, g, b);
 };
 
-describe('monochrome', () => {
-  it('accent and every surface/text token are neutral grey', () => {
-    const neutral = ['accent', 'accent-hover', 'accent-fg', 'bg', 'panel', 'elevated', 'inset', 'hover', 'control', 'border', 'border-strong',
-      'text-primary', 'text-secondary', 'text-muted', 'text-faint', 'working', 'rotating', 'innerchat', 'info'];
-    for (const [name, t] of Object.entries(THEMES)) {
-      for (const k of neutral) assert.ok(chroma(t[k]) <= 12, `${name} ${k} ${t[k]} should be grey (a slight cool zinc tint is fine)`);
-    }
+describe('palette', () => {
+  it('dark uses the slate blue scheme', () => {
+    const d = THEMES.dark;
+    assert.deepEqual([d.bg, d.panel, d.accent, d.control].map((c) => c.toLowerCase()), ['#32424f', '#24353d', '#28ace6', '#38505b']);
   });
 
-  it('accent is white-ish on dark and black-ish on light', () => {
-    assert.ok(luminance(THEMES.dark.accent) > 0.8);
+  it('light stays neutral with a black accent', () => {
+    const neutral = ['accent', 'accent-hover', 'accent-fg', 'bg', 'panel', 'elevated', 'inset', 'hover', 'control', 'border', 'border-strong',
+      'text-primary', 'text-secondary', 'text-muted', 'text-faint', 'working', 'rotating', 'innerchat', 'info'];
+    for (const k of neutral) assert.ok(chroma(THEMES.light[k]) <= 12, `light ${k} ${THEMES.light[k]} should be grey`);
     assert.ok(luminance(THEMES.light.accent) < 0.02);
   });
 

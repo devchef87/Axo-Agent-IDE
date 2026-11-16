@@ -32,7 +32,7 @@ export function WatchesView() {
         {(['active', 'finished', 'all'] as Filter[]).map((f) => (
           <button key={f} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}
             className={cn('rounded px-2 py-0.5 text-xs capitalize cursor-pointer', filter === f ? 'bg-control text-primary' : 'text-muted hover:text-secondary')}>
-            {f}{f === 'active' && active.length > 0 && <span className="ml-1 text-working">{active.length}</span>}
+            {f}{f === 'active' && active.length > 0 && <span className="ml-1 text-primary">{active.length}</span>}
           </button>
         ))}
         <span className="ml-auto text-2xs text-faint">Agents start watches with <code className="font-mono">axo watch</code>; they're woken with the result.</span>
