@@ -77,6 +77,14 @@ const VIEWS: View[] = ['fleet', 'editor', 'teams', 'watches'];
 
 type FilesListener = (nodeKey: string, ev: Extract<EventEnvelope, { type: 'files:changed' }>) => void;
 const filesListeners = new Set<FilesListener>();
+type EventListener = (nodeKey: string, ev: EventEnvelope) => void;
+const eventListeners = new Set<EventListener>();
+/** Subscribe to every event from every node (for views that keep their own state). */
+export function onNodeEvent(fn: EventListener): () => void {
+  eventListeners.add(fn);
+  return () => { eventListeners.delete(fn); };
+}
+
 /** Subscribe to files:changed from any node. Returns an unsubscribe function. */
 export function onFilesChanged(fn: FilesListener): () => void {
   filesListeners.add(fn);
@@ -100,8 +108,6 @@ export const focusedSel = (s: { layout: Layout }): Selection | null => s.layout.
 export type EventTap = (nodeKey: string, ev: EventEnvelope) => void;
 const taps = new Set<EventTap>();
 export function tapEvents(fn: EventTap): () => void { taps.add(fn); return () => taps.delete(fn); }
-/** Subscribe to every event from every node (alias of tapEvents, for views that keep their own state). */
-export const onNodeEvent = tapEvents;
 
 export const useAxo = create<AxoState>((set, get) => {
   const patchNode = (key: string, fn: (n: NodeView) => Partial<NodeView>) =>
@@ -137,6 +143,7 @@ export const useAxo = create<AxoState>((set, get) => {
 
   const onEvent = (key: string, ev: EventEnvelope) => {
     for (const t of taps) { try { t(key, ev); } catch (e) { console.error('[axo] event tap', e); } }
+    for (const fn of eventListeners) { try { fn(key, ev); } catch (e) { console.error('[axo] event listener', e); } }
     switch (ev.type) {
       case 'project:upsert': patchNode(key, (n) => ({ projects: upsert(n.projects, ev.project) })); break;
       case 'project:removed': patchNode(key, (n) => ({

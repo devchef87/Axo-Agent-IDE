@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Bell, BellOff, BookOpen, Code2, Columns2, Eye, FileSearch, FolderOpen, FolderPlus, GitFork, GitMerge, Monitor, Moon, PanelRight, Plus, RefreshCw, Search, Server, Sun, Users, X, type LucideIcon } from 'lucide-react';
+import { BookOpen, Code2, Eye, GitMerge, FileSearch, Users, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Bell, BellOff, Search, Server, Sun, X, type LucideIcon } from 'lucide-react';
 import type { AgentStatus } from '@axo/protocol';
 import { focusedSel, useAxo } from '../stores/store.ts';
 import { useTheme, type ThemePref } from '../lib/theme.ts';

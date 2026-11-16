@@ -13,10 +13,10 @@ import { ProjectContextDialog } from './components/project-context.tsx';
 import { cn, ConnDot, formatTokens } from './components/ui.tsx';
 import { useTheme, type ThemePref } from './lib/theme.ts';
 import { ServersPanel } from './components/servers/servers-panel.tsx';
+import { startNotifications } from './lib/notifications.ts';
 import { TeamsView } from './components/teams/teams-view.tsx';
 import { WatchesView } from './components/watches/watches-view.tsx';
 import { useActiveWatchCount, useWatchSync } from './stores/watches.ts';
-import { startNotifications } from './lib/notifications.ts';
 
 export function App() {
   const init = useAxo((s) => s.init);

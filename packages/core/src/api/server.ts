@@ -45,6 +45,7 @@ export class Router {
   get(p: string, h: Handler) { return this.add('GET', p, h); }
   post(p: string, h: Handler) { return this.add('POST', p, h); }
   patch(p: string, h: Handler) { return this.add('PATCH', p, h); }
+  put(p: string, h: Handler) { return this.add('PUT', p, h); }
   delete(p: string, h: Handler) { return this.add('DELETE', p, h); }
   match(method: string, path: string): { handler: Handler; params: Record<string, string> } | null {
     for (const r of this.routes) {
@@ -96,7 +97,7 @@ export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHe
       if (!m) return json(res, 404, { error: 'not found' });
       try {
         const limit = url.pathname.endsWith('/files/upload') ? MAX_UPLOAD_BODY : MAX_BODY;
-        const body = req.method === 'POST' || req.method === 'PATCH' ? await readJson(req, limit) : undefined;
+        const body = req.method === 'POST' || req.method === 'PATCH' || req.method === 'PUT' ? await readJson(req, limit) : undefined;
         const out = await m.handler({ req, params: m.params, query: url.searchParams, body, caller });
         if (out instanceof RawResponse) return await out.send(req, res);
         if (out instanceof TextResponse) {
@@ -158,7 +159,7 @@ function cors(res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Range');
   // pdf.js and <video> need these to do partial (Range) loads of raw files.
   res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, Content-Encoding');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
 }
 
 function json(res: ServerResponse, status: number, data: unknown): void {

@@ -1,4 +1,4 @@
-import type { Agent, AskRes, ChatThread, ChatTurn, ChatTurnKind, RelayEnvelope, TellRes, WhoEntry, WhoRes } from '@axo/protocol';
+import type { Agent, AskRes, ChatThread, ChatTurn, ChatTurnKind, PeerServer, RelayEnvelope, TellRes, WhoEntry, WhoRes } from '@axo/protocol';
 import type { Store } from '../store/db.ts';
 import type { EventBus } from '../events.ts';
 import type { AgentRuntime, DeliverEvent, GoneEvent, TurnEndEvent } from '../runtime/agent-runtime.ts';
@@ -61,6 +61,8 @@ export class InnerChat {
   private readonly blockedOn = new Map<string, string>();  // askerId → targetId
   private readonly remotePending = new Map<string, RemotePending>(); // by envelope id
   private stopped = false;
+  /** Servers the app knows (PUT /innerchat/peers). null until the app has told us: then any @server is queued. */
+  private peers: PeerServer[] | null = null;
   private readonly expiry: NodeJS.Timeout;
 
   constructor(store: Store, bus: EventBus, runtime: AgentRuntime) {
@@ -109,7 +111,7 @@ export class InnerChat {
       .filter((a) => !teams.get(a.teamId)?.archivedAt)
       .map((a) => ({ id: a.id, name: a.name, role: a.role, team: teams.get(a.teamId)?.name ?? '?', status: a.status,
         scope: a.scopeGlobs, you: a.id === callerId }));
-    return { you: me?.name ?? null, agents };
+    return { you: me?.name ?? null, agents, ...(this.peers ? { servers: this.peers } : {}) };
   }
 
   // ── ask / tell ───────────────────────────────────────────
@@ -341,7 +343,28 @@ export class InnerChat {
     const m = /^([^@\s]+)@([^@\s]+)$/.exec(ref.trim());
     if (!m) return null;
     const isTeam = this.store.listTeams().some((t) => t.projectId === from.projectId && !t.archivedAt && t.name.toLowerCase() === m[2].toLowerCase());
-    return isTeam ? null : { name: m[1], server: m[2] };
+    if (isTeam) return null;
+    return { name: m[1], server: this.resolveServer(m[2]) };
+  }
+
+  setPeers(servers: unknown): void {
+    if (!Array.isArray(servers)) throw new HttpError(400, 'servers[] required');
+    this.peers = servers
+      .filter((s) => s && typeof s.id === 'string' && s.id)
+      .map((s) => ({ id: String(s.id), name: String(s.name ?? s.id), connected: !!s.connected }));
+  }
+
+  /** The app's server id for an alias the agent typed (ids first, then names). Unknown → 404 once the app has sent its list. */
+  private resolveServer(alias: string): string {
+    if (!this.peers) return alias; // the app hasn't told us yet; it will resolve (or reject) the alias itself
+    const a = alias.toLowerCase();
+    const byId = this.peers.find((s) => s.id.toLowerCase() === a);
+    if (byId) return byId.id;
+    const byName = this.peers.filter((s) => s.name.toLowerCase() === a);
+    if (byName.length === 1) return byName[0].id;
+    const known = this.peers.map((s) => s.id).join(', ') || 'none';
+    if (byName.length > 1) throw new HttpError(409, `server name "${alias}" is ambiguous; use one of these ids: ${byName.map((s) => s.id).join(', ')}`);
+    throw new HttpError(404, `no team or server named "${alias}". Servers: ${known} (see \`axo who\`).`);
   }
 
   private remoteSend(from: Agent, to: { name: string; server: string }, message: string, kind: 'ask' | 'tell',
@@ -405,23 +428,17 @@ export class InnerChat {
     if (!ok) this.relayUndeliverable(toEnvelope(row), error ?? 'unknown error');
   }
 
-  /**
-   * An envelope from another node, delivered by the app. Idempotent by envelope id:
-   * the app may crash between relay-in and ack and retry, so a repeat is acknowledged
-   * without being applied twice. Only successfully applied envelopes are remembered.
-   */
+  /** An envelope from another node, delivered by the app. */
   relayIn(env: RelayEnvelope, fromServer: string): { ok: true } {
     if (!env || typeof env !== 'object' || !env.id || !env.from?.name || !fromServer) throw new HttpError(400, 'envelope and fromServer required');
-    const db = this.store.db;
-    if (db.prepare('SELECT 1 FROM ic_relay_seen WHERE id = ?').get(env.id)) return { ok: true };
-    const res = this.applyRelayed(env, fromServer);
-    const now = Date.now();
-    db.prepare('INSERT OR IGNORE INTO ic_relay_seen (id, ts) VALUES (?, ?)').run(env.id, now);
-    db.prepare('DELETE FROM ic_relay_seen WHERE ts < ?').run(now - 48 * 3600_000);
+    // Idempotent: the app may crash between relay-in and ack and send the same envelope again.
+    if (this.store.db.prepare('SELECT 1 FROM ic_inbox WHERE from_server = ? AND envelope_id = ?').get(fromServer, env.id)) return { ok: true };
+    const res = this.receive(env, fromServer);
+    this.store.db.prepare('INSERT OR IGNORE INTO ic_inbox (from_server, envelope_id, received_at) VALUES (?,?,?)').run(fromServer, env.id, Date.now());
     return res;
   }
 
-  private applyRelayed(env: RelayEnvelope, fromServer: string): { ok: true } {
+  private receive(env: RelayEnvelope, fromServer: string): { ok: true } {
     const sender: Party = { id: `remote:${env.from.name}@${fromServer}`, name: `${env.from.name}@${fromServer}`, role: env.from.role || 'agent' };
     if (env.kind === 'answer') {
       let r = env.replyTo ? this.remotePending.get(env.replyTo) : undefined;
@@ -528,6 +545,7 @@ export class InnerChat {
     const old = this.store.db.prepare(`SELECT * FROM ic_outbox WHERE status = 'pending' AND created_at < ?`).all(cutoff) as Record<string, any>[];
     for (const row of old) this.ack(row.id, false, 'not relayed within 24h (is the Axo app running and connected to that server?)');
     this.store.db.prepare(`DELETE FROM ic_outbox WHERE status != 'pending' AND updated_at < ?`).run(Date.now() - THREAD_HISTORY_MS);
+    this.store.db.prepare('DELETE FROM ic_inbox WHERE received_at < ?').run(Date.now() - THREAD_HISTORY_MS);
   }
 
   private dropRemote(r: RemotePending): void {
