@@ -120,11 +120,17 @@ const dot = (s: string) => (s === 'working' ? '●' : s === 'idle' || s === 'sta
 async function who(): Promise<void> {
   const res = await api<WhoRes>('GET', '/innerchat/who');
   const others = res.agents.filter((a) => !a.you);
-  if (!others.length) { console.log('No other agents in this project yet.'); return; }
-  console.log(`You are ${res.you ?? '?'}. Agents you can message:`);
-  for (const a of others) {
-    const scope = a.scope.length ? `  scope: ${a.scope.join(', ')}` : '';
-    console.log(`  ${dot(a.status)} ${a.name}  (${a.role}, team ${a.team}, ${a.status})${scope}`);
+  if (!others.length) console.log('No other agents in this project yet.');
+  else {
+    console.log(`You are ${res.you ?? '?'}. Agents you can message:`);
+    for (const a of others) {
+      const scope = a.scope.length ? `  scope: ${a.scope.join(', ')}` : '';
+      console.log(`  ${dot(a.status)} ${a.name}  (${a.role}, team ${a.team}, ${a.status})${scope}`);
+    }
+  }
+  if (res.servers?.length) {
+    console.log('\nServers (message an agent there as name@server):');
+    for (const sv of res.servers) console.log(`  ${sv.connected ? '●' : '○'} ${sv.id}${sv.name !== sv.id ? `  (${sv.name})` : ''}${sv.connected ? '' : '  disconnected: messages wait until it reconnects'}`);
   }
   console.log('\naxo ask <name> "<question>"   blocks until they answer');
   console.log('axo tell <name> "<message>"   returns immediately');

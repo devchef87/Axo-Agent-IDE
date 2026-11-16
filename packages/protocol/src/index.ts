@@ -206,7 +206,7 @@ export interface AskRes {
 export interface TellReq { to: string; message: string }
 export interface TellRes { delivered: true; threadId: string; exchangesRemaining: number }
 export interface WhoEntry { id: string; name: string; role: string; team: string; status: AgentStatus; scope: string[]; you: boolean }
-export interface WhoRes { you: string | null; agents: WhoEntry[] }
+export interface WhoRes { you: string | null; agents: WhoEntry[]; servers?: PeerServer[] }  // servers: from the app (name@server)
 
 export type WatchMode = 'command' | 'until';
 export type WatchStatus = 'active' | 'delivered' | 'undeliverable' | 'cancelled';
@@ -261,6 +261,9 @@ export interface RelayEnvelope {
 }
 /** POST /api/innerchat/relay-in (node token). fromServer = the app's alias for the origin node. */
 export interface RelayInReq { envelope: RelayEnvelope; fromServer: string }
+/** A server the app knows, pushed with PUT /api/innerchat/peers (node token). id: unique slug; 'local' = the local node. */
+export interface PeerServer { id: string; name: string; connected: boolean }
+export interface PeersReq { servers: PeerServer[] }
 /** POST /api/innerchat/outbox/:id/ack (node token), after the app tried to deliver it. */
 export interface RelayAckReq { ok: boolean; error?: string }
 
