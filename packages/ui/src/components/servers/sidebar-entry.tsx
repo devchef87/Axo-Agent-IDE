@@ -13,12 +13,12 @@ export function ServersSidebarEntry() {
   if (!isElectron) return null;
   return (
     <button
-      className="flex h-8 shrink-0 items-center gap-2 border-t border-border-subtle px-3 text-xs text-faint hover:bg-hover hover:text-secondary cursor-pointer"
+      className="flex h-8 shrink-0 items-center gap-2 border-t border-border-subtle px-3 text-[11px] text-faint hover:bg-hover hover:text-secondary cursor-pointer"
       title="Servers: add, connect, deploy and update"
       onClick={() => setUi({ servers: true })}
     >
       <Plus size={13} strokeWidth={1.75} /> Servers
-      {updates > 0 && <span className="ml-auto font-mono text-2xs text-secondary" title="A node runs an older build">{updates} update{updates > 1 ? 's' : ''}</span>}
+      {updates > 0 && <span className="ml-auto font-mono text-[9.5px] text-secondary" title="A node runs an older build">{updates} update{updates > 1 ? 's' : ''}</span>}
     </button>
   );
 }
