@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import type { Agent, AgentStatus, FeedItem, Project, Team, TeamMode } from '@axo/protocol';
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const MIGRATIONS: string[] = [
   /* v1 */ `
@@ -69,6 +69,14 @@ const MIGRATIONS: string[] = [
     kind TEXT NOT NULL, text TEXT NOT NULL, ts INTEGER NOT NULL
   );
   CREATE INDEX ic_turns_thread ON ic_turns(thread_id, ts);
+  `,
+  /* v3 (core2): cross-server InnerChat outbox. The app relays pending envelopes (innerchat/). */ `
+  CREATE TABLE ic_outbox (
+    id TEXT PRIMARY KEY, kind TEXT NOT NULL, from_agent_id TEXT NOT NULL, from_name TEXT NOT NULL, from_role TEXT NOT NULL,
+    to_server TEXT NOT NULL, to_agent TEXT, reply_to TEXT, text TEXT NOT NULL, error TEXT,
+    status TEXT NOT NULL, fail_reason TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX ic_outbox_status ON ic_outbox(status, created_at);
   `,
 ];
 

@@ -20,7 +20,7 @@ const HELP = `axo: talk to your team and schedule work from inside an Axo agent
   axo status                           who you are, your team, scope, active watches
   axo rotate [--note "<text>"]         ask for a fresh context at your next turn boundary
 
-Address agents as name (same project) or name@team.`;
+Address agents as name (same project), name@team, or name@server (another server, relayed by the Axo app).`;
 
 // ── tiny arg parser ─────────────────────────────────────────
 
