@@ -136,18 +136,18 @@ export function AddProjectDialog() {
           </div>
         </Field>
         {browse && (
-          <div className="mb-3 max-h-64 overflow-y-auto rounded-md border border-border-subtle bg-surface-1 py-1">
+          <div className="mb-3 max-h-64 overflow-y-auto rounded-md border border-border-subtle bg-panel py-1">
             {browse.parent && (
-              <button type="button" onClick={() => void list(browse.parent!)} className="flex w-full items-center gap-2 px-3 py-1 text-left text-xs text-text-2 hover:bg-surface-3 cursor-pointer">
+              <button type="button" onClick={() => void list(browse.parent!)} className="flex w-full items-center gap-2 px-3 py-1 text-left text-xs text-muted hover:bg-hover cursor-pointer">
                 <ArrowUp size={12} /> ..
               </button>
             )}
             {browse.entries.map((d) => (
-              <button type="button" key={d.path} onClick={() => void list(d.path)} className="flex w-full items-center gap-2 px-3 py-1 text-left text-xs text-text-1 hover:bg-surface-3 cursor-pointer">
-                <Folder size={12} className="text-text-3" /> {d.name}
+              <button type="button" key={d.path} onClick={() => void list(d.path)} className="flex w-full items-center gap-2 px-3 py-1 text-left text-xs text-secondary hover:bg-hover cursor-pointer">
+                <Folder size={12} className="text-faint" /> {d.name}
               </button>
             ))}
-            {browse.entries.length === 0 && <p className="px-3 py-1 text-xs text-text-4">No subfolders</p>}
+            {browse.entries.length === 0 && <p className="px-3 py-1 text-xs text-faint">No subfolders</p>}
           </div>
         )}
         {error && <p className="mb-3 text-xs text-danger">{error}</p>}

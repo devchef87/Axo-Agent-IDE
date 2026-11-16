@@ -14,7 +14,7 @@ export function ChatPane({ sel }: { sel: Selection }) {
 
   if (!agent) return <Empty text="This agent no longer exists." />;
   return (
-    <div className="flex h-full min-w-0 flex-1 flex-col bg-surface-2">
+    <div className="flex h-full min-w-0 flex-1 flex-col bg-bg">
       <Header agent={agent} sel={sel} subtitle={`${nodeName} / ${project?.name ?? ''}`} />
       {feed ? (
         <Feed feed={feed} agent={agent} onLoadOlder={() => void loadFeed(sel.nodeKey, sel.agentId, true)} />
@@ -30,7 +30,7 @@ function Header({ agent, sel, subtitle }: { agent: Agent; sel: Selection; subtit
   const client = useAxo((s) => s.client);
   const [menu, setMenu] = useState(false);
   const pct = agent.contextWindow ? Math.min(100, Math.round((agent.contextTokens / agent.contextWindow) * 100)) : 0;
-  const pctColor = pct >= 80 ? 'bg-danger' : pct >= 60 ? 'bg-warning' : 'bg-accent';
+  const pctColor = pct >= 80 ? 'bg-danger' : pct >= 60 ? 'bg-warning' : 'bg-muted';
 
   const act = async (fn: () => Promise<unknown>) => { setMenu(false); try { await fn(); } catch (e: any) { alert(e.message); } };
 
@@ -39,16 +39,16 @@ function Header({ agent, sel, subtitle }: { agent: Agent; sel: Selection; subtit
       <StatusDot status={agent.status} />
       <div className="min-w-0">
         <div className="flex items-baseline gap-2">
-          <span className="truncate text-[13px] font-semibold text-text-0">{agent.name}</span>
-          <span className="text-xs text-text-3">{agent.role}</span>
-          <span className={cn('text-2xs', agent.status === 'error' ? 'text-danger' : 'text-text-4')}>{STATUS_LABEL[agent.status]}</span>
+          <span className="truncate text-[13px] font-semibold text-primary">{agent.name}</span>
+          <span className="text-xs text-faint">{agent.role}</span>
+          <span className={cn('text-2xs', agent.status === 'error' ? 'text-danger' : 'text-faint')}>{STATUS_LABEL[agent.status]}</span>
         </div>
       </div>
-      <div className="ml-auto flex items-center gap-4 text-2xs text-text-3">
+      <div className="ml-auto flex items-center gap-4 text-2xs text-faint">
         <span className="hidden truncate md:inline">{subtitle}</span>
         <span className="font-mono">{agent.model}</span>
         <span className="flex items-center gap-1.5 font-mono" title={`${agent.contextTokens.toLocaleString()} / ${agent.contextWindow.toLocaleString()} context tokens · ${agent.compactions} compactions`}>
-          <span className="h-1 w-12 overflow-hidden rounded-full bg-surface-5">
+          <span className="h-1 w-12 overflow-hidden rounded-full bg-control">
             <span className={cn('block h-full rounded-full', pctColor)} style={{ width: `${pct}%` }} />
           </span>
           {pct}%
@@ -57,7 +57,7 @@ function Header({ agent, sel, subtitle }: { agent: Agent; sel: Selection; subtit
         <div className="relative">
           <IconButton title="Agent actions" onClick={() => setMenu(!menu)}><MoreHorizontal size={14} /></IconButton>
           {menu && (
-            <div className="absolute right-0 top-7 z-20 w-48 rounded-md border border-border bg-surface-4 py-1 shadow-xl" onMouseLeave={() => setMenu(false)}>
+            <div className="absolute right-0 top-7 z-20 w-48 rounded-md border border-border bg-elevated py-1 shadow-pop" onMouseLeave={() => setMenu(false)}>
               <MenuItem icon={Power} onClick={() => act(() => client(sel.nodeKey).post(`/agents/${agent.id}/stop`))}>Stop process</MenuItem>
               <MenuItem icon={Trash2} danger onClick={() => {
                 if (confirm(`Delete agent ${agent.name}? Its chat history will be removed.`)) void act(() => client(sel.nodeKey).del(`/agents/${agent.id}`));
@@ -72,7 +72,7 @@ function Header({ agent, sel, subtitle }: { agent: Agent; sel: Selection; subtit
 
 function MenuItem({ icon: Icon, children, onClick, danger }: { icon: typeof Power; children: string; onClick: () => void; danger?: boolean }) {
   return (
-    <button onClick={onClick} className={cn('flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-surface-6 cursor-pointer', danger ? 'text-danger' : 'text-text-1')}>
+    <button onClick={onClick} className={cn('flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-hover cursor-pointer', danger ? 'text-danger' : 'text-secondary')}>
       <Icon size={13} /> {children}
     </button>
   );
@@ -118,7 +118,7 @@ function Composer({ agent, sel }: { agent: Agent; sel: Selection }) {
     <div className="shrink-0 px-6 pb-4">
       <div className="mx-auto max-w-3xl">
         {error && <div className="mb-1.5 text-xs text-danger">{error}</div>}
-        <div className="rounded-lg border border-border bg-surface-3 focus-within:border-accent/60">
+        <div className="rounded-lg border border-border bg-elevated focus-within:border-accent/60">
           <textarea
             ref={ta}
             value={text}
@@ -126,10 +126,10 @@ function Composer({ agent, sel }: { agent: Agent; sel: Selection }) {
             onKeyDown={onKey}
             rows={1}
             placeholder={working ? 'Queue a message (delivered when this turn ends) · Esc to interrupt' : `Message ${agent.name}…`}
-            className="block max-h-72 w-full resize-none bg-transparent px-3.5 pt-2.5 pb-1 text-[13.5px] leading-relaxed text-text-0 placeholder:text-text-4 outline-none"
+            className="block max-h-72 w-full resize-none bg-transparent px-3.5 pt-2.5 pb-1 text-[13.5px] leading-relaxed text-primary placeholder:text-faint outline-none"
           />
           <div className="flex items-center gap-2 px-2 pb-2">
-            <span className="pl-1.5 text-2xs text-text-4">
+            <span className="pl-1.5 text-2xs text-faint">
               {agent.queued > 0 ? `${agent.queued} queued` : working ? 'working…' : 'Enter to send · Shift+Enter for newline'}
             </span>
             <div className="ml-auto flex items-center gap-1.5">
@@ -137,7 +137,7 @@ function Composer({ agent, sel }: { agent: Agent; sel: Selection }) {
                 <button
                   title="Interrupt (Esc)"
                   onClick={() => void client(sel.nodeKey).post(`/agents/${agent.id}/interrupt`)}
-                  className="flex h-7 w-7 items-center justify-center rounded-md bg-surface-5 text-text-1 hover:bg-danger/25 hover:text-danger cursor-pointer"
+                  className="flex h-7 w-7 items-center justify-center rounded-md bg-control text-secondary hover:bg-danger/25 hover:text-danger cursor-pointer"
                 >
                   <Square size={11} fill="currentColor" />
                 </button>
@@ -146,7 +146,7 @@ function Composer({ agent, sel }: { agent: Agent; sel: Selection }) {
                 title="Send (Enter)"
                 disabled={!text.trim()}
                 onClick={() => void send()}
-                className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-surface-0 hover:bg-accent/85 disabled:bg-surface-5 disabled:text-text-4 cursor-pointer"
+                className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-accent-fg hover:bg-accent-hover disabled:bg-control disabled:text-faint cursor-pointer"
               >
                 <ArrowUp size={14} strokeWidth={2.5} />
               </button>
@@ -160,7 +160,7 @@ function Composer({ agent, sel }: { agent: Agent; sel: Selection }) {
 
 export function Empty({ text, children }: { text: string; children?: React.ReactNode }) {
   return (
-    <div className="flex h-full flex-1 flex-col items-center justify-center gap-3 bg-surface-2 text-[13px] text-text-3">
+    <div className="flex h-full flex-1 flex-col items-center justify-center gap-3 bg-bg text-[13px] text-faint">
       <span>{text}</span>
       {children}
     </div>

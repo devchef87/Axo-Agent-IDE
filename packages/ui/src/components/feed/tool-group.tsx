@@ -28,14 +28,14 @@ export function ToolGroup({ items, live }: { items: ToolItem[]; live: boolean })
     <div className="my-1.5">
       <button
         onClick={() => setOpen(!open)}
-        className="group flex max-w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-text-3 hover:bg-surface-3 hover:text-text-1 cursor-pointer"
+        className="group flex max-w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-faint hover:bg-hover hover:text-secondary cursor-pointer"
       >
         <ChevronRight size={12} className={cn('shrink-0 transition-transform', open && 'rotate-90')} />
         {showLive ? (
           <>
-            <Loader2 size={12} className="shrink-0 animate-spin text-accent" />
-            <span className="shrink-0 text-text-2">{current.tool}</span>
-            <span className="truncate font-mono text-2xs text-text-3">{current.summary}</span>
+            <Loader2 size={12} className="shrink-0 animate-spin text-working" />
+            <span className="shrink-0 text-muted">{current.tool}</span>
+            <span className="truncate font-mono text-2xs text-faint">{current.summary}</span>
           </>
         ) : (
           <>
@@ -59,14 +59,14 @@ function ToolRow({ item }: { item: ToolItem }) {
   const Icon = ICONS[item.tool] ?? Wrench;
   return (
     <div>
-      <button onClick={() => setOpen(!open)} className="flex w-full items-center gap-2 rounded px-1.5 py-0.5 text-left text-xs hover:bg-surface-3 cursor-pointer">
-        <Icon size={12} className="shrink-0 text-text-3" />
-        <span className="shrink-0 text-text-2">{item.tool}</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-2xs text-text-3">{item.summary}</span>
-        {item.durationMs != null && item.durationMs > 1500 && <span className="shrink-0 text-2xs text-text-4">{formatDuration(item.durationMs)}</span>}
-        {item.status === 'running' && <Loader2 size={11} className="shrink-0 animate-spin text-accent" />}
+      <button onClick={() => setOpen(!open)} className="flex w-full items-center gap-2 rounded px-1.5 py-0.5 text-left text-xs hover:bg-hover cursor-pointer">
+        <Icon size={12} className="shrink-0 text-faint" />
+        <span className="shrink-0 text-muted">{item.tool}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-2xs text-faint">{item.summary}</span>
+        {item.durationMs != null && item.durationMs > 1500 && <span className="shrink-0 text-2xs text-faint">{formatDuration(item.durationMs)}</span>}
+        {item.status === 'running' && <Loader2 size={11} className="shrink-0 animate-spin text-working" />}
         {item.status === 'error' && <AlertCircle size={11} className="shrink-0 text-danger" />}
-        {item.status === 'ok' && <Check size={11} className="shrink-0 text-text-4" />}
+        {item.status === 'ok' && <Check size={11} className="shrink-0 text-faint" />}
       </button>
       {open && <ToolDetail item={item} />}
     </div>
@@ -91,7 +91,7 @@ function ToolDetail({ item }: { item: ToolItem }) {
 
 function Pre({ children, className }: { children: string; className?: string }) {
   return (
-    <pre className={cn('max-h-72 overflow-auto whitespace-pre-wrap break-all rounded border border-border-subtle bg-surface-0 px-2.5 py-1.5 font-mono text-2xs leading-relaxed text-text-2', className)}>
+    <pre className={cn('max-h-72 overflow-auto whitespace-pre-wrap break-all rounded border border-border-subtle bg-inset px-2.5 py-1.5 font-mono text-2xs leading-relaxed text-muted', className)}>
       {children}
     </pre>
   );
@@ -99,9 +99,9 @@ function Pre({ children, className }: { children: string; className?: string }) 
 
 function Diff({ before, after }: { before: string; after: string }) {
   return (
-    <pre className="max-h-72 overflow-auto rounded border border-border-subtle bg-surface-0 py-1.5 font-mono text-2xs leading-relaxed">
-      {before.split('\n').map((l, n) => <div key={`b${n}`} className="bg-danger/10 px-2.5 text-danger/90 whitespace-pre-wrap break-all">- {l}</div>)}
-      {after.split('\n').map((l, n) => <div key={`a${n}`} className="bg-success/10 px-2.5 text-success/90 whitespace-pre-wrap break-all">+ {l}</div>)}
+    <pre className="max-h-72 overflow-auto rounded border border-border-subtle bg-inset py-1.5 font-mono text-2xs leading-relaxed">
+      {before.split('\n').map((l, n) => <div key={`b${n}`} className="bg-danger/10 px-2.5 text-danger whitespace-pre-wrap break-all">- {l}</div>)}
+      {after.split('\n').map((l, n) => <div key={`a${n}`} className="bg-success/10 px-2.5 text-success whitespace-pre-wrap break-all">+ {l}</div>)}
     </pre>
   );
 }

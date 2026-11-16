@@ -1,32 +1,92 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter";
 
-/* Design tokens carried over from Groove (One Dark + teal). */
+/*
+ * Axo theme. Semantic tokens live as plain CSS variables per theme and are mapped
+ * into Tailwind below, so components only ever say bg-panel / text-muted / border-subtle.
+ * The accent (axolotl coral) is brand only: never use it for status. Status has its own
+ * tokens (working / success / warning / danger / rotating / faint) and InnerChat has --innerchat.
+ * test/theme.test.ts checks every text/surface pair against WCAG AA; run `npm test` after edits.
+ */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  /* surfaces: deep graphite, slightly cool */
+  --bg: #1b1d22;            /* main canvas (chat) */
+  --panel: #15171b;         /* sidebar, title strip, status bar */
+  --elevated: #24272e;      /* modals, menus, composer */
+  --inset: #121418;         /* code blocks, tool output */
+  --hover: #2a2d35;         /* row hover */
+  --control: #30343d;       /* subtle fills: buttons, badges, user bubble, tracks */
+  --control-hover: #3a3e48;
+  --border: #353943;
+  --border-subtle: #262930;
+  --border-strong: #6a707b; /* input outlines (≥3:1 on elevated) */
+  /* text */
+  --text-primary: #eceef2;
+  --text-secondary: #b9bec8;
+  --text-muted: #a3a9b4;
+  --text-faint: #8f95a0;
+  /* brand */
+  --accent: #ff7f9f;
+  --accent-hover: #ff97b1;
+  --accent-fg: #26080f;
+  /* semantic */
+  --success: #5fc98a;
+  --warning: #e3b04f;
+  --danger: #f47a68;
+  --info: #6cb2f0;
+  --working: #4fbbe0;
+  --rotating: #b892f2;
+  --innerchat: #9097f5;
+  /* misc */
+  --scrollbar: #3a3e48;
+  --scrollbar-hover: #4a4f5b;
+  --overlay: rgb(5 6 8 / 0.6);
+  --shadow: 0 12px 40px rgb(0 0 0 / 0.45), 0 2px 8px rgb(0 0 0 / 0.3);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  /* surfaces: warm paper, never stark white */
+  --bg: #faf8f4;
+  --panel: #f2eee8;
+  --elevated: #fffdf9;
+  --inset: #f1ede6;
+  --hover: #ece7df;
+  --control: #e8e2d9;
+  --control-hover: #ded7cc;
+  --border: #ddd6cb;
+  --border-subtle: #e8e3db;
+  --border-strong: #8f887d;
+  --text-primary: #1d1b18;
+  --text-secondary: #46423c;
+  --text-muted: #5a554e;
+  --text-faint: #68635b;
+  --accent: #bb2c57;
+  --accent-hover: #a2234a;
+  --accent-fg: #ffffff;
+  --success: #1a713f;
+  --warning: #8a5a00;
+  --danger: #b93226;
+  --info: #1c67a5;
+  --working: #0f6a90;
+  --rotating: #7445c4;
+  --innerchat: #4a51c2;
+  --scrollbar: #d3ccc1;
+  --scrollbar-hover: #bdb5a8;
+  --overlay: rgb(40 34 28 / 0.32);
+  --shadow: 0 12px 40px rgb(60 45 30 / 0.16), 0 2px 8px rgb(60 45 30 / 0.08);
+}
+
+/* Drop Tailwind's default palette so only semantic colours exist. */
 @theme {
-  --color-surface-0: #1a1e25;
-  --color-surface-1: #1e2127;
-  --color-surface-2: #24282f;
-  --color-surface-3: #282c34;
-  --color-surface-4: #2c313a;
-  --color-surface-5: #333842;
-  --color-surface-6: #3a3f4b;
-
-  --color-text-0: #e6e6e6;
-  --color-text-1: #bcc2cd;
-  --color-text-2: #8b929e;
-  --color-text-3: #6e7681;
-  --color-text-4: #6b7280;
-
-  --color-border: #3e4451;
-  --color-border-subtle: #2c313a;
-
-  --color-accent: #33afbc;
-  --color-success: #73c991;
-  --color-warning: #cda869;
-  --color-danger: #d4736e;
-  --color-info: #7ab0df;
-  --color-purple: #b07fd5;
-  --color-indigo: #7c86e0; /* InnerChat */
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-black: #000;
+  --color-white: #fff;
 
   --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -37,11 +97,39 @@
   --text-xs--line-height: 1rem;
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-elevated: var(--elevated);
+  --color-inset: var(--inset);
+  --color-hover: var(--hover);
+  --color-control: var(--control);
+  --color-control-hover: var(--control-hover);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-working: var(--working);
+  --color-rotating: var(--rotating);
+  --color-innerchat: var(--innerchat);
+  --shadow-pop: var(--shadow);
+}
+
 html { font-size: 15px; }
 body {
   font-family: var(--font-sans);
-  background: var(--color-surface-2);
-  color: var(--color-text-1);
+  background: var(--bg);
+  color: var(--text-secondary);
   font-size: 0.875rem;
   -webkit-font-smoothing: antialiased;
   margin: 0;
@@ -50,11 +138,15 @@ body {
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-surface-5); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-surface-6); }
-::selection { background: rgba(51, 175, 188, 0.25); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+::selection { background: color-mix(in oklab, var(--accent) 28%, transparent); }
 
-/* Electron window drag region (macOS hidden titlebar) */
+/* Keyboard focus: visible ring for keyboard users only. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 4px; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
+
+/* Electron window drag region (macOS hidden titlebar). Only the 32px title strip may use .drag. */
 .drag { -webkit-app-region: drag; }
 .no-drag { -webkit-app-region: no-drag; }
 
@@ -64,23 +156,29 @@ body {
 @keyframes fade-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
 .animate-fade-in { animation: fade-in 0.2s ease-out; }
 
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-dot, .animate-fade-in { animation: none; }
+}
+
 /* Markdown (assistant prose) */
-.md { line-height: 1.6; color: var(--color-text-1); word-wrap: break-word; }
+.md { line-height: 1.6; color: var(--text-secondary); word-wrap: break-word; }
 .md > :first-child { margin-top: 0; }
 .md > :last-child { margin-bottom: 0; }
 .md p { margin: 0.5em 0; }
-.md h1, .md h2, .md h3, .md h4 { color: var(--color-text-0); font-weight: 600; margin: 1em 0 0.4em; line-height: 1.3; }
+.md h1, .md h2, .md h3, .md h4 { color: var(--text-primary); font-weight: 600; margin: 1em 0 0.4em; line-height: 1.3; }
 .md h1 { font-size: 1.25em; } .md h2 { font-size: 1.12em; } .md h3, .md h4 { font-size: 1em; }
 .md ul, .md ol { margin: 0.4em 0; padding-left: 1.4em; }
 .md ul { list-style: disc; } .md ol { list-style: decimal; }
 .md li { margin: 0.15em 0; }
-.md a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 2px; }
-.md strong { color: var(--color-text-0); font-weight: 600; }
-.md code { font-family: var(--font-mono); font-size: 0.86em; background: var(--color-surface-4); padding: 0.1em 0.35em; border-radius: 4px; color: var(--color-text-0); }
-.md pre { background: var(--color-surface-0); border: 1px solid var(--color-border-subtle); border-radius: 6px; padding: 0.7em 0.9em; overflow-x: auto; margin: 0.6em 0; }
-.md pre code { background: none; padding: 0; font-size: 0.82em; line-height: 1.5; }
-.md blockquote { border-left: 2px solid var(--color-border); padding-left: 0.8em; color: var(--color-text-2); margin: 0.5em 0; }
+.md li::marker { color: var(--text-faint); }
+.md a { color: var(--accent); text-decoration: underline; text-decoration-color: color-mix(in oklab, var(--accent) 45%, transparent); text-underline-offset: 2px; }
+.md a:hover { text-decoration-color: var(--accent); }
+.md strong { color: var(--text-primary); font-weight: 600; }
+.md code { font-family: var(--font-mono); font-size: 0.86em; background: var(--control); padding: 0.1em 0.35em; border-radius: 4px; color: var(--text-primary); }
+.md pre { background: var(--inset); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.7em 0.9em; overflow-x: auto; margin: 0.6em 0; }
+.md pre code { background: none; padding: 0; font-size: 0.82em; line-height: 1.5; color: var(--text-secondary); }
+.md blockquote { border-left: 2px solid var(--border); padding-left: 0.8em; color: var(--text-muted); margin: 0.5em 0; }
 .md table { border-collapse: collapse; margin: 0.6em 0; font-size: 0.92em; }
-.md th, .md td { border: 1px solid var(--color-border-subtle); padding: 0.3em 0.6em; text-align: left; }
-.md th { background: var(--color-surface-3); color: var(--color-text-0); font-weight: 600; }
-.md hr { border: none; border-top: 1px solid var(--color-border-subtle); margin: 1em 0; }
+.md th, .md td { border: 1px solid var(--border); padding: 0.3em 0.6em; text-align: left; }
+.md th { background: var(--panel); color: var(--text-primary); font-weight: 600; }
+.md hr { border: none; border-top: 1px solid var(--border-subtle); margin: 1em 0; }
