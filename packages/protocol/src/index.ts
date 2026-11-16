@@ -328,7 +328,8 @@ export interface ServersSnapshot {
 // ── files (Phase 4) ─────────────────────────────────────────
 // All routes live under /projects/:id/files/*. Paths are relative to the file root
 // and confined to it (no absolute paths, no `..`, symlinks may not escape).
-// The root is the project folder, or a team's worktree with `?team=<teamId>`.
+// The root is the project folder, a team's worktree with `?team=<teamId>`, or an agent's
+// own worktree (its workdir) with `?agent=<agentId>`.
 // Raw/media URLs authenticate with `?token=` because <img>/<video> cannot send headers.
 
 export interface FileEntry {

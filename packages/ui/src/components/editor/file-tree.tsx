@@ -3,7 +3,7 @@ import {
   ChevronDown, ChevronRight, Copy, File, FileDiff, FilePlus, FolderPlus, Folder, FolderOpen, GitBranch, ListTree, Pencil, RefreshCw, Trash2,
 } from 'lucide-react';
 import type { FileEntry, FileTree as TreeRes, GitFileStatus, GitStatusRes, UploadRes } from '@axo/protocol';
-import { basename, dirname, type EditorTarget } from '../../lib/editor-model.ts';
+import { basename, dirname, targetKey, type EditorTarget } from '../../lib/editor-model.ts';
 import { fileQuery, useEditor } from '../../stores/editor.ts';
 import { useAxo } from '../../stores/store.ts';
 import { cn, IconButton, useDismiss } from '../ui.tsx';
@@ -25,7 +25,7 @@ export function FileTree({ target, label }: { target: EditorTarget; label: strin
   const renamed = useEditor((s) => s.renamed);
   const removed = useEditor((s) => s.removed);
 
-  const storeKey = `axo.tree.${target.nodeKey}:${target.projectId}:${target.team ?? ''}`;
+  const storeKey = `axo.tree.${targetKey(target)}`;
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(JSON.parse(localStorage.getItem(storeKey) ?? '[]')));
   const [children, setChildren] = useState<Record<string, FileEntry[]>>({});
   const [git, setGit] = useState<GitStatusRes | null>(null);

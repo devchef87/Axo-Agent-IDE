@@ -1,13 +1,14 @@
 // Editor tab rules and file classification. Pure (no DOM, no store) so they are unit-testable.
 
-export interface EditorTarget { nodeKey: string; projectId: string; team: string | null }
+/** Files root: the project, a team worktree (`team`), or an agent's own worktree (`agent`). */
+export interface EditorTarget { nodeKey: string; projectId: string; team: string | null; agent?: string | null }
 export type TabKind = 'file' | 'diff';
 export interface EditorTab { kind: TabKind; path: string }
 export interface Tabs { tabs: EditorTab[]; active: number } // active = -1 when empty
 
 export const MAX_TABS = 20;
 export const tabKey = (t: EditorTab) => `${t.kind}:${t.path}`;
-export const targetKey = (t: EditorTarget) => `${t.nodeKey}:${t.projectId}:${t.team ?? ''}`;
+export const targetKey = (t: EditorTarget) => `${t.nodeKey}:${t.projectId}:${t.team ?? ''}${t.agent ? `:a:${t.agent}` : ''}`;
 
 /** Open (or focus) a tab, inserted after the active one. Evicts the oldest clean tab past MAX_TABS. */
 export function openTab(s: Tabs, tab: EditorTab, isDirty: (t: EditorTab) => boolean = () => false): Tabs {

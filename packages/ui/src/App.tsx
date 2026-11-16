@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { lazy, Suspense } from 'react';
-import { Code2, Monitor, Moon, Search, Sun, Users } from 'lucide-react';
+import { Code2, Eye, GitMerge, Monitor, Moon, Search, Sun, Users } from 'lucide-react';
 import { focusedSel, useAxo } from './stores/store.ts';
 import { isElectron, isMac } from './lib/bridge.ts';
 import { Sidebar } from './components/sidebar.tsx';
@@ -13,6 +13,9 @@ import { ProjectContextDialog } from './components/project-context.tsx';
 import { cn, ConnDot, formatTokens } from './components/ui.tsx';
 import { useTheme, type ThemePref } from './lib/theme.ts';
 import { ServersPanel } from './components/servers/servers-panel.tsx';
+import { TeamsView } from './components/teams/teams-view.tsx';
+import { WatchesView } from './components/watches/watches-view.tsx';
+import { useActiveWatchCount, useWatchSync } from './stores/watches.ts';
 
 export function App() {
   const init = useAxo((s) => s.init);
@@ -20,6 +23,7 @@ export function App() {
   const view = useAxo((s) => s.view);
   useEffect(() => { void init(); }, [init]);
   useGlobalShortcuts();
+  useWatchSync();
 
   return (
     <div className="flex h-full flex-col">
@@ -31,6 +35,10 @@ export function App() {
           <div className="flex min-h-0 flex-1">
             {view === 'editor' ? (
               <Suspense fallback={<div className="flex-1 bg-bg" />}><EditorView /></Suspense>
+            ) : view === 'teams' ? (
+              <TeamsView />
+            ) : view === 'watches' ? (
+              <WatchesView />
             ) : (
               <>
                 <Fleet />
@@ -64,9 +72,12 @@ const EditorTargetPicker = lazy(() => import('./components/editor/editor-view.ts
 const VIEWS = [
   { id: 'fleet' as const, label: 'Fleet', icon: Users },
   { id: 'editor' as const, label: 'Editor', icon: Code2 },
+  { id: 'teams' as const, label: 'Teams', icon: GitMerge },
+  { id: 'watches' as const, label: 'Watches', icon: Eye },
 ];
 
 function ViewBar() {
+  const activeWatches = useActiveWatchCount();
   const view = useAxo((s) => s.view);
   const setView = useAxo((s) => s.setView);
   return (
@@ -77,12 +88,13 @@ function ViewBar() {
             key={id}
             role="tab"
             aria-selected={view === id}
-            title={`${label} (⌘E to switch)`}
+            title={id === 'fleet' || id === 'editor' ? `${label} (⌘E switches Fleet/Editor)` : label}
             onClick={() => setView(id)}
             className={cn('flex h-6 items-center gap-1.5 rounded px-2 text-xs font-medium cursor-pointer',
               view === id ? 'bg-control text-primary' : 'text-muted hover:bg-hover hover:text-secondary')}
           >
             <Icon size={12} /> {label}
+            {id === 'watches' && activeWatches > 0 && <span className="rounded bg-working/15 px-1 text-2xs text-working">{activeWatches}</span>}
           </button>
         ))}
       </div>
@@ -169,6 +181,8 @@ function StatusBar() {
   const working = all.filter((a) => a.status === 'working' || a.status === 'starting').length;
   const tokens = all.reduce((n, a) => n + a.sessionTokens, 0);
   const setUi = useAxo((s) => s.setUi);
+  const setView = useAxo((s) => s.setView);
+  const activeWatches = useActiveWatchCount();
   return (
     <div className="flex h-6 shrink-0 items-center gap-4 border-t border-border-subtle bg-panel px-3 text-2xs text-muted">
       {order.map((k) => (
@@ -185,6 +199,11 @@ function StatusBar() {
         <Search size={10} /> ⌘K
       </button>
       <span className="ml-auto">{working} working · {all.length} agents</span>
+      {activeWatches > 0 && (
+        <button className="flex items-center gap-1 rounded px-1 hover:bg-hover hover:text-secondary cursor-pointer" title="Open Watches" onClick={() => setView('watches')}>
+          <Eye size={10} /> {activeWatches} watch{activeWatches === 1 ? '' : 'es'}
+        </button>
+      )}
       <span title="Tokens processed across current sessions">{formatTokens(tokens)} tok</span>
       <ThemeToggle />
     </div>

@@ -5,13 +5,20 @@ import type { Node } from '../node.ts';
 import { HttpError } from '../util/http-error.ts';
 import * as F from './files.ts';
 
-/** /projects/:id/files/* — the editor's file API. `?team=` targets a team worktree. */
+/** /projects/:id/files/* — the editor's file API. `?team=` targets a team worktree, `?agent=` an agent's own worktree. */
 export function registerFileRoutes(r: Router, node: Node): void {
   const { store, bus } = node;
 
   const rootFor = (projectId: string, query: URLSearchParams): string => {
     const p = store.getProject(projectId);
     if (!p) throw new HttpError(404, 'project not found');
+    const agentId = query.get('agent');
+    if (agentId) {
+      // An agent's own worktree (per-agent branch), or wherever it works.
+      const a = store.getAgent(agentId);
+      if (!a || a.projectId !== p.id) throw new HttpError(404, 'agent not found');
+      return a.workdir;
+    }
     const teamId = query.get('team');
     if (!teamId) return p.path;
     const t = store.getTeam(teamId);

@@ -20,7 +20,9 @@ export function EditorView() {
 
   // Pick a sensible project the first time, and drop targets whose project is gone.
   useEffect(() => {
-    const exists = target && nodes[target.nodeKey]?.projects.some((p) => p.id === target.projectId);
+    const node = target ? nodes[target.nodeKey] : undefined;
+    const exists = target && node?.projects.some((p) => p.id === target.projectId)
+      && (!target.agent || node.agents.some((a) => a.id === target.agent));
     if (!exists) {
       const t = defaultTarget();
       if (t || (target && nodes[target.nodeKey]?.status === 'online')) setTarget(t);
@@ -33,7 +35,8 @@ export function EditorView() {
   const node = nodes[target.nodeKey];
   const project = node?.projects.find((p) => p.id === target.projectId);
   const team = target.team ? node?.teams.find((t) => t.id === target.team) : undefined;
-  const label = [project?.name, team?.name].filter(Boolean).join(' · ') || 'Files';
+  const ownAgent = target.agent ? node?.agents.find((a) => a.id === target.agent) : undefined;
+  const label = [project?.name, team?.name, ownAgent ? `${ownAgent.name}'s worktree` : null].filter(Boolean).join(' · ') || 'Files';
 
   return (
     <div className="flex h-full min-w-0 flex-1">
@@ -56,17 +59,22 @@ export function EditorTargetPicker() {
   const nodes = useAxo((s) => s.nodes);
   const order = useAxo((s) => s.nodeOrder);
   const options = order.flatMap((k) => nodes[k].projects.flatMap((p) => [
-    { value: `${k}|${p.id}|`, label: order.length > 1 ? `${nodes[k].name} / ${p.name}` : p.name },
-    ...nodes[k].teams.filter((t) => t.projectId === p.id && t.worktreePath && !t.archivedAt)
-      .map((t) => ({ value: `${k}|${p.id}|${t.id}`, label: `${order.length > 1 ? `${nodes[k].name} / ` : ''}${p.name} · ${t.name} (worktree)` })),
+    // value = node|project|team|agent
+    { value: `${k}|${p.id}||`, label: order.length > 1 ? `${nodes[k].name} / ${p.name}` : p.name },
+    ...nodes[k].teams.filter((t) => t.projectId === p.id && t.worktreePath && !t.archivedAt).flatMap((t) => [
+      { value: `${k}|${p.id}|${t.id}|`, label: `${order.length > 1 ? `${nodes[k].name} / ` : ''}${p.name} · ${t.name} (team worktree)` },
+      // Agents with their own worktree (own branch off the team branch).
+      ...nodes[k].agents.filter((a) => a.teamId === t.id && a.workdir !== t.worktreePath)
+        .map((a) => ({ value: `${k}|${p.id}||${a.id}`, label: `${order.length > 1 ? `${nodes[k].name} / ` : ''}${p.name} · ${t.name} · ${a.name} (own worktree)` })),
+    ]),
   ]));
   if (!options.length) return null;
-  const value = target ? `${target.nodeKey}|${target.projectId}|${target.team ?? ''}` : '';
+  const value = target ? `${target.nodeKey}|${target.projectId}|${target.agent ? '' : target.team ?? ''}|${target.agent ?? ''}` : '';
   return (
     <select
       aria-label="Project"
       value={value}
-      onChange={(e) => { const [nodeKey, projectId, team] = e.target.value.split('|'); setTarget({ nodeKey, projectId, team: team || null }); }}
+      onChange={(e) => { const [nodeKey, projectId, team, agent] = e.target.value.split('|'); setTarget({ nodeKey, projectId, team: team || null, agent: agent || null }); }}
       className="h-6 max-w-64 rounded border border-border bg-bg px-1.5 text-xs text-secondary outline-none focus:border-accent cursor-pointer"
     >
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

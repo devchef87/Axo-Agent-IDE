@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { BookOpen, Code2, FileSearch, Users, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Search, Server, Sun, X, type LucideIcon } from 'lucide-react';
+import { BookOpen, Code2, Eye, GitMerge, FileSearch, Users, Columns2, FolderOpen, FolderPlus, GitFork, Monitor, Moon, PanelRight, Plus, RefreshCw, Search, Server, Sun, X, type LucideIcon } from 'lucide-react';
 import type { AgentStatus } from '@axo/protocol';
 import { focusedSel, useAxo } from '../stores/store.ts';
 import { useTheme, type ThemePref } from '../lib/theme.ts';
@@ -73,6 +73,8 @@ function useCommands(open: boolean): Command[] {
     out.unshift(s.view === 'editor'
       ? { id: 'view', group: 'Actions', label: 'Back to Fleet', icon: Users, shortcut: '⌘E', run: () => toggleView() }
       : { id: 'view', group: 'Actions', label: 'Open editor', icon: Code2, shortcut: '⌘E', run: () => toggleView() });
+    out.push({ id: 'view-teams', group: 'Actions', label: 'Teams: review & merge branches', icon: GitMerge, run: () => s.setView('teams') });
+    out.push({ id: 'view-watches', group: 'Actions', label: 'Watches', icon: Eye, run: () => s.setView('watches') });
     out.splice(1, 0, { id: 'go-to-file', group: 'Actions', label: 'Go to file…', icon: FileSearch, shortcut: '⌘P', run: () => openQuickOpen() });
     out.unshift({ id: 'new-agent', group: 'Actions', label: 'New agent…', icon: Plus, shortcut: '⌘N', run: () => openNewAgent() });
     const next: Record<ThemePref, ThemePref> = { system: 'light', light: 'dark', dark: 'system' };
