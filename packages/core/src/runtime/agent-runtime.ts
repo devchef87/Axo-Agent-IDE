@@ -74,7 +74,9 @@ const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
 function checkEffort(e: string | null | undefined): void {
   if (e != null && !EFFORTS.has(e)) throw new HttpError(400, `effort must be one of ${[...EFFORTS].join(', ')}`);
 }
-const STRIP_ENV = /^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CLAUDE_CODE_SSE_PORT|CLAUDE_AGENT_SDK_VERSION|GROOVE_.*|AXO_.*)$/;
+// ELECTRON_RUN_AS_NODE: the local node runs on Electron's binary; never leak that into agents
+// (any Electron app an agent launched would silently run as plain node).
+const STRIP_ENV = /^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CLAUDE_CODE_SSE_PORT|CLAUDE_AGENT_SDK_VERSION|GROOVE_.*|AXO_.*|ELECTRON_RUN_AS_NODE)$/;
 
 /** Clean environment for any claude child process (no inherited agent identity, subscription auth by default). */
 export function claudeEnv(cfg: { authMode: 'subscription' | 'api' }): NodeJS.ProcessEnv {

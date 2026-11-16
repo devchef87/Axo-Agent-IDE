@@ -200,3 +200,15 @@ describe('settings changes', () => {
     await t.waitFor(() => t.feed(a.id).some((i) => i.kind === 'text' && i.text === 'echo: next'));
   });
 });
+
+describe('environment hygiene', () => {
+  it('never leaks ELECTRON_RUN_AS_NODE into agents', async () => {
+    process.env.ELECTRON_RUN_AS_NODE = '1';
+    try {
+      const { claudeEnv } = await import('../src/runtime/agent-runtime.ts');
+      assert.equal(claudeEnv({ authMode: 'subscription' }).ELECTRON_RUN_AS_NODE, undefined);
+    } finally {
+      delete process.env.ELECTRON_RUN_AS_NODE;
+    }
+  });
+});
