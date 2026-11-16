@@ -7,7 +7,7 @@ export function openNewAgent(): void {
   const s = useAxo.getState();
   const sel = focusedSel(s);
   const agent = sel ? s.nodes[sel.nodeKey]?.agents.find((a) => a.id === sel.agentId) : undefined;
-  if (sel && agent) return s.setUi({ newAgent: { nodeKey: sel.nodeKey, projectId: agent.projectId } });
+  if (sel && agent) return s.setUi({ newAgent: { nodeKey: sel.nodeKey, projectId: agent.projectId, teamId: agent.teamId } });
   for (const k of s.nodeOrder) {
     const p = s.nodes[k].projects[0];
     if (p) return s.setUi({ newAgent: { nodeKey: k, projectId: p.id } });

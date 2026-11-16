@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent } from 'react';
-import { BookOpen, ChevronDown, ChevronRight, Columns2, FolderPlus, Pencil, Plus, RefreshCw, Settings2, Square, Trash2, Users, UsersRound } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, Columns2, FolderPlus, Pencil, Plus, RefreshCw, Settings2, Square, Trash2, UsersRound } from 'lucide-react';
 import type { Agent, Project, Team } from '@axo/protocol';
 import { focusedSel, useAxo, useRefreshing, type NodeView } from '../stores/store.ts';
 import { sameSel } from '../lib/layout.ts';
@@ -53,41 +53,54 @@ function NodeSection({ node }: { node: NodeView }) {
   const [open, setOpen] = useState(true);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const setUi = useAxo((s) => s.setUi);
+  const client = useAxo((s) => s.client);
   const sel = useAxo((s) => focusedSel(s));
-  // New team defaults to the project you're looking at on this server, else its first project.
+  const multiProject = node.projects.length > 1;
+  // Server → team → agent. Projects stay out of the tree; with several, each team names its project.
+  const groups = node.projects.flatMap((p) => groupByTeam(p.id, node.agents, node.teams).map((g) => ({ ...g, project: p })));
+  // New team goes to the project you're working in on this server, else its first project.
   const newTeam = () => {
     const agent = sel?.nodeKey === node.key ? node.agents.find((a) => a.id === sel.agentId) : undefined;
     const projectId = agent?.projectId ?? node.projects[0]?.id;
     if (projectId) setUi({ newTeam: { nodeKey: node.key, projectId } });
   };
+  const removeProject = async (p: Project) => {
+    if (!confirm(`Remove project "${p.name}" from Axo?\n\nIts teams and agents will be stopped and deleted. Files on disk are not touched.`)) return;
+    await client(node.key).del(`/projects/${p.id}`);
+  };
+
   return (
     <div className="mb-2">
       <div className="group flex h-8 items-center gap-1 pl-3 pr-1.5" onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
-        <button data-nav data-level={1} data-label={node.name} aria-expanded={open} className="label flex min-w-0 flex-1 items-center gap-2 rounded-sm outline-none hover:!text-secondary focus-visible:bg-hover cursor-pointer" onClick={() => setOpen(!open)}>
+        <button data-nav data-level={1} data-label={node.name} aria-expanded={open}
+          className="label flex min-w-0 flex-1 items-center gap-2 rounded-sm outline-none hover:!text-secondary focus-visible:bg-hover cursor-pointer"
+          onClick={() => setOpen(!open)}
+          title={node.projects.map((p) => p.path).join('\n') || node.name}>
           <ConnDot status={node.status} />
           <span className="truncate">{node.name}</span>
           {!open && <ChevronRight size={10} />}
         </button>
-        <span className="font-mono text-2xs text-faint" title={`${node.agents.length} agents`}>{node.agents.length || ''}</span>
+        <span className="font-mono text-2xs text-faint group-hover:hidden group-focus-within:hidden" title={`${node.agents.length} agents`}>{node.agents.length || ''}</span>
         {node.projects.length > 0 && (
-          <IconButton title="New team" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={newTeam}>
-            <UsersRound size={12} strokeWidth={1.75} />
-          </IconButton>
+          <span className="hidden group-hover:flex group-focus-within:flex">
+            <IconButton title="New team" onClick={newTeam}><Plus size={13} /></IconButton>
+          </span>
         )}
-        <IconButton title="Add project" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setUi({ addProject: node.key })}>
-          <FolderPlus size={13} strokeWidth={1.75} />
-        </IconButton>
       </div>
       {menu && (
         <ContextMenu menu={menu} onClose={() => setMenu(null)} items={[
           ...(node.projects.length ? [{ icon: UsersRound, label: 'New team', run: newTeam }] : []),
           { icon: FolderPlus, label: 'Add project', run: () => setUi({ addProject: node.key }) },
+          ...node.projects.map((p) => ({ icon: BookOpen, label: multiProject ? `Map & decisions · ${p.name}` : 'Map & decisions', run: () => setUi({ context: { nodeKey: node.key, projectId: p.id } }) })),
+          ...node.projects.map((p) => ({ icon: Trash2, label: multiProject ? `Remove ${p.name}` : 'Remove project', danger: true, run: () => void removeProject(p) })),
         ]} />
       )}
       {open && (
         <div>
           {node.status === 'unauthorized' && <p className="px-3 py-1 text-xs text-danger">Bad token for this node.</p>}
-          {node.projects.map((p) => <ProjectSection key={p.id} node={node} project={p} />)}
+          {groups.map((g) => (g.team
+            ? <TeamSection key={g.team.id} node={node} project={g.project} team={g.team} agents={g.agents} showProject={multiProject} />
+            : g.agents.map((a) => <AgentRow key={a.id} nodeKey={node.key} agent={a} />)))}
           {node.status === 'online' && node.projects.length === 0 && (
             <button
               data-nav data-level={2} data-label="Add a project"
@@ -103,77 +116,7 @@ function NodeSection({ node }: { node: NodeView }) {
   );
 }
 
-function ProjectSection({ node, project }: { node: NodeView; project: Project }) {
-  const [open, setOpen] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const setUi = useAxo((s) => s.setUi);
-  const client = useAxo((s) => s.client);
-  const groups = groupByTeam(project.id, node.agents, node.teams);
-  const newAgent = () => setUi({ newAgent: { nodeKey: node.key, projectId: project.id } });
-  const newTeam = () => setUi({ newTeam: { nodeKey: node.key, projectId: project.id } });
-
-  const remove = async () => {
-    if (!confirm(`Remove project "${project.name}" from Axo?\n\nIts agents will be stopped and deleted. Files on disk are not touched.`)) return;
-    await client(node.key).del(`/projects/${project.id}`);
-  };
-  const rename = (name: string) => client(node.key).patch(`/projects/${project.id}`, { name }).then(() => {});
-
-  return (
-    <div>
-      <div className="group flex h-7 items-center gap-0.5 pl-1.5 pr-1.5 text-[13px] text-primary hover:bg-hover"
-        onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
-        {editing ? (
-          <div className="flex min-w-0 flex-1 items-center gap-1">
-            <ChevronDown size={12} className="shrink-0 text-faint" />
-            <RenameInput initial={project.name} onSave={rename} onDone={() => setEditing(false)} />
-          </div>
-        ) : (
-          <button data-nav data-level={2} data-label={project.name} aria-expanded={open}
-            className="flex min-w-0 flex-1 items-center gap-1 rounded-sm outline-none focus-visible:bg-hover cursor-pointer"
-            onClick={() => setOpen(!open)} onDoubleClick={() => setEditing(true)}
-            onKeyDown={(e) => { if (e.key === 'F2') { e.preventDefault(); setEditing(true); } }}
-            title={`${project.path} · double-click to rename`}>
-            {open ? <ChevronDown size={12} className="shrink-0 text-faint" /> : <ChevronRight size={12} className="shrink-0 text-faint" />}
-            <span className="truncate">{project.name}</span>
-          </button>
-        )}
-        <IconButton title="Project map and decisions" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setUi({ context: { nodeKey: node.key, projectId: project.id } })}>
-          <BookOpen size={12} />
-        </IconButton>
-        <IconButton title="New team" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={newTeam}>
-          <UsersRound size={12} />
-        </IconButton>
-        <IconButton title="New agent" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={newAgent}>
-          <Plus size={13} />
-        </IconButton>
-      </div>
-      {menu && (
-        <ContextMenu menu={menu} onClose={() => setMenu(null)} items={[
-          { icon: Plus, label: 'New agent', run: newAgent },
-          { icon: UsersRound, label: 'New team', run: newTeam },
-          { icon: Pencil, label: 'Rename project', hint: 'F2', run: () => setEditing(true) },
-          { icon: BookOpen, label: 'Map & decisions', run: () => setUi({ context: { nodeKey: node.key, projectId: project.id } }) },
-          { icon: Trash2, label: 'Remove project', danger: true, run: () => void remove() },
-        ]} />
-      )}
-      {open && groups.map((g) => (g.team
-        ? <TeamSection key={g.team.id} node={node} project={project} team={g.team} agents={g.agents} />
-        : g.agents.map((a) => <AgentRow key={a.id} nodeKey={node.key} agent={a} level={3} />)))}
-      {open && groups.length === 0 && (
-        <button
-          data-nav data-level={3} data-label="New agent"
-          className="flex h-7 w-full items-center gap-2 pl-[26px] text-xs text-faint outline-none hover:bg-hover hover:text-secondary focus-visible:bg-hover cursor-pointer"
-          onClick={newAgent}
-        >
-          <Plus size={12} /> New agent
-        </button>
-      )}
-    </div>
-  );
-}
-
-function TeamSection({ node, project, team, agents }: { node: NodeView; project: Project; team: Team; agents: Agent[] }) {
+function TeamSection({ node, project, team, agents, showProject }: { node: NodeView; project: Project; team: Team; agents: Agent[]; showProject: boolean }) {
   const [open, setOpen] = useState(true);
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -185,44 +128,54 @@ function TeamSection({ node, project, team, agents }: { node: NodeView; project:
 
   return (
     <div>
-      <div className="group flex h-7 items-center gap-0.5 pl-[18px] pr-1.5 text-xs text-secondary hover:bg-hover"
+      <div className="group flex h-7 items-center gap-0.5 pl-1.5 pr-1.5 text-[13px] text-primary hover:bg-hover"
         onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
         {editing ? (
           <div className="flex min-w-0 flex-1 items-center gap-1">
-            <ChevronDown size={11} className="shrink-0 text-faint" />
+            <ChevronDown size={12} className="shrink-0 text-faint" />
             <RenameInput initial={team.name} onSave={rename} onDone={() => setEditing(false)} />
           </div>
         ) : (
-          <button data-nav data-level={3} data-label={team.name} aria-expanded={open}
+          <button data-nav data-level={2} data-label={team.name} aria-expanded={open}
             className="flex min-w-0 flex-1 items-center gap-1 rounded-sm outline-none focus-visible:bg-hover cursor-pointer"
             onClick={() => setOpen(!open)} onDoubleClick={() => setEditing(true)}
             onKeyDown={(e) => { if (e.key === 'F2') { e.preventDefault(); setEditing(true); } }}
-            title={`Team ${team.name}${team.branch ? ` · ${team.branch}` : ''} · double-click to rename`}>
-            {open ? <ChevronDown size={11} className="shrink-0 text-faint" /> : <ChevronRight size={11} className="shrink-0 text-faint" />}
-            <Users size={11} className="shrink-0 text-faint" />
+            title={`${team.name} · ${project.name}${team.branch ? ` · ${team.branch}` : ''} · double-click to rename`}>
+            {open ? <ChevronDown size={12} className="shrink-0 text-faint" /> : <ChevronRight size={12} className="shrink-0 text-faint" />}
             <span className="truncate">{team.name}</span>
+            {showProject && <span className="shrink-0 truncate text-xs text-faint">· {project.name}</span>}
           </button>
         )}
         {!editing && (
-          <span className="pr-1 font-mono text-2xs text-faint" title={`${agents.length} agents${working ? `, ${working} working` : ''}`}>
+          <span className="pr-1 font-mono text-2xs text-faint group-hover:hidden group-focus-within:hidden" title={`${agents.length} agents${working ? `, ${working} working` : ''}`}>
             {agents.length || ''}
           </span>
         )}
-        <IconButton title="Rename team (F2)" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setEditing(true)}>
-          <Pencil size={11} />
-        </IconButton>
-        <IconButton title="New agent in this team" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={newAgent}>
-          <Plus size={12} />
-        </IconButton>
+        {!editing && (
+          <span className="hidden group-hover:flex group-focus-within:flex">
+            <IconButton title="Rename team (F2)" onClick={() => setEditing(true)}><Pencil size={11} /></IconButton>
+            <IconButton title="New agent in this team" onClick={newAgent}><Plus size={13} /></IconButton>
+          </span>
+        )}
       </div>
       {menu && (
         <ContextMenu menu={menu} onClose={() => setMenu(null)} items={[
-          { icon: Plus, label: 'New agent in team', run: newAgent },
+          { icon: Plus, label: 'New agent', run: newAgent },
           { icon: Pencil, label: 'Rename team', hint: 'F2', run: () => setEditing(true) },
           { icon: UsersRound, label: 'New team', run: () => setUi({ newTeam: { nodeKey: node.key, projectId: project.id } }) },
+          { icon: BookOpen, label: 'Map & decisions', run: () => setUi({ context: { nodeKey: node.key, projectId: project.id } }) },
         ]} />
       )}
-      {open && agents.map((a) => <AgentRow key={a.id} nodeKey={node.key} agent={a} level={4} />)}
+      {open && agents.map((a) => <AgentRow key={a.id} nodeKey={node.key} agent={a} />)}
+      {open && agents.length === 0 && (
+        <button
+          data-nav data-level={3} data-label="New agent"
+          className="flex h-7 w-full items-center gap-2 pl-[28px] text-xs text-faint outline-none hover:bg-hover hover:text-secondary focus-visible:bg-hover cursor-pointer"
+          onClick={newAgent}
+        >
+          <Plus size={12} /> New agent
+        </button>
+      )}
     </div>
   );
 }
@@ -268,7 +221,7 @@ function friendlyNameError(msg = ''): string {
   return msg || 'Rename failed.';
 }
 
-function AgentRow({ nodeKey, agent, level }: { nodeKey: string; agent: Agent; level: 3 | 4 }) {
+function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
   const sel = { nodeKey, agentId: agent.id };
   const focused = useAxo((s) => sameSel(focusedSel(s), sel));
   // Shown in some other pane (not the focused one).
@@ -280,7 +233,7 @@ function AgentRow({ nodeKey, agent, level }: { nodeKey: string; agent: Agent; le
   const refreshing = useRefreshing(sel);
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const indent = level === 4 ? 'pl-[40px]' : 'pl-[28px]';
+  const indent = 'pl-[28px]';
   const running = agent.status === 'working' || agent.status === 'starting' || agent.status === 'idle' || agent.status === 'rotating';
 
   const rename = (name: string) => client(nodeKey).patch(`/agents/${agent.id}`, { name }).then(() => {});
@@ -312,7 +265,7 @@ function AgentRow({ nodeKey, agent, level }: { nodeKey: string; agent: Agent; le
           if (e.key === 'F2') { e.preventDefault(); setEditing(true); }
           if ((e.key === 'Delete' || (e.key === 'Backspace' && e.metaKey))) { e.preventDefault(); void remove(); }
         }}
-        data-nav data-level={level} data-label={agent.name} data-agent={`${nodeKey}:${agent.id}`}
+        data-nav data-level={3} data-label={agent.name} data-agent={`${nodeKey}:${agent.id}`}
         title="Click to open · ⌘-click for a split · double-click or F2 to rename · right-click for more"
         aria-current={focused ? 'true' : undefined}
         className={cn(
