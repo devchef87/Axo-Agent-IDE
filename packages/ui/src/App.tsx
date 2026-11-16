@@ -100,7 +100,7 @@ function TitleBar() {
   return (
     <header className={cn('relative flex h-[44px] shrink-0 select-none items-center gap-4 border-b border-border bg-panel pr-3', mac ? 'drag pl-[88px]' : 'pl-4')}>
       <span className="text-[13px] font-semibold tracking-[-0.01em] text-primary">Axo</span>
-      <nav role="tablist" aria-label="View" className="no-drag flex items-center gap-0.5">
+      <nav role="tablist" aria-label="View" className="no-drag flex items-center gap-1.5">
         {VIEWS.map(({ id, label }) => (
           <button
             key={id}
@@ -108,8 +108,8 @@ function TitleBar() {
             aria-selected={view === id}
             title={id === 'fleet' || id === 'editor' ? `${label} · ⌘E switches Fleet/Editor` : label}
             onClick={() => setView(id)}
-            className={cn('flex h-[26px] items-center gap-1.5 rounded-[5px] px-2.5 text-[12.5px] cursor-pointer transition-colors',
-              view === id ? 'bg-control text-primary' : 'text-muted hover:bg-hover hover:text-primary')}
+            className={cn('flex h-[26px] items-center gap-1.5 rounded-[5px] px-2.5 text-xs cursor-pointer transition-colors',
+              view === id ? 'bg-control-hover text-primary' : 'text-muted hover:bg-hover hover:text-primary')}
           >
             {label}
             {id === 'watches' && activeWatches > 0 && <span className="font-mono text-2xs text-secondary">{activeWatches}</span>}

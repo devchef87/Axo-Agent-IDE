@@ -19,6 +19,7 @@
   --panel: #24353D;         /* sidebar, title bar, status bar, composer */
   --elevated: #2a3a45;      /* modals, menus */
   --inset: #24353D;         /* inputs, code blocks, tool output */
+  --terminal: #1c2a31;      /* terminal panel: a shade under the sidebar */
   --hover: #3a4b58;
   --control: #38505B;       /* buttons, badges, tracks */
   --control-hover: #405965;
@@ -61,6 +62,7 @@
   --panel: #f7f7f7;
   --elevated: #ffffff;
   --inset: #f5f5f5;
+  --terminal: #f0f0f0;
   --hover: #f0f0f0;
   --control: #ebebeb;
   --control-hover: #e2e2e2;
@@ -130,6 +132,7 @@
   --color-hover: var(--hover);
   --color-control: var(--control);
   --color-control-hover: var(--control-hover);
+  --color-terminal: var(--terminal);
   --color-border: var(--border);
   --color-border-subtle: var(--border-subtle);
   --color-border-strong: var(--border-strong);
