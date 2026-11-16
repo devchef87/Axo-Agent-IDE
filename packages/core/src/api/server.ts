@@ -21,7 +21,7 @@ export class TextResponse {
 }
 
 /** Routes an agent token may call. Everything else needs the node token. */
-const AGENT_ROUTES = /^\/(version|me|knock|innerchat\/.+|watches(\/.*)?|agents\/([a-z0-9]+)\/rotate)$/;
+const AGENT_ROUTES = /^\/(version|me|knock|innerchat\/.+|watches(\/.*)?|agents\/([a-z0-9]+)\/refresh)$/;
 
 interface Route { method: string; re: RegExp; keys: string[]; handler: Handler }
 

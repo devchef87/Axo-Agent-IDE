@@ -5,7 +5,7 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "build": "npm run build -w @axo/ui && npm run build -w @axo/cli && npm run build -w @axo/core && npm run build -w @axo/app",
-    "test": "npm test -w @axo/core",
+    "test": "npm test -w @axo/core && npm test -w @axo/ui",
     "typecheck": "tsc -p packages/core && tsc -p packages/cli && tsc -p packages/ui && tsc -p packages/app",
     "dev:ui": "npm run dev -w @axo/ui",
     "node": "node --disable-warning=ExperimentalWarning packages/core/src/main.ts",

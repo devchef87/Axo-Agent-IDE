@@ -214,9 +214,9 @@ async function rotate(a: Args): Promise<void> {
   const id = env('AXO_AGENT_ID');
   const note = typeof a.flags.note === 'string' ? a.flags.note : undefined;
   try {
-    await api('POST', `/agents/${encodeURIComponent(id)}/rotate`, { note });
+    await api('POST', `/agents/${encodeURIComponent(id)}/refresh`, { note, reason: 'requested' });
   } catch (e) {
-    if (e instanceof ApiError && e.status === 404) fail('rotation is not available on this node yet.');
+    if (e instanceof ApiError && e.status === 409) fail('a refresh is already in progress.');
     throw e;
   }
   console.log('Rotation requested. It happens at your next turn boundary; finish this turn normally.');

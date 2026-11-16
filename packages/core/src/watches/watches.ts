@@ -59,7 +59,7 @@ export class Watches {
     this.minPollMs = opts.minPollMs ?? 3000;
     this.commandPollMs = opts.commandPollMs ?? 500;
     mkdirSync(this.runsDir, { recursive: true });
-    runtime.hooks.on('gone', (e: { agentId: string; reason: string }) => {
+    runtime.on('gone', (e: { agentId: string; reason: string }) => {
       if (e.reason === 'delete') this.cancelForAgent(e.agentId);
     });
   }

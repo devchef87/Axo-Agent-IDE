@@ -126,7 +126,7 @@ describe('knock hook', () => {
     assert.equal((await call(t, '/state', {}, tok)).status, 401);
     assert.equal((await call(t, `/agents/${a.id}/message`, { method: 'POST', body: '{"text":"x"}' }, tok)).status, 401);
     assert.equal((await call(t, '/innerchat/who', {}, tok)).status, 200);
-    assert.equal((await call(t, `/agents/${b.id}/rotate`, { method: 'POST', body: '{}' }, tok)).status, 401, 'cannot rotate others');
+    assert.equal((await call(t, `/agents/${b.id}/refresh`, { method: 'POST', body: '{}' }, tok)).status, 401, 'cannot rotate others');
     const me = await call(t, '/me', {}, tok);
     assert.equal(me.body.agent.id, a.id);
   });

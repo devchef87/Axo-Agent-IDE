@@ -1,11 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import type { ArchiveTeamReq, CreateTeamReq, Project, Team, TeamMode, UpdateProjectReq } from '@axo/protocol';
 import type { Store } from '../store/db.ts';
 import type { EventBus } from '../events.ts';
 import type { AgentRuntime } from '../runtime/agent-runtime.ts';
 import { ulid } from '../util/ulid.ts';
+import { excludeFromGit } from '../journalist/files.ts';
 import { HttpError } from '../util/http-error.ts';
 
 const NAME_RE = /^[\w][\w .-]{0,39}$/;
@@ -25,20 +26,6 @@ function gitOk(cwd: string, args: string[]): boolean {
 
 export function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'team';
-}
-
-/**
- * Add `.axo/` to the repo's `.git/info/exclude` (shared by all worktrees). Axo never edits
- * `.gitignore`.
- */
-export function excludeAxoDir(projectPath: string): void {
-  let common = git(projectPath, ['rev-parse', '--git-common-dir'], 10_000);
-  if (!isAbsolute(common)) common = resolve(projectPath, common);
-  const file = join(common, 'info', 'exclude');
-  const current = existsSync(file) ? readFileSync(file, 'utf8') : '';
-  if (current.split('\n').some((l) => l.trim() === '.axo/' || l.trim() === '/.axo/')) return;
-  mkdirSync(join(common, 'info'), { recursive: true });
-  appendFileSync(file, `${current && !current.endsWith('\n') ? '\n' : ''}# Axo (agent worktrees and context)\n.axo/\n`);
 }
 
 export interface TeamsDeps {
@@ -160,7 +147,7 @@ export class Teams {
     for (let n = 2; existsSync(join(root, s)) || gitOk(project.path, ['rev-parse', '--verify', '--quiet', `refs/heads/axo/${s}`]); n++) {
       s = `${slug}-${n}`;
     }
-    excludeAxoDir(project.path);
+    excludeFromGit(project.path); // .axo/ (worktrees live there) stays out of git; .gitignore is never touched
     mkdirSync(root, { recursive: true });
     const path = join(root, s);
     const branch = `axo/${s}`;

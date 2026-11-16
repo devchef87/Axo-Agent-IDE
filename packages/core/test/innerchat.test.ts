@@ -5,6 +5,9 @@ import type { FeedItem } from '@axo/protocol';
 import { makeNode, call, type TestNode } from './helpers.ts';
 import { agentToken } from '../src/util/agent-token.ts';
 import { MAX_EXCHANGES } from '../src/innerchat/innerchat.ts';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { verifyAgentToken } from '../src/util/agent-token.ts';
 
 let t: TestNode;
 afterEach(async () => { await t?.stop(); });
@@ -172,5 +175,29 @@ describe('innerchat', () => {
     const bad = await axo(t, a.id, 'ask', 'nobody', 'hi');
     assert.equal(bad.code, 1);
     assert.match(bad.stderr, /no agent named "nobody".*bob/);
+  });
+
+  it('a pending ask survives a rotation of the target: same agent id, reply still arrives', async () => {
+    t = await makeNode({}, {}, { journalist: { debounceMs: 30 } });
+    writeFileSync(join(t.fakeDir, 'headless.json'), JSON.stringify([
+      { match: 'working-state document for an AI coding agent', reply: '## Mission\nx\n## Plan\n1. [ ] y\n## Now\nz' },
+      { match: 'You write handoff briefs', reply: '## Where things stand\nok\n## Exactly what to do next\ncontinue' },
+      { match: 'Your context is about to be refreshed', reply: '## Where things stand\nok\n## Exactly what to do next\ncontinue\n' + 'detail '.repeat(40) },
+      { match: 'understood its handoff', reply: 'PASS' },
+    ]));
+    const { a, b } = await pair(t);
+    t.node.runtime.deliver(b.id, 'SLOW warmup work');
+    await t.waitFor(() => t.node.runtime.get(b.id).status === 'working');
+    const asked = t.node.innerchat.ask(a.id, 'bob', 'still there after your refresh?', 20_000);
+    await t.node.rotator.rotate(b.id, { reason: 'manual' });
+    assert.equal(t.node.runtime.get(b.id).generation, 1);
+    const res = await asked;
+    assert.equal(res.timedOut, false, res.note);
+    assert.match(res.reply!, /still there after your refresh\?/);
+
+    // The rotator's warm-up process got the knock hook and bob's own token too.
+    const warm = t.spawns().filter((s) => s.args.includes('--input-format')).at(-1)!;
+    assert.ok(warm.args.includes('--settings'));
+    assert.equal(verifyAgentToken(t.node.cfg.token, warm.env.AXO_TOKEN), b.id);
   });
 });

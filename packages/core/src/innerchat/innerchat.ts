@@ -1,7 +1,7 @@
 import type { Agent, AskRes, ChatThread, ChatTurn, ChatTurnKind, TellRes, WhoEntry, WhoRes } from '@axo/protocol';
 import type { Store } from '../store/db.ts';
 import type { EventBus } from '../events.ts';
-import type { AgentRuntime, DeliverHook, GoneHook, TurnEndHook } from '../runtime/agent-runtime.ts';
+import type { AgentRuntime, DeliverEvent, GoneEvent, TurnEndEvent } from '../runtime/agent-runtime.ts';
 import { ulid } from '../util/ulid.ts';
 import { HttpError } from '../util/http-error.ts';
 
@@ -47,9 +47,9 @@ export class InnerChat {
     this.store = store;
     this.bus = bus;
     this.runtime = runtime;
-    runtime.hooks.on('turn-end', (e: TurnEndHook) => this.onTurnEnd(e));
-    runtime.hooks.on('gone', (e: GoneHook) => this.onGone(e));
-    runtime.hooks.on('deliver', (e: DeliverHook) => { if (e.author === 'user') this.closeThreadsOf(e.agentId); });
+    runtime.on('turn-end', (e: TurnEndEvent) => this.onTurnEnd(e));
+    runtime.on('gone', (e: GoneEvent) => this.onGone(e));
+    runtime.on('deliver', (e: DeliverEvent) => { if (e.author === 'user') this.closeThreadsOf(e.agentId); });
     this.pruneThreads();
   }
 
@@ -234,18 +234,19 @@ export class InnerChat {
     thread.exchanges++;
     this.store.db.prepare(`UPDATE ic_threads SET exchanges = ?, status = 'awaiting', updated_at = ? WHERE id = ?`)
       .run(thread.exchanges, Date.now(), thread.id);
-    this.runtime.appendFeed(from.id, { kind: 'user', id: `ic-${ulid()}`, ts: Date.now(), author: from.name,
+    this.runtime.postFeed(from.id, { kind: 'user', id: `ic-${ulid()}`, ts: Date.now(), author: from.name,
       text: `[${kind} → ${to.name}] ${text}` });
     this.record(thread.id, from, to, kind, text);
     return msgId;
   }
 
-  private onTurnEnd(e: TurnEndHook): void {
+  private onTurnEnd(e: TurnEndEvent): void {
     if (this.stopped) return;
     const list = this.pending.get(e.agentId);
-    if (!list?.length || !e.messageIds.length) return;
-    for (const p of list.filter((x) => e.messageIds.includes(x.msgId))) {
-      const text = e.text.trim();
+    const ids = e.messageIds ?? [];
+    if (!list?.length || !ids.length) return;
+    for (const p of list.filter((x) => ids.includes(x.msgId))) {
+      const text = e.lastText.trim();
       if (text) { this.answer(p, text); continue; }
       const responder = this.store.getAgent(e.agentId)?.name ?? 'the agent';
       if (p.settle) p.settle({ error: `${responder} ${e.interrupted ? 'was interrupted' : 'ended its turn'} without answering.` });
@@ -261,7 +262,7 @@ export class InnerChat {
       .run(Date.now(), p.threadId);
     this.record(p.threadId, responder, sender, 'answer', text);
     if (p.settle) {
-      this.runtime.appendFeed(sender.id, { kind: 'user', id: `ic-${ulid()}`, ts: Date.now(), author: responder.name, text });
+      this.runtime.postFeed(sender.id, { kind: 'user', id: `ic-${ulid()}`, ts: Date.now(), author: responder.name, text });
       p.settle({ text });
       return;
     }
@@ -274,7 +275,7 @@ export class InnerChat {
     } catch { /* sender deleted meanwhile */ }
   }
 
-  private onGone(e: GoneHook): void {
+  private onGone(e: GoneEvent): void {
     const name = this.store.getAgent(e.agentId)?.name ?? 'the agent';
     const why = e.reason === 'stop' ? 'was stopped' : e.reason === 'delete' ? 'was deleted' : 'hit an error';
     for (const p of [...(this.pending.get(e.agentId) ?? [])]) {

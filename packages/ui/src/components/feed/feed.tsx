@@ -5,7 +5,7 @@ import { AlertTriangle, Info, OctagonAlert } from 'lucide-react';
 import type { Agent, FeedItem } from '@axo/protocol';
 import type { FeedState } from '../../stores/store.ts';
 import { ToolGroup, useTick } from './tool-group.tsx';
-import { cn, formatDuration } from '../ui.tsx';
+import { cn, formatDuration, REFRESH_REASON } from '../ui.tsx';
 
 type ToolItem = Extract<FeedItem, { kind: 'tool' }>;
 type Block =
@@ -49,11 +49,11 @@ export function Feed({ feed, agent, onLoadOlder }: { feed: FeedState; agent: Age
   return (
     <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl px-6 py-5">
-        {feed.hasMore && <div className="mb-3 text-center text-2xs text-text-4">Scroll up for earlier messages</div>}
-        {!feed.loaded && <div className="py-10 text-center text-xs text-text-3">Loading…</div>}
+        {feed.hasMore && <div className="mb-3 text-center text-2xs text-faint">Scroll up for earlier messages</div>}
+        {!feed.loaded && <div className="py-10 text-center text-xs text-faint">Loading…</div>}
         {feed.loaded && blocks.length === 0 && (
-          <div className="py-16 text-center text-[13px] text-text-3">
-            <div className="mb-1 text-text-1">{agent.name} is ready.</div>
+          <div className="py-16 text-center text-[13px] text-faint">
+            <div className="mb-1 text-secondary">{agent.name} is ready.</div>
             Send the first instruction below.
           </div>
         )}
@@ -73,6 +73,7 @@ const BlockView = memo(function BlockView({ block, live }: { block: Block; live:
     case 'text': return <Prose text={item.text} />;
     case 'system': return <SystemLine item={item} />;
     case 'turn': return <TurnFooter item={item} />;
+    case 'rotation': return <RotationDivider item={item} />;
     default: return null;
   }
 });
@@ -84,23 +85,36 @@ function UserMessage({ item }: { item: Extract<FeedItem, { kind: 'user' }> }) {
       <div
         className={cn(
           'max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-3.5 py-2 text-[13px] leading-relaxed',
-          fromUser ? 'bg-surface-5 text-text-0' : 'border border-indigo/40 bg-indigo/8 text-text-1',
+          fromUser ? 'bg-control text-primary' : 'border border-innerchat/40 bg-innerchat/8 text-secondary',
         )}
       >
-        {!fromUser && <div className="mb-0.5 text-2xs font-medium text-indigo">{item.author}</div>}
+        {!fromUser && <div className="mb-0.5 text-2xs font-medium text-innerchat">{item.author}</div>}
         {item.text}
       </div>
     </div>
   );
 }
 
-const Prose = memo(function Prose({ text }: { text: string }) {
+export const Prose = memo(function Prose({ text }: { text: string }) {
   return (
     <div className="md my-2 text-[13.5px]">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
     </div>
   );
 });
+
+/** Context refresh. Deliberately quiet: rotations should feel invisible. */
+function RotationDivider({ item }: { item: Extract<FeedItem, { kind: 'rotation' }> }) {
+  const why = REFRESH_REASON[item.reason] ?? item.reason;
+  const title = [`Context refreshed (${why})`, item.note].filter(Boolean).join('\n\n');
+  return (
+    <div className="my-5 flex items-center gap-3 text-2xs text-faint" title={title}>
+      <span className="h-px flex-1 bg-border-subtle" />
+      <span className="cursor-default select-none">context refreshed · gen {item.generation}</span>
+      <span className="h-px flex-1 bg-border-subtle" />
+    </div>
+  );
+}
 
 function SystemLine({ item }: { item: Extract<FeedItem, { kind: 'system' }> }) {
   const Icon = item.level === 'error' ? OctagonAlert : item.level === 'warn' ? AlertTriangle : Info;
@@ -110,7 +124,7 @@ function SystemLine({ item }: { item: Extract<FeedItem, { kind: 'system' }> }) {
         'my-2 flex gap-2 rounded-md px-3 py-1.5 text-xs',
         item.level === 'error' && 'bg-danger/10 text-danger',
         item.level === 'warn' && 'bg-warning/10 text-warning',
-        item.level === 'info' && 'text-text-3',
+        item.level === 'info' && 'text-faint',
       )}
     >
       <Icon size={13} className="mt-0.5 shrink-0" />
@@ -121,7 +135,7 @@ function SystemLine({ item }: { item: Extract<FeedItem, { kind: 'system' }> }) {
 
 function TurnFooter({ item }: { item: Extract<FeedItem, { kind: 'turn' }> }) {
   return (
-    <div className="mb-4 mt-1 flex items-center gap-2 text-2xs text-text-4">
+    <div className="mb-4 mt-1 flex items-center gap-2 text-2xs text-faint">
       <span>{formatDuration(item.durationMs)}</span>
       {item.costUsd > 0 && <span>· ${item.costUsd.toFixed(2)}</span>}
       {item.interrupted && <span className="text-warning">· interrupted</span>}
@@ -137,14 +151,14 @@ function Working({ agent, lastBlock }: { agent: Agent; lastBlock: Block | undefi
   const toolsRunning = lastBlock?.type === 'tools' && lastBlock.items.some((t) => t.status === 'running');
   if (toolsRunning) return null;
   return (
-    <div className="my-2 flex items-center gap-2 text-xs text-text-3">
+    <div className="my-2 flex items-center gap-2 text-xs text-faint">
       <span className="flex gap-1">
         {[0, 1, 2].map((i) => (
-          <span key={i} className="h-1 w-1 rounded-full bg-accent animate-pulse-dot" style={{ animationDelay: `${i * 0.2}s` }} />
+          <span key={i} className="h-1 w-1 rounded-full bg-working animate-pulse-dot" style={{ animationDelay: `${i * 0.2}s` }} />
         ))}
       </span>
       {agent.status === 'starting' ? 'Starting…' : 'Thinking…'}
-      {elapsed > 3000 && <span className="text-text-4">{formatDuration(Math.round(elapsed / 1000) * 1000)}</span>}
+      {elapsed > 3000 && <span className="text-faint">{formatDuration(Math.round(elapsed / 1000) * 1000)}</span>}
     </div>
   );
 }
