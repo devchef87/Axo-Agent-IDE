@@ -25,6 +25,17 @@ contextBridge.exposeInMainWorld('axo', {
       return () => ipcRenderer.removeListener('axo:servers-changed', h);
     },
   },
+  notify: (n: unknown) => ipcRenderer.send('axo:notify', n),
+  onServerLost: (cb: (n: unknown) => void) => {
+    const h = (_: unknown, n: unknown) => cb(n);
+    ipcRenderer.on('axo:server-lost', h);
+    return () => ipcRenderer.removeListener('axo:server-lost', h);
+  },
+  onNotificationClick: (cb: (target: unknown) => void) => {
+    const h = (_: unknown, target: unknown) => cb(target);
+    ipcRenderer.on('axo:notification-click', h);
+    return () => ipcRenderer.removeListener('axo:notification-click', h);
+  },
   onNodesChanged: (cb: (nodes: unknown) => void) => {
     const h = (_: unknown, nodes: unknown) => cb(nodes);
     ipcRenderer.on('axo:nodes-changed', h);

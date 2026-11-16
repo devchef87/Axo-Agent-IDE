@@ -4,6 +4,8 @@
 
 import type { PreflightResult, ServerConfig, ServerInput, ServersSnapshot, SshHostEntry } from '@axo/protocol';
 
+export type NotifyTarget = { kind: 'agent'; nodeKey: string; agentId: string } | { kind: 'servers' };
+
 export interface NodeConn {
   key: string;      // stable client-side key ('local', 'prod-1', …)
   name: string;     // display name
@@ -37,6 +39,10 @@ interface AxoBridge {
   /** Sync native window chrome with the UI theme. Optional: older preloads lack it. */
   setTheme?(pref: 'system' | 'light' | 'dark', background: string): void;
   servers?: ServersBridge;
+  /** Native notification; clicking it focuses the window and calls onNotificationClick with `target`. */
+  notify?(n: { title: string; body: string; target: NotifyTarget }): void;
+  onNotificationClick?(cb: (target: NotifyTarget) => void): () => void;
+  onServerLost?(cb: (n: { title: string; body: string }) => void): () => void;
   platform: string;
 }
 

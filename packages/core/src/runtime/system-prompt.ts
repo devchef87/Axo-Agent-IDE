@@ -34,7 +34,7 @@ const TEAM_TOOLS = [
   '- `axo who`: agents you can reach, their teams, status and file scopes.',
   '- `axo ask <agent> "<question>"`: asks and WAITS for the answer (printed to stdout; default limit 110s). Use it when you need the answer before you can continue, e.g. agreeing an interface.',
   '- `axo tell <agent> "<message>"`: sends and returns at once; any reply arrives later as a message. Use it for handoffs and FYIs, or when the other agent is busy.',
-  '- Address agents as `name` or `name@team`. Do not use your built-in Task/SendMessage tools to reach Axo agents: they cannot see them.',
+  '- Address agents as `name`, `name@team`, or `name@server` for an agent on another of the user\'s servers (relayed by the Axo app; slower, and queued while the app is closed). Do not use your built-in Task/SendMessage tools to reach Axo agents: they cannot see them.',
   '- When a teammate asks you something, answer directly in your reply; it is relayed back to them.',
   '- Writing a file inside a teammate\'s scope is blocked by a hook that tells you who owns it. Ask the owner (`axo ask`/`axo tell`) instead of working around it.',
   '- **Long jobs (builds, test suites, training, deploys, anything over ~2 minutes): use `axo watch "<command>" [--label L] [--timeout 2h]`.** It runs detached, survives your turn ending and node restarts, and wakes you with the exit code and the last 4KB of output. Then END YOUR TURN; do not sleep or poll. A job you start yourself with `&` or `nohup` dies with your turn.',

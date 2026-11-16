@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Placeholder app icon: macOS squircle, graphite ground, coral node mark. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a2e36"/><stop offset="1" stop-color="#16181d"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#g)"/>
+  <g stroke="#ff7f9f" stroke-width="34" stroke-linecap="round" opacity="0.55">
+    <line x1="512" y1="512" x2="330" y2="360"/><line x1="512" y1="512" x2="694" y2="360"/><line x1="512" y1="512" x2="512" y2="720"/>
+  </g>
+  <circle cx="512" cy="512" r="96" fill="#ff7f9f"/>
+  <circle cx="330" cy="360" r="54" fill="#ff7f9f"/>
+  <circle cx="694" cy="360" r="54" fill="#ff7f9f"/>
+  <circle cx="512" cy="720" r="54" fill="#ff7f9f"/>
+</svg>

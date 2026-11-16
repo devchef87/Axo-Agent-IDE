@@ -245,6 +245,25 @@ export interface CreateWatchRes { watch: Watch; reattached: boolean }
 /** `GET /api/me` (agent token): what `axo status` prints. */
 export interface MeRes { agent: Agent; team: Team; project: Project; watches: Watch[]; teammates: WhoEntry[] }
 
+// Cross-server InnerChat (name@server), relayed by the app. Nodes never talk to each other: the
+// app reads each node's outbox (node token), posts envelopes to the target node's relay-in and
+// acks them on the origin node. Answers travel the same way in the other direction.
+export interface RelayEnvelope {
+  id: string;
+  kind: 'ask' | 'tell' | 'answer';
+  from: { agentId: string; name: string; role: string };
+  toServer: string;         // server alias as typed by the agent (the app resolves it)
+  toAgent: string | null;   // target agent name; null for answers
+  replyTo: string | null;   // answers: id of the ask/tell envelope on the origin node
+  text: string;
+  error: string | null;     // answers: set when the target could not answer (stopped, silent, …)
+  createdAt: number;
+}
+/** POST /api/innerchat/relay-in (node token). fromServer = the app's alias for the origin node. */
+export interface RelayInReq { envelope: RelayEnvelope; fromServer: string }
+/** POST /api/innerchat/outbox/:id/ack (node token), after the app tried to deliver it. */
+export interface RelayAckReq { ok: boolean; error?: string }
+
 // Merge view: a branch compared with the branch it merges into.
 export interface DiffFile { path: string; additions: number; deletions: number; binary: boolean }
 export interface BranchDiff {
@@ -266,6 +285,7 @@ export type CoordinationEvent =
   | { type: 'innerchat:turn'; thread: ChatThread; turn: ChatTurn }
   | { type: 'watch:upsert'; watch: Watch }
   | { type: 'watch:removed'; watchId: string }
+  | { type: 'innerchat:outbox'; envelope: RelayEnvelope }
   | { type: 'team:merged'; teamId: string; agentId: string | null; base: string; branch: string; commit: string; strategy: 'merge' | 'squash' };
 
 // ── Remote nodes / servers (Axo-Remote) ─────────────────────

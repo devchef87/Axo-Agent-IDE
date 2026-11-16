@@ -35,7 +35,7 @@ export function knockSettings(knockPath: string): string {
     hooks: {
       PreToolUse: [{
         matcher: 'Write|Edit|MultiEdit|NotebookEdit',
-        hooks: [{ type: 'command', command: `sh ${shq(knockPath)}`, timeout: 10 }],
+        hooks: [{ type: 'command', command: shq(knockPath), timeout: 10 }], // executable (0755); bare path keeps Claude's 'hook error: [cmd]' prefix short
       }],
     },
   });
@@ -60,7 +60,7 @@ export function installBin(home: string): BinPaths {
     cli = fileURLToPath(new URL('../../../cli/src/axo.ts', import.meta.url));
   }
   const axo = join(dir, 'axo');
-  writeIfChanged(axo, `#!/bin/sh\nexec ${shq(process.execPath)} --disable-warning=ExperimentalWarning ${shq(cli)} "$@"\n`, 0o755);
+  writeIfChanged(axo, `#!/bin/sh\nELECTRON_RUN_AS_NODE=1 exec ${shq(process.execPath)} --disable-warning=ExperimentalWarning ${shq(cli)} "$@"\n`, 0o755);
   return { dir, axo, knock, cli };
 }
 

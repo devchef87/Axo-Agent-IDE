@@ -16,12 +16,14 @@ import { ServersPanel } from './components/servers/servers-panel.tsx';
 import { TeamsView } from './components/teams/teams-view.tsx';
 import { WatchesView } from './components/watches/watches-view.tsx';
 import { useActiveWatchCount, useWatchSync } from './stores/watches.ts';
+import { startNotifications } from './lib/notifications.ts';
 
 export function App() {
   const init = useAxo((s) => s.init);
   const drawer = useAxo((s) => s.ui.drawer);
   const view = useAxo((s) => s.view);
   useEffect(() => { void init(); }, [init]);
+  useEffect(() => { startNotifications(); }, []);
   useGlobalShortcuts();
   useWatchSync();
 

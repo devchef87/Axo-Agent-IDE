@@ -1,5 +1,5 @@
 import type {
-  ArchiveTeamReq, AskReq, MergeReq, CreateTeamReq, CreateWatchReq, KnockReq, KnockRes, MeRes, TellReq, UpdateProjectReq, UpdateTeamReq,
+  ArchiveTeamReq, AskReq, MergeReq, RelayAckReq, RelayInReq, CreateTeamReq, CreateWatchReq, KnockReq, KnockRes, MeRes, TellReq, UpdateProjectReq, UpdateTeamReq,
 } from '@axo/protocol';
 import { TextResponse, type Caller, type Router } from './server.ts';
 import type { Node } from '../node.ts';
@@ -71,6 +71,20 @@ export function addCoordinationRoutes(r: Router, node: Node): void {
       throw new HttpError(404, 'thread not found');
     }
     return turns;
+  });
+
+  // Cross-server relay: only the app (node token) may read the outbox or inject envelopes.
+  const appOnly = (caller: Caller) => { if (caller.agentId) throw new HttpError(403, 'relay routes need the node token'); };
+  r.get('/innerchat/outbox', ({ caller }) => { appOnly(caller); return innerchat.outbox(); });
+  r.post('/innerchat/outbox/:id/ack', ({ params, body, caller }) => {
+    appOnly(caller);
+    const b = (body ?? {}) as RelayAckReq;
+    innerchat.ack(params.id, !!b.ok, b.error);
+  });
+  r.post('/innerchat/relay-in', ({ body, caller }) => {
+    appOnly(caller);
+    const b = (body ?? {}) as RelayInReq;
+    return innerchat.relayIn(b.envelope, String(b.fromServer ?? ''));
   });
 
   // ── watches ──

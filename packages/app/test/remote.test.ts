@@ -121,7 +121,7 @@ describe('server lifecycle over (fake) ssh', () => {
     process.env.FAKE_REMOTE_HOME = remoteHome;
     process.env.FAKE_SSH_LOG = join(root, 'ssh.log');
     remotePort = await freePort();
-    mgr = new NodeManager({ dataDir: join(root, 'data'), sshEnv: sshEnv(), readBundle: () => readFileSync(BUNDLE), bundleInfo: bundleInfo(), idlePollMs: 50 });
+    mgr = new NodeManager({ dataDir: join(root, 'data'), sshEnv: sshEnv(), readBundle: () => readFileSync(BUNDLE), bundleInfo: bundleInfo(), idlePollMs: 50, lostAfterMs: 400 });
     mgr.on('nodes', (c: NodeConn[]) => { lastConns = c; });
     mgr.on('snapshot', (s: ServersSnapshot) => { lastSnap = s; });
   });
@@ -182,6 +182,10 @@ describe('server lifecycle over (fake) ssh', () => {
     const pid1 = JSON.parse(readFileSync(join(remoteHome, '.axo/node.pid'), 'utf8')).pid;
     execFileSync('sh', [join(remoteHome, '.axo/bin/start.sh')], { env: { ...process.env, HOME: remoteHome } });
     assert.equal(JSON.parse(readFileSync(join(remoteHome, '.axo/node.pid'), 'utf8')).pid, pid1);
+    // The node installs the axo CLI next to our files; agents get ~/.axo/bin first on PATH.
+    for (const f of ['axo', 'axo.mjs', 'knock.sh']) assert.ok(existsSync(join(remoteHome, '.axo/bin', f)), f);
+    const help = execFileSync(join(remoteHome, '.axo/bin/axo'), ['help'], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: remoteHome } });
+    assert.match(help, /axo/);
   });
 
   test('connect opens a tunnel and registers the node', async () => {
@@ -216,6 +220,24 @@ describe('server lifecycle over (fake) ssh', () => {
     await until(() => mgr.snapshot().servers[0].status.phase === 'connected', 30_000, 'connected after redeploy');
     const conn = lastConns.find((c) => c.key === 'prod-1')!;
     assert.ok((await fetch(`${conn.baseUrl}/api/health`)).ok);
+  });
+
+  test('an unexpected drop that does not heal raises server-lost; a wake-up reconnect does not', async () => {
+    const lost: string[] = [];
+    mgr.on('server-lost', (cfg: { name: string }) => lost.push(cfg.name));
+    mgr.kickAll(); // intentional reconnect: no notification
+    await until(() => mgr.snapshot().servers[0].status.phase === 'connected', 20_000, 'reconnected after kick');
+    await new Promise((r) => setTimeout(r, 600));
+    assert.deepEqual(lost, []);
+    // Server becomes unreachable: tunnel dies and new ssh connections are refused.
+    process.env.FAKE_SSH_FAIL = 'auth';
+    const port = new URL(lastConns.find((c) => c.key === 'prod-1')!.baseUrl).port;
+    execFileSync('pkill', ['-f', `127.0.0.1:${port}:127.0.0.1:${remotePort}`]);
+    await until(() => lost.length === 1, 10_000, 'server-lost');
+    assert.deepEqual(lost, ['Prod 1']);
+    delete process.env.FAKE_SSH_FAIL;
+    mgr.kickAll();
+    await until(() => mgr.snapshot().servers[0].status.phase === 'connected', 30_000, 'recovered');
   });
 
   test('disconnect removes the node from the renderer but leaves it running', async () => {
