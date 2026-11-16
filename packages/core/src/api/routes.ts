@@ -1,18 +1,18 @@
 import { readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { homedir } from 'node:os';
-import type { CreateAgentReq, CreateProjectReq, ForkReq, FsEntry, MessageReq, NodeState, ProjectContext, RefreshReq, StateDoc, UpdateAgentReq } from '@axo/protocol';
+import type { CreateAgentReq, CreateProjectReq, ForkReq, FsEntry, MessageReq, NodeState, ProjectContext, RefreshReq, StateDoc, UpdateAgentReq, VersionInfo } from '@axo/protocol';
 import { Router } from './server.ts';
 import type { Node } from '../node.ts';
 import { HttpError } from '../util/http-error.ts';
 import { expandHome } from '../projects.ts';
-import { VERSION } from '../config.ts';
+import { BUILD, VERSION } from '../config.ts';
 
 export function buildRouter(node: Node): Router {
   const { store, bus, runtime, projects, cfg, journalist, rotator } = node;
   const r = new Router();
 
-  r.get('/version', () => ({ version: VERSION, nodeId: cfg.nodeId, hostname: cfg.hostname }));
+  r.get('/version', (): VersionInfo => ({ version: VERSION, build: BUILD, nodeId: cfg.nodeId, hostname: cfg.hostname }));
 
   r.get('/state', (): NodeState => ({
     nodeId: cfg.nodeId, version: VERSION, hostname: cfg.hostname, seq: bus.currentSeq, epoch: bus.epoch,

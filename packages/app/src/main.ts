@@ -1,7 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, powerMonitor, shell } from 'electron';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { homedir } from 'node:os';
+import type { ServerInput } from '@axo/protocol';
 import { ensureLocalNode, stopLocalNode, type LocalNode } from './local-node.ts';
+import { NodeManager, isStale, type NodeConn } from './node-manager.ts';
 
 const DEV_UI = process.env.AXO_UI_URL;
 const resources = app.isPackaged ? process.resourcesPath : join(__dirname, '..', '..');
@@ -11,7 +14,24 @@ const UI_INDEX = app.isPackaged ? join(resources, 'ui', 'index.html') : join(res
 let win: BrowserWindow | null = null;
 let local: LocalNode | null = null;
 
-interface NodeConn { key: string; name: string; baseUrl: string; token: string }
+function bundleInfo(): { version: string; build: string } {
+  try { return JSON.parse(readFileSync(join(dirname(NODE_BUNDLE), 'axo-node.json'), 'utf8')); } catch { return { version: '?', build: 'dev' }; }
+}
+
+const manager = new NodeManager({
+  dataDir: app.getPath('userData'),
+  // ControlMaster sockets: short path, macOS caps unix socket paths at 104 bytes.
+  sshEnv: { sshBin: 'ssh', controlDir: join(process.env.AXO_HOME || join(homedir(), '.axo'), 'ssh') },
+  readBundle: () => readFileSync(NODE_BUNDLE),
+  bundleInfo: bundleInfo(),
+  restartLocal: async () => {
+    await stopLocalNode();
+    local = await ensureLocalNode(NODE_BUNDLE);
+    return local;
+  },
+});
+manager.on('nodes', (conns: NodeConn[]) => win?.webContents.send('axo:nodes-changed', conns));
+manager.on('snapshot', (snap) => win?.webContents.send('axo:servers-changed', snap));
 
 // Theme: the renderer owns the preference; we mirror it so the window opens in the
 // right colours next launch and native chrome (traffic lights, dialogs) matches.
@@ -36,7 +56,7 @@ function initialBackground(): string {
 }
 
 function nodes(): NodeConn[] {
-  return local ? [{ key: 'local', name: 'Local', baseUrl: local.baseUrl, token: local.token }] : [];
+  return manager.conns();
 }
 
 async function createWindow(): Promise<void> {
@@ -89,9 +109,24 @@ ipcMain.handle('axo:pick-folder', async () => {
 ipcMain.handle('axo:restart-local-node', async () => {
   await stopLocalNode();
   local = await ensureLocalNode(NODE_BUNDLE);
+  await manager.setLocal(local);
   win?.webContents.send('axo:nodes-changed', nodes());
   win?.webContents.reload();
 });
+
+// Servers (Settings → Servers). Long operations resolve when done; progress arrives via 'axo:servers-changed'.
+ipcMain.handle('axo:servers:snapshot', () => manager.snapshot());
+ipcMain.handle('axo:servers:ssh-hosts', () => manager.sshHosts());
+ipcMain.handle('axo:servers:add', (_e, input: ServerInput) => manager.add(input));
+ipcMain.handle('axo:servers:update', (_e, id: string, patch: Partial<ServerInput>) => manager.update(id, patch));
+ipcMain.handle('axo:servers:remove', (_e, id: string, opts?: { stopNode?: boolean }) => manager.remove(id, opts));
+ipcMain.handle('axo:servers:preflight', (_e, id: string) => manager.preflight(id));
+ipcMain.handle('axo:servers:deploy', (_e, id: string) => manager.deploy(id));
+ipcMain.handle('axo:servers:cancel-update', (_e, id: string) => manager.cancelUpdate(id));
+ipcMain.handle('axo:servers:connect', (_e, id: string) => manager.connect(id));
+ipcMain.handle('axo:servers:disconnect', (_e, id: string) => manager.disconnect(id));
+ipcMain.handle('axo:local:update', () => manager.updateLocal());
+ipcMain.handle('axo:local:cancel-update', () => manager.cancelLocalUpdate());
 
 function buildMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
@@ -118,6 +153,7 @@ function buildMenu(): void {
             if (ok.response !== 0) return;
             await stopLocalNode();
             local = await ensureLocalNode(NODE_BUNDLE);
+            await manager.setLocal(local);
             win?.webContents.reload();
           },
         },
@@ -133,11 +169,26 @@ app.whenReady().then(async () => {
   buildMenu();
   try {
     local = await ensureLocalNode(NODE_BUNDLE);
+    await manager.setLocal(local);
+    // A node left running from an older build (e.g. after a rebuild): swap it
+    // for the bundled one as soon as no agent is mid-turn. Agents resume by session.
+    if (isStale({ version: local.version, build: local.build, nodeId: '', hostname: '' }, bundleInfo().build)) void manager.updateLocal();
   } catch (e: any) {
     dialog.showErrorBox('Axo', e.message);
   }
   await createWindow();
+  manager.connectAutos();
+  powerMonitor.on('resume', () => manager.kickAll());
   app.on('activate', () => { if (!win) void createWindow(); });
+});
+
+// Tunnels are children of the app; remote nodes and their agents keep running.
+let quitting = false;
+app.on('before-quit', (e) => {
+  if (quitting) return;
+  quitting = true;
+  e.preventDefault();
+  void manager.shutdown().finally(() => app.quit());
 });
 
 // Agents live in the detached node, so quitting the app leaves them running.
