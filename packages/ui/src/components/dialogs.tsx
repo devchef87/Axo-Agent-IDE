@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ArrowUp, Folder, FolderOpen } from 'lucide-react';
-import type { Agent, FsEntry } from '@axo/protocol';
-import { useAxo } from '../stores/store.ts';
+import type { Agent, ForkReq, FsEntry, RefreshReq } from '@axo/protocol';
+import { useAgent, useAxo } from '../stores/store.ts';
 import { bridge } from '../lib/bridge.ts';
 import { Button, Field, inputCls, Modal } from './ui.tsx';
 
@@ -166,6 +166,119 @@ export function AddProjectDialog() {
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={close}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={busy || !path.trim()}>Add project</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+export function RefreshDialog() {
+  const target = useAxo((s) => s.ui.refresh);
+  const setUi = useAxo((s) => s.setUi);
+  const client = useAxo((s) => s.client);
+  const agent = useAgent(target);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => { if (target) { setNote(''); setError(null); } }, [target]);
+  const close = () => setUi({ refresh: null });
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!target || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const body: RefreshReq = note.trim() ? { note: note.trim() } : {};
+      await client(target.nodeKey).post(`/agents/${target.agentId}/refresh`, body);
+      close();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open={!!target} onClose={close} title={`Refresh ${agent?.name ?? 'agent'}`} width={460}>
+      <form onSubmit={submit}>
+        <p className="mb-3 text-xs leading-relaxed text-muted">
+          Starts a fresh context for the same agent. It keeps its name, chat and working state, and carries on where it left off.
+        </p>
+        <Field label="What went wrong?" hint="Optional. Passed to the fresh context so it avoids the same problem. ⌘Enter to refresh.">
+          <textarea
+            autoFocus
+            className={inputCls + ' min-h-20 resize-y'}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) void submit(e as any); }}
+            placeholder="e.g. It kept re-reading the same files and lost track of the failing test."
+          />
+        </Field>
+        {error && <p role="alert" className="mb-3 text-xs text-danger">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={close}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={busy}>{busy ? 'Starting…' : 'Refresh'}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+export function ForkDialog() {
+  const target = useAxo((s) => s.ui.fork);
+  const setUi = useAxo((s) => s.setUi);
+  const client = useAxo((s) => s.client);
+  const select = useAxo((s) => s.select);
+  const agent = useAgent(target);
+  const [name, setName] = useState('');
+  const [task, setTask] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => { if (target) { setName(''); setTask(''); setError(null); } }, [target]);
+  const close = () => setUi({ fork: null });
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!target || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const body: ForkReq = { name: name.trim() || undefined, task: task.trim() || undefined };
+      const created = await client(target.nodeKey).post<Agent>(`/agents/${target.agentId}/fork`, body);
+      close();
+      select({ nodeKey: target.nodeKey, agentId: created.id });
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open={!!target} onClose={close} title={`Fork ${agent?.name ?? 'agent'}`} width={480}>
+      <form onSubmit={submit}>
+        <p className="mb-3 text-xs leading-relaxed text-muted">
+          Creates a new agent in the same team with the same role and model, seeded with {agent?.name ?? 'this agent'}'s working state. The original keeps going.
+        </p>
+        <Field label="Name" hint="Optional — defaults to role-N">
+          <input autoFocus className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder={agent ? `${agent.role}-2` : ''} />
+        </Field>
+        <Field label="Task" hint="Optional — otherwise it continues the work in its state. ⌘Enter to fork.">
+          <textarea
+            className={inputCls + ' min-h-20 resize-y'}
+            value={task}
+            onChange={(e) => setTask(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) void submit(e as any); }}
+            placeholder="e.g. Take the UI half of this; leave the API to the original."
+          />
+        </Field>
+        {error && <p role="alert" className="mb-3 text-xs text-danger">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={close}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={busy}>{busy ? 'Forking…' : 'Fork agent'}</Button>
         </div>
       </form>
     </Modal>
