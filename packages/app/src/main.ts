@@ -5,6 +5,7 @@ import { homedir } from 'node:os';
 import type { ServerInput } from '@axo/protocol';
 import { ensureLocalNode, stopLocalNode, type LocalNode } from './local-node.ts';
 import { NodeManager, isStale, type NodeConn } from './node-manager.ts';
+import { InnerChatRelay } from './relay.ts';
 
 const DEV_UI = process.env.AXO_UI_URL;
 const resources = app.isPackaged ? process.resourcesPath : join(__dirname, '..', '..');
@@ -32,6 +33,12 @@ const manager = new NodeManager({
 });
 manager.on('nodes', (conns: NodeConn[]) => win?.webContents.send('axo:nodes-changed', conns));
 manager.on('snapshot', (snap) => win?.webContents.send('axo:servers-changed', snap));
+
+// name@server InnerChat: the app carries messages between nodes (they never talk directly).
+// Runs in main, so it works with no window open; kicks immediately when a node (re)connects.
+const relay = new InnerChatRelay(() => manager.relayEndpoints(), (m) => console.warn('[axo] innerchat', m));
+relay.start();
+manager.on('nodes', () => void relay.runOnce());
 
 // ── Notifications ───────────────────────────────────────────
 // The renderer decides which agent events notify (it holds the node connections);
@@ -223,6 +230,7 @@ app.on('before-quit', (e) => {
   if (quitting) return;
   quitting = true;
   e.preventDefault();
+  relay.stop();
   void manager.shutdown().finally(() => app.quit());
 });
 
