@@ -137,7 +137,7 @@ function ConfigTab({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
         />
       </Field>
       <p className="mb-3 text-2xs text-faint">
-        Model, effort and instructions apply when the process next starts. An idle agent picks them up on its next message; for a working one, stop the process once this turn ends.
+        Model, effort and instructions take effect on the next turn. If the agent is working, they apply once the current turn ends.
       </p>
       {error && <p role="alert" className="mb-3 text-xs text-danger">{error}</p>}
       <div className="flex items-center justify-end gap-2">
