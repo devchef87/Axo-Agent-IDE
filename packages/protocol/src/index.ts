@@ -107,7 +107,9 @@ export type NodeEvent =
   | { type: 'journalist:updated'; projectId: string; agentId: string | null; doc: 'state' | 'map' | 'decisions' }
   | { type: 'rotation:started'; agentId: string; reason: string }
   | { type: 'rotation:completed'; agentId: string; generation: number }
-  | { type: 'rotation:aborted'; agentId: string; reason: string };
+  | { type: 'rotation:aborted'; agentId: string; reason: string }
+  // ── files (Phase 4) ──
+  | { type: 'files:changed'; projectId: string; root: string; paths: string[] };
 
 export type EventEnvelope = NodeEvent & { seq: number; ts: number; nodeId: string };
 
@@ -151,3 +153,42 @@ export interface ForkReq { name?: string; task?: string }
 export interface StateDoc { text: string; updatedAt: number }
 /** GET /projects/:id/context */
 export interface ProjectContext { map: string; decisions: string }
+
+// ── files (Phase 4) ─────────────────────────────────────────
+// All routes live under /projects/:id/files/*. Paths are relative to the file root
+// and confined to it (no absolute paths, no `..`, symlinks may not escape).
+// The root is the project folder, or a team's worktree with `?team=<teamId>`.
+// Raw/media URLs authenticate with `?token=` because <img>/<video> cannot send headers.
+
+export interface FileEntry {
+  name: string;
+  path: string;            // relative to the root, '/'-separated
+  dir: boolean;
+  size?: number;           // files only
+  hasChildren?: boolean;   // dirs only
+}
+/** GET /projects/:id/files/tree?path= */
+export interface FileTree { root: string; path: string; entries: FileEntry[] }
+/** GET /projects/:id/files/read?path= — content is null for binary or oversized files. */
+export interface FileContent { path: string; content: string | null; binary: boolean; size: number; mtime: number; language: string }
+/** POST /projects/:id/files/write — 409 if `baseMtime` is given and the file changed since. */
+export interface WriteFileReq { path: string; content: string; baseMtime?: number }
+export interface WriteFileRes { path: string; size: number; mtime: number }
+/** POST /projects/:id/files/create */
+export interface CreateFileReq { path: string; dir?: boolean; content?: string }
+/** POST /projects/:id/files/rename */
+export interface RenameFileReq { from: string; to: string }
+/** POST /projects/:id/files/upload — base64 contents, written into `dir`. */
+export interface UploadReq { dir?: string; files: { name: string; content: string }[] }
+export interface UploadRes { uploaded: { path: string; size: number }[] }
+/** GET /projects/:id/files/search?q=&limit= — filename match. */
+export interface FileSearchRes { files: { path: string; name: string }[] }
+export type GitFileStatus = 'M' | 'A' | 'D' | 'R' | 'U' | '?';
+/** GET /projects/:id/files/git-status */
+export interface GitStatusRes { isRepo: boolean; branch: string | null; entries: { path: string; status: GitFileStatus }[] }
+export interface FileDiff { path: string; status: 'added' | 'modified' | 'deleted'; additions: number; deletions: number; patch: string }
+/** GET /projects/:id/files/diff?path= (omit path for the whole working tree) */
+export interface DiffRes { diffs: FileDiff[] }
+/** GET /projects/:id/files/original?path= — the file at HEAD; null if untracked/new. */
+export interface OriginalRes { path: string; content: string | null }
+

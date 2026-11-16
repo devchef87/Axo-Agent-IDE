@@ -7,6 +7,7 @@ import type { Node } from '../node.ts';
 import { HttpError } from '../util/http-error.ts';
 import { expandHome } from '../projects.ts';
 import { VERSION } from '../config.ts';
+import { registerFileRoutes } from '../files/routes.ts';
 
 export function buildRouter(node: Node): Router {
   const { store, bus, runtime, projects, cfg, journalist, rotator } = node;
@@ -74,6 +75,8 @@ export function buildRouter(node: Node): Router {
     await journalist.refreshMap(p);
     return journalist.projectContext(p);
   });
+
+  registerFileRoutes(r, node);
 
   // ── fs (minimal: directory picker for remote nodes; full file API arrives in phase 4) ──
   r.get('/fs/list', async ({ query }): Promise<{ path: string; parent: string | null; entries: FsEntry[] }> => {

@@ -12,6 +12,15 @@ export type Handler = (ctx: { req: IncomingMessage; params: Record<string, strin
 
 interface Route { method: string; re: RegExp; keys: string[]; handler: Handler }
 
+/** Return from a handler to write the response yourself (binary, streams, Range). */
+export class RawResponse {
+  readonly send: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
+  constructor(send: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>) { this.send = send; }
+}
+
+const MAX_BODY = 10 * 1024 * 1024;
+const MAX_UPLOAD_BODY = 64 * 1024 * 1024; // base64 file uploads
+
 export class Router {
   private routes: Route[] = [];
   add(method: string, path: string, handler: Handler): this {
@@ -60,12 +69,15 @@ export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHe
       const m = router.match(req.method ?? 'GET', url.pathname.slice(4));
       if (!m) return json(res, 404, { error: 'not found' });
       try {
-        const body = req.method === 'POST' || req.method === 'PATCH' ? await readJson(req) : undefined;
+        const limit = url.pathname.endsWith('/files/upload') ? MAX_UPLOAD_BODY : MAX_BODY;
+        const body = req.method === 'POST' || req.method === 'PATCH' ? await readJson(req, limit) : undefined;
         const out = await m.handler({ req, params: m.params, query: url.searchParams, body });
+        if (out instanceof RawResponse) return await out.send(req, res);
         return json(res, 200, out ?? { ok: true });
       } catch (e: any) {
         const status = e instanceof HttpError ? e.status : 500;
         if (status === 500) console.error('[api]', req.method, url.pathname, e);
+        if (res.headersSent) { res.destroy(); return; }
         return json(res, status, { error: e?.message ?? 'internal error' });
       }
     }
@@ -123,13 +135,13 @@ function json(res: ServerResponse, status: number, data: unknown): void {
   res.end(body);
 }
 
-function readJson(req: IncomingMessage): Promise<any> {
+function readJson(req: IncomingMessage, limit = MAX_BODY): Promise<any> {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => {
       size += c.length;
-      if (size > 10 * 1024 * 1024) { reject(new HttpError(413, 'body too large')); req.destroy(); return; }
+      if (size > limit) { reject(new HttpError(413, 'body too large')); req.destroy(); return; }
       chunks.push(c);
     });
     req.on('end', () => {
