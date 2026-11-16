@@ -129,6 +129,10 @@ describe('files api', () => {
     assert.equal(await part.text(), '2345');
     assert.equal((await fetch(url, { headers: { Range: 'bytes=50-' } })).status, 416);
     assert.equal((await fetch(`${base()}${f}/raw?path=clip.mp4`)).status, 401);
+    // Cross-origin Range loads (pdf.js runs in a worker on another origin).
+    const pre = await fetch(url, { method: 'OPTIONS', headers: { 'Access-Control-Request-Headers': 'range', Origin: 'null' } });
+    assert.match(pre.headers.get('access-control-allow-headers') ?? '', /Range/);
+    assert.match(part.headers.get('access-control-expose-headers') ?? '', /Content-Range/);
   });
 
   it('searches filenames', async () => {

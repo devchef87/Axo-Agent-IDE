@@ -125,7 +125,9 @@ export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHe
 function cors(res: ServerResponse): void {
   // Token auth (header, never cookies) makes cross-origin requests safe; the UI may talk to many nodes.
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Range');
+  // pdf.js and <video> need these to do partial (Range) loads of raw files.
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, Content-Encoding');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
 }
 
