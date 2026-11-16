@@ -1,5 +1,5 @@
 import type {
-  ArchiveTeamReq, AskReq, CreateTeamReq, CreateWatchReq, KnockReq, KnockRes, MeRes, TellReq, UpdateProjectReq, UpdateTeamReq,
+  ArchiveTeamReq, AskReq, MergeReq, CreateTeamReq, CreateWatchReq, KnockReq, KnockRes, MeRes, TellReq, UpdateProjectReq, UpdateTeamReq,
 } from '@axo/protocol';
 import { TextResponse, type Caller, type Router } from './server.ts';
 import type { Node } from '../node.ts';
@@ -27,6 +27,10 @@ export function addCoordinationRoutes(r: Router, node: Node): void {
     return b?.name !== undefined ? teams.rename(params.id, String(b.name)) : teams.get(params.id);
   });
   r.post('/teams/:id/archive', ({ params, body }) => teams.archive(params.id, body as ArchiveTeamReq));
+  r.get('/teams/:id/diff', ({ params }) => teams.diff(params.id));
+  r.post('/teams/:id/merge', ({ params, body }) => teams.merge(params.id, (body as MergeReq)?.strategy ?? 'merge'));
+  r.get('/agents/:id/diff', ({ params }) => teams.agentDiff(params.id));
+  r.post('/agents/:id/merge-into-team', ({ params, body }) => teams.mergeAgent(params.id, (body as MergeReq)?.strategy ?? 'merge'));
 
   // ── knock (PreToolUse hook) ──
   r.post('/knock', ({ body, query, caller }) => {

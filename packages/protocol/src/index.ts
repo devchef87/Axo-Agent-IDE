@@ -108,9 +108,14 @@ export type NodeEvent =
   | { type: 'rotation:started'; agentId: string; reason: string }
   | { type: 'rotation:completed'; agentId: string; generation: number }
   | { type: 'rotation:aborted'; agentId: string; reason: string }
+<<<<<<< HEAD
   | CoordinationEvent // phase 2, defined below
   // ── files (Phase 4) ──
   | { type: 'files:changed'; projectId: string; root: string; paths: string[] };
+=======
+  | { type: 'files:changed'; projectId: string; root: string; paths: string[] } // files (Phase 4)
+  | CoordinationEvent; // phase 2, defined below
+>>>>>>> origin/main
 
 export type EventEnvelope = NodeEvent & { seq: number; ts: number; nodeId: string };
 
@@ -138,6 +143,7 @@ export interface CreateAgentReq {
   effort?: string;
   instructions?: string;
   task?: string;            // first message, sent immediately
+  ownWorktree?: boolean;    // [core2] own worktree + branch off the team branch (SPEC §6 per-agent worktree)
 }
 export interface UpdateAgentReq { name?: string; model?: string; effort?: string | null; instructions?: string; scopeGlobs?: string[] }
 export interface MessageReq { text: string; author?: string }
@@ -245,11 +251,28 @@ export interface CreateWatchRes { watch: Watch; reattached: boolean }
 /** `GET /api/me` (agent token): what `axo status` prints. */
 export interface MeRes { agent: Agent; team: Team; project: Project; watches: Watch[]; teammates: WhoEntry[] }
 
+// Merge view: a branch compared with the branch it merges into.
+export interface DiffFile { path: string; additions: number; deletions: number; binary: boolean }
+export interface BranchDiff {
+  base: string;             // merges into this branch
+  branch: string;           // the team (or per-agent) branch
+  ahead: number;            // commits on branch not on base
+  behind: number;           // commits on base not on branch
+  commits: { sha: string; subject: string }[];   // newest first, max 100
+  files: DiffFile[];
+  patch: string;            // unified diff base...branch (merge-base to branch tip)
+  truncated: boolean;       // patch was cut at 512KB
+  dirty: string[];          // uncommitted changes in the branch's worktree (`git status --porcelain`): not part of the diff
+}
+export interface MergeReq { strategy?: 'merge' | 'squash' }  // default 'merge'
+export interface MergeRes { merged: true; strategy: 'merge' | 'squash'; base: string; branch: string; commit: string }
+
 export type CoordinationEvent =
   | { type: 'knock:denied'; agentId: string; agentName: string; tool: string; path: string; owner: string | null; reason: string }
   | { type: 'innerchat:turn'; thread: ChatThread; turn: ChatTurn }
   | { type: 'watch:upsert'; watch: Watch }
-  | { type: 'watch:removed'; watchId: string };
+  | { type: 'watch:removed'; watchId: string }
+  | { type: 'team:merged'; teamId: string; agentId: string | null; base: string; branch: string; commit: string; strategy: 'merge' | 'squash' };
 
 // ── Remote nodes / servers (Axo-Remote) ─────────────────────
 // Served by every node at GET /api/version. `build` is a content hash of the
@@ -345,3 +368,7 @@ export interface FileDiff { path: string; status: 'added' | 'modified' | 'delete
 export interface DiffRes { diffs: FileDiff[] }
 /** GET /projects/:id/files/original?path= — the file at HEAD; null if untracked/new. */
 export interface OriginalRes { path: string; content: string | null }
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
