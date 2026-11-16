@@ -108,14 +108,8 @@ export type NodeEvent =
   | { type: 'rotation:started'; agentId: string; reason: string }
   | { type: 'rotation:completed'; agentId: string; generation: number }
   | { type: 'rotation:aborted'; agentId: string; reason: string }
-<<<<<<< HEAD
-  | CoordinationEvent // phase 2, defined below
-  // ── files (Phase 4) ──
-  | { type: 'files:changed'; projectId: string; root: string; paths: string[] };
-=======
   | { type: 'files:changed'; projectId: string; root: string; paths: string[] } // files (Phase 4)
   | CoordinationEvent; // phase 2, defined below
->>>>>>> origin/main
 
 export type EventEnvelope = NodeEvent & { seq: number; ts: number; nodeId: string };
 
@@ -368,7 +362,4 @@ export interface FileDiff { path: string; status: 'added' | 'modified' | 'delete
 export interface DiffRes { diffs: FileDiff[] }
 /** GET /projects/:id/files/original?path= — the file at HEAD; null if untracked/new. */
 export interface OriginalRes { path: string; content: string | null }
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/main
