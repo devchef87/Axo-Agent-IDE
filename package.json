@@ -3,7 +3,11 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/protocol",
+    "packages/core",
+    "packages/ui",
+    "packages/app",
+    "packages/cli"
   ],
   "scripts": {
     "build": "npm run build -w @axo/ui && npm run build -w @axo/cli && npm run build -w @axo/core && npm run build -w @axo/app",
