@@ -39,6 +39,10 @@ describe('mobile devices', () => {
     }
     assert.equal((await call(t, `/agents/${agentId}/message`, { method: 'POST', body: JSON.stringify({ text: 'from the phone', author: 'alice' }) }, tok)).status, 200);
     await t.waitFor(() => t.feed(agentId).some((i) => i.kind === 'user' && i.text === 'from the phone' && i.author === 'user'));
+    // the drawer's preview comes with the agent, no feed request per agent
+    const st = (await call(t, '/state', {}, tok)).body;
+    assert.ok(st.agents[0].preview?.text, 'agent carries a last-message preview');
+    assert.notEqual((await call(t, `/agents/${agentId}/images/none`, {}, tok)).status, 401, 'tool-result images are readable');
     assert.equal((await call(t, `/agents/${agentId}/interrupt`, { method: 'POST' }, tok)).status, 200);
     for (const [method, path] of [['GET', '/devices'], ['POST', '/devices'], ['GET', '/terminals'], ['POST', '/terminals'], ['DELETE', `/agents/${agentId}`],
       ['POST', '/agents'], ['PATCH', `/agents/${agentId}`], ['GET', '/innerchat/outbox'], ['PUT', '/settings/tailscale'], ['GET', `/agents/${agentId}/state`]]) {

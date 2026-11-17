@@ -164,7 +164,7 @@ export class AgentRuntime extends EventEmitter {
     return a;
   }
   private view(a: Agent): Agent {
-    return { ...a, status: this.held.has(a.id) ? 'rotating' : a.status, queued: this.queues.get(a.id)?.length ?? 0 };
+    return { ...a, status: this.held.has(a.id) ? 'rotating' : a.status, queued: this.queues.get(a.id)?.length ?? 0, preview: this.store.feedPreview(a.id) };
   }
 
   /** Journalist/introducer supply project map, decisions, state doc, handoff for system prompts. */

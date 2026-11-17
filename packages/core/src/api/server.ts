@@ -29,7 +29,7 @@ const AGENT_ROUTES = /^\/(version|me|knock|innerchat\/.+|watches(\/.*)?|agents\/
 /** What a paired phone may do (docs/MOBILE.md): read, message an agent, stop it. Nothing else. */
 const DEVICE_ROUTES: [string, RegExp][] = [
   ['GET', /^\/(version|state|events)$/],
-  ['GET', /^\/agents\/[a-z0-9]+\/feed$/],
+  ['GET', /^\/agents\/[a-z0-9]+\/(feed|images\/[^/]+)$/],
   ['POST', /^\/agents\/[a-z0-9]+\/(message|interrupt)$/],
 ];
 

@@ -242,6 +242,15 @@ export class Store {
     return r ? JSON.parse(r.data) : null;
   }
   /** Newest-last page of feed items older than `before` (ts). */
+  /** Latest text/user item, trimmed for list previews. */
+  feedPreview(agentId: string): { text: string; ts: number; author: string | null } | null {
+    const r = this.db.prepare(`SELECT data FROM feed WHERE agent_id = ? AND kind IN ('text','user') ORDER BY ts DESC, id DESC LIMIT 1`).get(agentId) as Row | undefined;
+    if (!r) return null;
+    const it = JSON.parse(r.data) as { text?: string; ts: number; author?: string };
+    const text = String(it.text ?? '').replace(/\s+/g, ' ').trim();
+    return { text: text.length > 120 ? `${text.slice(0, 119)}…` : text, ts: it.ts, author: it.author ?? null };
+  }
+
   feedPage(agentId: string, before: number | null, limit: number): { items: FeedItem[]; hasMore: boolean } {
     const rows = (before
       ? this.db.prepare('SELECT data FROM feed WHERE agent_id = ? AND ts < ? ORDER BY ts DESC, id DESC LIMIT ?').all(agentId, before, limit + 1)

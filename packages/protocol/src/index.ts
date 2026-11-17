@@ -59,6 +59,8 @@ export interface Agent {
   lastError: string | null;
   createdAt: number;
   lastActiveAt: number;
+  /** Start of the latest prose in the chat (agent reply or a message to it), for lists. Computed, never stored. */
+  preview?: { text: string; ts: number; author: string | null } | null;
 }
 
 // ── Feed (chat timeline) ────────────────────────────────────
