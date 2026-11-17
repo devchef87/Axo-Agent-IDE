@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AppState, BackHandler, Keyboard, KeyboardAvoidingView, Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, BackHandler, Keyboard, Pressable, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { feedKey, useAgent, useAxo } from './src/lib/store.ts';
@@ -51,14 +51,8 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
   const node = useAxo((s) => (selected ? s.nodes[selected.nodeKey] : undefined));
   const feed = useAxo((s) => (selected ? s.feeds[feedKey(selected.nodeKey, selected.agentId)] : undefined));
   const [drawer, setDrawer] = useState(!selected);
-  const [kb, setKb] = useState(false);
   const [composerH, setComposerH] = useState(72);
-
-  useEffect(() => {
-    const a = Keyboard.addListener('keyboardDidShow', () => setKb(true));
-    const b = Keyboard.addListener('keyboardDidHide', () => setKb(false));
-    return () => { a.remove(); b.remove(); };
-  }, []);
+  const kbLift = useKeyboardLift();
   // Restored selection: load its feed once the store is up.
   useEffect(() => {
     if (selected && !feed) useAxo.getState().select(selected);
@@ -92,7 +86,7 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
         </View>
       </View>
 
-      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+      <View style={{ flex: 1 }} onLayout={kbLift.onLayout}>
         {agent && selected ? (
           <>
             {agent.status === 'error' && agent.lastError && (
@@ -105,13 +99,13 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
                 feed={feed ?? { items: [], drafts: {}, hasMore: false, loaded: false, loadingOlder: false }}
                 agent={agent}
                 nodeKey={selected.nodeKey}
-                bottomInset={composerH}
+                bottomInset={composerH + kbLift.lift}
                 onLoadOlder={() => void useAxo.getState().loadFeed(selected.nodeKey, selected.agentId, true)}
               />
             </View>
             {/* Floating composer: overlays the chat, which scrolls underneath it. */}
             <View pointerEvents="box-none" onLayout={(e) => setComposerH(e.nativeEvent.layout.height)}
-              style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: kb ? 0 : insets.bottom }}>
+              style={{ position: 'absolute', left: 0, right: 0, bottom: kbLift.lift, paddingBottom: kbLift.open ? 4 : insets.bottom + 10 }}>
               <Composer
                 agent={agent}
                 disabled={offline}
@@ -128,9 +122,32 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
             </Text>
           </View>
         )}
-      </KeyboardAvoidingView>
+      </View>
 
       <Drawer open={drawer} onClose={closeDrawer} onPair={openSettings} />
     </View>
   );
+}
+
+/**
+ * How far to raise the floating composer above the keyboard. Android may or may not resize the window
+ * for the keyboard (edge-to-edge usually doesn't), so measure: lift by the keyboard's height minus
+ * however much the chat area already shrank.
+ */
+function useKeyboardLift() {
+  const restH = useRef(0);
+  const [curH, setCurH] = useState(0);
+  const [kbH, setKbH] = useState(0);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => setKbH(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbH(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+  const onLayout = useCallback((e: { nativeEvent: { layout: { height: number } } }) => {
+    const h = e.nativeEvent.layout.height;
+    if (kbH === 0 || h > restH.current) restH.current = h;
+    setCurH(h);
+  }, [kbH]);
+  const shrunk = Math.max(0, restH.current - curH);
+  return { lift: kbH ? Math.max(0, kbH - shrunk) : 0, open: kbH > 0, onLayout };
 }
