@@ -446,3 +446,7 @@ export interface CreateDeviceReq { name: string }
 export interface TailscaleSettings { enabled: boolean; address: string | null; url: string | null }
 /** What the desktop's "Pair phone" QR code encodes. */
 export interface PairingPayload { v: 1; nodes: { id: string; name: string; url: string; token: string }[] }
+/** POST /agents/:id/attachments — files for a message (phone or desktop). Saved under <workdir>/.axo/uploads/
+ *  (kept out of git), names timestamped. Returns absolute paths to put in the message text. */
+export interface AttachmentsReq { files: { name: string; content: string }[] } // content: base64
+export interface AttachmentsRes { paths: string[] }

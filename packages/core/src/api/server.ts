@@ -30,7 +30,7 @@ const AGENT_ROUTES = /^\/(version|me|knock|innerchat\/.+|watches(\/.*)?|agents\/
 const DEVICE_ROUTES: [string, RegExp][] = [
   ['GET', /^\/(version|state|events)$/],
   ['GET', /^\/agents\/[a-z0-9]+\/(feed|images\/[^/]+)$/],
-  ['POST', /^\/agents\/[a-z0-9]+\/(message|interrupt)$/],
+  ['POST', /^\/agents\/[a-z0-9]+\/(message|interrupt|attachments)$/],
 ];
 
 interface Route { method: string; re: RegExp; keys: string[]; handler: Handler }
@@ -109,7 +109,7 @@ export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHe
       const m = router.match(req.method ?? 'GET', route);
       if (!m) return json(res, 404, { error: 'not found' });
       try {
-        const limit = url.pathname.endsWith('/files/upload') ? MAX_UPLOAD_BODY : MAX_BODY;
+        const limit = url.pathname.endsWith('/files/upload') || url.pathname.endsWith('/attachments') ? MAX_UPLOAD_BODY : MAX_BODY;
         const body = req.method === 'POST' || req.method === 'PATCH' || req.method === 'PUT' ? await readJson(req, limit) : undefined;
         const out = await m.handler({ req, params: m.params, query: url.searchParams, body, caller });
         if (out instanceof RawResponse) return await out.send(req, res);
