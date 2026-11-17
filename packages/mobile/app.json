@@ -52,6 +52,14 @@
           "resizeMode": "contain",
           "backgroundColor": "#24353D"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Axo attaches photos you choose to messages.",
+          "cameraPermission": "Axo uses the camera to take photos to send to your agents.",
+          "microphonePermission": "Axo records audio when you film a video to send to an agent."
+        }
       ]
     ]
   }

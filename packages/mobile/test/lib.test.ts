@@ -73,3 +73,19 @@ test('senderOf and previewOf', () => {
   assert.equal(previewOf(tool('t')), null);
   assert.equal(previewOf({ ts: 1, id: 'u', kind: 'user', text: 'hi', author: 'user' })?.author, 'user');
 });
+
+const { withAttachments, nameFor, formatBytes } = await import('../src/lib/attachments.ts');
+
+test('attachments: message text matches the desktop format', () => {
+  assert.equal(withAttachments('look', []), 'look');
+  assert.equal(withAttachments('look', ['/w/.axo/uploads/a.png']), 'look\n\nAttached file:\n- /w/.axo/uploads/a.png');
+  assert.equal(withAttachments('', ['/a', '/b']), 'Attached files:\n- /a\n- /b');
+});
+
+test('attachments: names for picked assets', () => {
+  assert.equal(nameFor('file:///data/cache/IMG_1234.jpg', 'image/jpeg'), 'IMG_1234.jpg');
+  assert.equal(nameFor('content://media/external/images/media/42', 'image/jpeg', 'photo'), 'photo.jpg');
+  assert.equal(nameFor('content://x/y/z', null), 'file');
+  assert.equal(formatBytes(2048), '2 KB');
+  assert.equal(formatBytes(3.5 * 1024 * 1024), '3.5 MB');
+});

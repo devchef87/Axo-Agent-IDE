@@ -16,7 +16,7 @@ import { REFRESH_REASON, usePulse, useTick } from './ui.tsx';
 /** Resolves a tool-result image id to a URL on the agent's node. */
 const ImageUrl = createContext<(id: string) => string | null>(() => null);
 
-export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; agent: Agent; nodeKey: string; onLoadOlder: () => void }) {
+export function Feed({ feed, agent, nodeKey, onLoadOlder, bottomInset = 0 }: { feed: FeedState; agent: Agent; nodeKey: string; onLoadOlder: () => void; bottomInset?: number }) {
   const urlFor = useCallback((id: string) => imageUrl(nodeKey, agent.id, id), [nodeKey, agent.id]);
   const blocks = useMemo(() => toBlocks(feed.items, feed.drafts), [feed.items, feed.drafts]);
   const data = useMemo(() => blocks.slice().reverse(), [blocks]);
@@ -32,7 +32,7 @@ export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; a
   }
   if (!blocks.length && !working) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, paddingBottom: 32 + bottomInset }}>
         <Text style={{ color: C.secondary, fontSize: 15, marginBottom: 4 }}>{agent.name} is ready.</Text>
         <Text style={{ color: C.dim, fontSize: 14 }}>Send the first instruction below.</Text>
       </View>
@@ -46,7 +46,8 @@ export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; a
       keyExtractor={(b) => b.id}
       renderItem={render}
       contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
-      ListHeaderComponent={working ? <Working agent={agent} last={blocks.at(-1)} /> : undefined}
+      // Inverted: the header sits at the bottom. Room for the floating composer, so the last message clears it.
+      ListHeaderComponent={<>{working && <Working agent={agent} last={blocks.at(-1)} />}<View style={{ height: bottomInset }} /></>}
       ListFooterComponent={feed.loadingOlder ? <ActivityIndicator color={C.dim} style={{ marginVertical: 12 }} /> : undefined}
       onEndReached={feed.hasMore ? onLoadOlder : undefined}
       onEndReachedThreshold={0.5}
