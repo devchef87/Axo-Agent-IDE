@@ -12,7 +12,8 @@ npm install
 npm test            # pure logic (pairing, feed grouping), node:test
 npm run typecheck
 npx expo start      # dev: open in Expo Go on the phone (same Wi-Fi, or --tunnel)
-npm run apk         # sideloadable APK via EAS (needs an Expo account: npx eas-cli login)
+sh scripts/build-apk.sh   # local release APK → ~/Desktop/axo-mobile.apk (Android SDK + JDK 17; ~7 min)
+npm run apk         # or build it in the cloud with EAS (needs an Expo account)
 ```
 
 ## Layout
