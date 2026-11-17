@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import type { Agent, AgentStatus, FeedItem, Project, Team, TeamMode } from '@axo/protocol';
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 const MIGRATIONS: string[] = [
   /* v1 */ `
@@ -91,6 +91,12 @@ const MIGRATIONS: string[] = [
   ALTER TABLE watches ADD COLUMN last_run_at INTEGER;
   ALTER TABLE watches ADD COLUMN runs INTEGER NOT NULL DEFAULT 0;
   CREATE INDEX watches_due ON watches(mode, status, next_run_at);
+  `,
+  /* v6: per-phone device tokens (mobile app over Tailscale). Only a hash of each token is stored. */ `
+  CREATE TABLE devices (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+    created_at INTEGER NOT NULL, last_seen_at INTEGER
+  );
   `,
 ];
 

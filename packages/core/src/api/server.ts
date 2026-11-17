@@ -9,9 +9,11 @@ import type { EventBus } from '../events.ts';
 import { HttpError } from '../util/http-error.ts';
 import { verifyAgentToken } from '../util/agent-token.ts';
 import type { Terminals } from '../terminal/terminals.ts';
+import type { Devices } from '../devices/devices.ts';
 
 /** Who is calling: the node token (app/user, full access) or one agent's token (agentId set). */
-export interface Caller { agentId: string | null }
+/** Who is calling: the node token (app/user, full access), one agent's token (agentId), or a paired phone (deviceId). */
+export interface Caller { agentId: string | null; deviceId?: string | null }
 
 export type Handler = (ctx: { req: IncomingMessage; params: Record<string, string>; query: URLSearchParams; body: any; caller: Caller }) => unknown | Promise<unknown>;
 
@@ -23,6 +25,13 @@ export class TextResponse {
 
 /** Routes an agent token may call. Everything else needs the node token. */
 const AGENT_ROUTES = /^\/(version|me|knock|innerchat\/.+|watches(\/.*)?|agents\/([a-z0-9]+)\/refresh)$/;
+
+/** What a paired phone may do (docs/MOBILE.md): read, message an agent, stop it. Nothing else. */
+const DEVICE_ROUTES: [string, RegExp][] = [
+  ['GET', /^\/(version|state|events)$/],
+  ['GET', /^\/agents\/[a-z0-9]+\/feed$/],
+  ['POST', /^\/agents\/[a-z0-9]+\/(message|interrupt)$/],
+];
 
 interface Route { method: string; re: RegExp; keys: string[]; handler: Handler }
 
@@ -63,7 +72,7 @@ const MIME: Record<string, string> = {
   '.png': 'image/png', '.woff2': 'font/woff2', '.json': 'application/json', '.ico': 'image/x-icon',
 };
 
-export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHello: () => EventEnvelope, terminals?: Terminals): Promise<Server> {
+export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHello: () => EventEnvelope, terminals?: Terminals, devices?: Devices): Promise<Server> {
   const tokenBuf = Buffer.from(cfg.token);
   const given = (req: IncomingMessage, url: URL): string => {
     const h = req.headers.authorization;
@@ -76,6 +85,9 @@ export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHe
   /** Caller for an /api request, or null if unauthorized. */
   const callerFor = (req: IncomingMessage, url: URL, route: string): Caller | null => {
     if (authed(req, url)) return { agentId: null };
+    const deviceId = devices?.verify(given(req, url));
+    if (deviceId) return DEVICE_ROUTES.some(([m, re]) => m === req.method && re.test(route)) ? { agentId: null, deviceId } : null;
+    if ((req as any).axoExternal) return null; // agents are local: their tokens are never valid off-box
     const agentId = verifyAgentToken(cfg.token, given(req, url));
     if (!agentId) return null;
     const m = AGENT_ROUTES.exec(route);
@@ -125,23 +137,27 @@ export function startServer(cfg: NodeConfig, bus: EventBus, router: Router, onHe
     // Terminals: node token only (authed() never accepts agent tokens).
     const term = /^\/ws\/term\/([A-Za-z0-9]+)$/.exec(url.pathname);
     if (term && terminals) {
-      if (!authed(req, url)) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); socket.destroy(); return; }
+      if (!authed(req, url) || (req as any).axoExternal) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); socket.destroy(); return; }
       if (!terminals.has(term[1])) { socket.write('HTTP/1.1 404 Not Found\r\n\r\n'); socket.destroy(); return; }
       termWss.handleUpgrade(req, socket, head, (ws) => terminals.attach(term[1], ws));
       return;
     }
-    if (url.pathname !== '/ws' || !authed(req, url)) {
+    const deviceId = url.pathname === '/ws' && !authed(req, url) ? devices?.verify(given(req, url)) ?? null : null;
+    if (url.pathname !== '/ws' || (!authed(req, url) && !deviceId)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;
     }
-    wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+    wss.handleUpgrade(req, socket, head, (ws) => { (ws as any).deviceId = deviceId; wss.emit('connection', ws, req); });
   });
 
   wss.on('connection', (ws: WebSocket) => {
     (ws as any).isAlive = true;
     ws.on('pong', () => { (ws as any).isAlive = true; });
     ws.send(JSON.stringify(onHello()));
+  });
+  devices?.on('revoked', (id: string) => {
+    for (const c of wss.clients) if ((c as any).deviceId === id) c.close(4401, 'device revoked');
   });
   bus.on('event', (env: EventEnvelope) => {
     const msg = JSON.stringify(env);

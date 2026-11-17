@@ -432,3 +432,15 @@ export interface TerminalInfo {
 export interface CreateTerminalReq { cwd?: string; cols?: number; rows?: number }
 export type TermClientMsg = { type: 'resize'; cols: number; rows: number };
 export type TermServerMsg = { type: 'exit'; code: number };
+
+// ── Mobile devices ───────────────────────────────────────
+// A phone gets its own token per node (POST /devices, node token only), revocable. Device tokens may only
+// read state/events/feeds, message an agent and interrupt it. See docs/MOBILE.md.
+export interface Device { id: string; name: string; createdAt: number; lastSeenAt: number | null }
+/** POST /devices response. `token` is shown once; `url` is the node's Tailscale address, if it is listening there. */
+export interface CreatedDevice extends Device { token: string; url: string | null }
+export interface CreateDeviceReq { name: string }
+/** GET/PUT /settings/tailscale — the opt-in listener on this node's Tailscale address (100.64.0.0/10). */
+export interface TailscaleSettings { enabled: boolean; address: string | null; url: string | null }
+/** What the desktop's "Pair phone" QR code encodes. */
+export interface PairingPayload { v: 1; nodes: { id: string; name: string; url: string; token: string }[] }

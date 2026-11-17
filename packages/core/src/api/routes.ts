@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { homedir } from 'node:os';
-import type { CreateAgentReq, CreateProjectReq, CreateTerminalReq, ForkReq, FsEntry, MessageReq, NodeState, ProjectContext, RefreshReq, StateDoc, UpdateAgentReq, UsageSummary, UsageTotals, VersionInfo } from '@axo/protocol';
+import type { CreateAgentReq, CreateDeviceReq, CreateProjectReq, CreateTerminalReq, ForkReq, FsEntry, MessageReq, NodeState, ProjectContext, RefreshReq, StateDoc, UpdateAgentReq, UsageSummary, UsageTotals, VersionInfo } from '@axo/protocol';
 import { RawResponse, Router } from './server.ts';
 import { IMAGE_MIME } from '../runtime/images.ts';
 import { createReadStream, existsSync } from 'node:fs';
@@ -41,13 +41,20 @@ export function buildRouter(node: Node): Router {
   r.post('/terminals', ({ body }) => node.terminals.create((body ?? {}) as CreateTerminalReq));
   r.delete('/terminals/:id', ({ params }) => node.terminals.kill(params.id));
 
+  // ── mobile devices + Tailscale listener (node token only) ──
+  r.get('/devices', () => node.devices.list());
+  r.post('/devices', ({ body }) => node.devices.create((body as CreateDeviceReq)?.name, node.tailscale.settings().url));
+  r.delete('/devices/:id', ({ params }) => node.devices.revoke(params.id));
+  r.get('/settings/tailscale', () => node.tailscale.settings());
+  r.put('/settings/tailscale', ({ body }) => node.tailscale.set(!!(body as { enabled?: boolean })?.enabled));
+
   // ── agents ──
   r.post('/agents', ({ body }) => node.teams.createAgent(body as CreateAgentReq)); // [core2] archived check + ownWorktree
   r.patch('/agents/:id', ({ params, body }) => runtime.update(params.id, body as UpdateAgentReq));
   r.delete('/agents/:id', ({ params }) => runtime.remove(params.id));
-  r.post('/agents/:id/message', ({ params, body }) => {
+  r.post('/agents/:id/message', ({ params, body, caller }) => {
     const b = body as MessageReq;
-    runtime.deliver(params.id, String(b?.text ?? ''), b?.author || 'user');
+    runtime.deliver(params.id, String(b?.text ?? ''), caller.deviceId ? 'user' : b?.author || 'user'); // a phone is always the user
   });
   r.post('/agents/:id/interrupt', ({ params }) => runtime.interrupt(params.id));
   r.post('/agents/:id/stop', ({ params }) => runtime.stop(params.id));

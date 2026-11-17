@@ -18,6 +18,7 @@ import { Journalist, type JournalistOptions } from './journalist/journalist.ts';
 import { Rotator, type RotationConfig } from './rotation/rotator.ts';
 import { FileWatcher } from './files/watcher.ts';
 import { Terminals } from './terminal/terminals.ts';
+import { Devices, TailscaleListener } from './devices/devices.ts';
 
 /** One Axo node: store + runtime + API. Same code locally and on servers. */
 export class Node {
@@ -35,7 +36,9 @@ export class Node {
   readonly innerchat: InnerChat;
   readonly fileWatcher: FileWatcher;
   readonly terminals: Terminals;
-  private server: Server | null = null;
+  readonly devices: Devices;
+  readonly tailscale: TailscaleListener;
+  server: Server | null = null;
 
   constructor(
     overrides: Partial<NodeConfig> = {},
@@ -70,6 +73,8 @@ export class Node {
     this.rotator = new Rotator(this.runtime, this.journalist, this.headless, this.bus, this.cfg, extra.rotation);
     this.runtime.on('renamed', ({ agent, from }) => this.journalist.renameAgent(agent, from));
     this.terminals = new Terminals();
+    this.devices = new Devices(this.store);
+    this.tailscale = new TailscaleListener(this.cfg.home, () => this.cfg.port);
     this.fileWatcher = new FileWatcher((root, projectId, paths) => this.bus.publish({ type: 'files:changed', projectId, root, paths }));
     this.bus.on('event', (e: any) => { if (e.type === 'project:removed') this.fileWatcher.dropProject(e.projectId); });
   }
@@ -81,15 +86,17 @@ export class Node {
     this.server = await startServer(this.cfg, this.bus, buildRouter(this), () => ({
       type: 'hello', nodeId: this.cfg.nodeId, version: VERSION, seq: this.bus.currentSeq, epoch: this.bus.epoch,
       ts: Date.now(),
-    }) as any, this.terminals);
+    }) as any, this.terminals, this.devices);
     const addr = this.server.address();
     if (addr && typeof addr === 'object') this.cfg.port = addr.port;
+    this.tailscale.start(this.server);
     this.watches.restore(); // after listen: a fired watch may spawn an agent, which needs the port
     writeFileSync(join(this.cfg.home, 'node.pid'), JSON.stringify({ pid: process.pid, port: this.cfg.port, version: VERSION }));
   }
 
   async stop(): Promise<void> {
     this.terminals.shutdown();
+    await this.tailscale.stop();
     this.fileWatcher.close();
     this.watches.stop();
     this.innerchat.stop();
