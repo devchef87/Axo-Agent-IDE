@@ -44,6 +44,15 @@ describe('mobile devices', () => {
     assert.ok(st.agents[0].preview?.text, 'agent carries a last-message preview');
     assert.notEqual((await call(t, `/agents/${agentId}/images/none`, {}, tok)).status, 401, 'tool-result images are readable');
     assert.equal((await call(t, `/agents/${agentId}/interrupt`, { method: 'POST' }, tok)).status, 200);
+    // attachments from the phone land in the agent's folder, out of git, with sanitized timestamped names
+    const up = await call(t, `/agents/${agentId}/attachments`, { method: 'POST', body: JSON.stringify({ files: [{ name: '../../evil photo.jpg', content: Buffer.from('jpegbytes').toString('base64') }] }) }, tok);
+    assert.equal(up.status, 200, JSON.stringify(up.body));
+    const [p] = up.body.paths as string[];
+    const wd = (await call(t, '/state')).body.agents[0].workdir.replace(/\/+$/, '');
+    assert.ok(p.startsWith(`${wd}/.axo/uploads/`) && /-evil_photo\.jpg$/.test(p), p);
+    assert.equal(readFileSync(p, 'utf8'), 'jpegbytes');
+    assert.equal(readFileSync(join(wd, '.axo/uploads/.gitignore'), 'utf8'), '*\n');
+    assert.equal((await call(t, `/agents/${agentId}/attachments`, { method: 'POST', body: '{"files":[]}' }, tok)).status, 400);
     for (const [method, path] of [['GET', '/devices'], ['POST', '/devices'], ['GET', '/terminals'], ['POST', '/terminals'], ['DELETE', `/agents/${agentId}`],
       ['POST', '/agents'], ['PATCH', `/agents/${agentId}`], ['GET', '/innerchat/outbox'], ['PUT', '/settings/tailscale'], ['GET', `/agents/${agentId}/state`]]) {
       assert.equal((await call(t, path, { method, body: method === 'GET' ? undefined : '{}' }, tok)).status, 401, `${method} ${path}`);

@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { homedir } from 'node:os';
-import type { CreateAgentReq, CreateDeviceReq, CreateProjectReq, CreateTerminalReq, ForkReq, FsEntry, MessageReq, NodeState, ProjectContext, RefreshReq, StateDoc, UpdateAgentReq, UsageSummary, UsageTotals, VersionInfo } from '@axo/protocol';
+import type { AttachmentsReq, CreateAgentReq, CreateDeviceReq, CreateProjectReq, CreateTerminalReq, ForkReq, FsEntry, MessageReq, NodeState, ProjectContext, RefreshReq, StateDoc, UpdateAgentReq, UsageSummary, UsageTotals, VersionInfo } from '@axo/protocol';
 import { RawResponse, Router } from './server.ts';
 import { IMAGE_MIME } from '../runtime/images.ts';
 import { createReadStream, existsSync } from 'node:fs';
@@ -11,6 +11,7 @@ import { expandHome } from '../projects.ts';
 import { BUILD, VERSION } from '../config.ts';
 import { addCoordinationRoutes } from './coordination-routes.ts';
 import { registerFileRoutes } from '../files/routes.ts';
+import { saveAttachments } from '../files/attachments.ts';
 
 export function buildRouter(node: Node): Router {
   const { store, bus, runtime, projects, cfg, journalist, rotator } = node;
@@ -56,6 +57,7 @@ export function buildRouter(node: Node): Router {
     const b = body as MessageReq;
     runtime.deliver(params.id, String(b?.text ?? ''), caller.deviceId ? 'user' : b?.author || 'user'); // a phone is always the user
   });
+  r.post('/agents/:id/attachments', ({ params, body }) => saveAttachments(runtime.get(params.id).workdir, (body as AttachmentsReq)?.files));
   r.post('/agents/:id/interrupt', ({ params }) => runtime.interrupt(params.id));
   r.post('/agents/:id/stop', ({ params }) => runtime.stop(params.id));
   r.get('/agents/:id/feed', ({ params, query }) => {
