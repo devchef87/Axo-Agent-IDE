@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppState, BackHandler, Keyboard, Pressable, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardProvider, KeyboardStickyView, useKeyboardState } from 'react-native-keyboard-controller';
 import { feedKey, useAgent, useAxo } from './src/lib/store.ts';
 import { Feed } from './src/components/feed.tsx';
 import { Composer } from './src/components/composer.tsx';
@@ -13,10 +14,12 @@ import { C } from './src/theme.ts';
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
-      <View style={{ flex: 1, backgroundColor: C.panel }}>
-        <Root />
-      </View>
+      <KeyboardProvider>
+        <StatusBar style="light" />
+        <View style={{ flex: 1, backgroundColor: C.panel }}>
+          <Root />
+        </View>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }
@@ -52,7 +55,8 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
   const feed = useAxo((s) => (selected ? s.feeds[feedKey(selected.nodeKey, selected.agentId)] : undefined));
   const [drawer, setDrawer] = useState(!selected);
   const [composerH, setComposerH] = useState(72);
-  const kbLift = useKeyboardLift();
+  // Keyboard tracked natively (react-native-keyboard-controller): Android edge-to-edge never resizes the window.
+  const kbHeight = useKeyboardState((k) => (k.isVisible ? k.height : 0));
   // Restored selection: load its feed once the store is up.
   useEffect(() => {
     if (selected && !feed) useAxo.getState().select(selected);
@@ -86,7 +90,7 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
         </View>
       </View>
 
-      <View style={{ flex: 1 }} onLayout={kbLift.onLayout}>
+      <View style={{ flex: 1 }}>
         {agent && selected ? (
           <>
             {agent.status === 'error' && agent.lastError && (
@@ -99,13 +103,16 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
                 feed={feed ?? { items: [], drafts: {}, hasMore: false, loaded: false, loadingOlder: false }}
                 agent={agent}
                 nodeKey={selected.nodeKey}
-                bottomInset={composerH + kbLift.lift}
+                bottomInset={composerH + Math.max(0, kbHeight - insets.bottom)}
                 onLoadOlder={() => void useAxo.getState().loadFeed(selected.nodeKey, selected.agentId, true)}
               />
             </View>
             {/* Floating composer: overlays the chat, which scrolls underneath it. */}
-            <View pointerEvents="box-none" onLayout={(e) => setComposerH(e.nativeEvent.layout.height)}
-              style={{ position: 'absolute', left: 0, right: 0, bottom: kbLift.lift, paddingBottom: kbLift.open ? 4 : insets.bottom + 10 }}>
+            {/* Sticks to the top of the keyboard; with it closed, sits off the bottom edge. Opened offset drops
+                the nav-bar padding, which the keyboard already covers. */}
+            <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom + 4 }} pointerEvents="box-none"
+              onLayout={(e) => setComposerH(e.nativeEvent.layout.height)}
+              style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: insets.bottom + 10 }}>
               <Composer
                 agent={agent}
                 disabled={offline}
@@ -113,7 +120,7 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
                 onStop={() => useAxo.getState().interrupt(selected)}
                 onUpload={(files) => useAxo.getState().upload(selected, files)}
               />
-            </View>
+            </KeyboardStickyView>
           </>
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
@@ -129,25 +136,3 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
   );
 }
 
-/**
- * How far to raise the floating composer above the keyboard. Android may or may not resize the window
- * for the keyboard (edge-to-edge usually doesn't), so measure: lift by the keyboard's height minus
- * however much the chat area already shrank.
- */
-function useKeyboardLift() {
-  const restH = useRef(0);
-  const [curH, setCurH] = useState(0);
-  const [kbH, setKbH] = useState(0);
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', (e) => setKbH(e.endCoordinates.height));
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKbH(0));
-    return () => { show.remove(); hide.remove(); };
-  }, []);
-  const onLayout = useCallback((e: { nativeEvent: { layout: { height: number } } }) => {
-    const h = e.nativeEvent.layout.height;
-    if (kbH === 0 || h > restH.current) restH.current = h;
-    setCurH(h);
-  }, [kbH]);
-  const shrunk = Math.max(0, restH.current - curH);
-  return { lift: kbH ? Math.max(0, kbH - shrunk) : 0, open: kbH > 0, onLayout };
-}
