@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import type { Agent, EventEnvelope, FeedItem, FeedPage, NodeState, Project, Team } from '@axo/protocol';
-import { NodeClient, type ConnStatus } from './client.ts';
+import { HttpError, NodeClient, type ConnStatus } from './client.ts';
 import type { PairedNode } from './pairing.ts';
 import { loadLast, loadNodes, saveLast, saveNodes, type Selection } from './storage.ts';
 import { previewOf } from './feed.ts';
+import { readAsStringAsync } from 'expo-file-system/legacy';
+import { MAX_ATTACHMENT_BYTES, type Attachment } from './attachments.ts';
 
 export type { Selection };
 
@@ -44,6 +46,7 @@ interface AxoState {
   loadFeed(nodeKey: string, agentId: string, older?: boolean): Promise<void>;
   loadPreviews(): void;
   send(sel: Selection, text: string): Promise<void>;
+  upload(sel: Selection, files: Attachment[]): Promise<string[]>;
   interrupt(sel: Selection): Promise<void>;
   wake(): void;
 }
@@ -254,6 +257,20 @@ export const useAxo = create<AxoState>((set, get) => {
 
     async send(sel, text) {
       await client(sel.nodeKey).post(`/agents/${sel.agentId}/message`, { text });
+    },
+
+    /** Upload attachments into the agent's .axo/uploads/; returns their absolute paths for the message. */
+    async upload(sel, files) {
+      const big = files.find((f) => f.size != null && f.size > MAX_ATTACHMENT_BYTES);
+      if (big) throw new Error(`${big.name} is over ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB.`);
+      const list = await Promise.all(files.map(async (f) => ({ name: f.name, content: await readAsStringAsync(f.uri, { encoding: 'base64' }) })));
+      try {
+        const res = await client(sel.nodeKey).post<{ paths: string[] }>(`/agents/${sel.agentId}/attachments`, { files: list });
+        return res.paths;
+      } catch (e) {
+        if (e instanceof HttpError && (e.status === 404 || e.status === 401)) throw new Error('This server needs an update before it can take attachments from the phone.');
+        throw e;
+      }
     },
 
     async interrupt(sel) {

@@ -52,6 +52,7 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
   const feed = useAxo((s) => (selected ? s.feeds[feedKey(selected.nodeKey, selected.agentId)] : undefined));
   const [drawer, setDrawer] = useState(!selected);
   const [kb, setKb] = useState(false);
+  const [composerH, setComposerH] = useState(72);
 
   useEffect(() => {
     const a = Keyboard.addListener('keyboardDidShow', () => setKb(true));
@@ -104,15 +105,19 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
                 feed={feed ?? { items: [], drafts: {}, hasMore: false, loaded: false, loadingOlder: false }}
                 agent={agent}
                 nodeKey={selected.nodeKey}
+                bottomInset={composerH}
                 onLoadOlder={() => void useAxo.getState().loadFeed(selected.nodeKey, selected.agentId, true)}
               />
             </View>
-            <View style={{ paddingBottom: kb ? 0 : insets.bottom, backgroundColor: C.panel }}>
+            {/* Floating composer: overlays the chat, which scrolls underneath it. */}
+            <View pointerEvents="box-none" onLayout={(e) => setComposerH(e.nativeEvent.layout.height)}
+              style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: kb ? 0 : insets.bottom }}>
               <Composer
                 agent={agent}
                 disabled={offline}
                 onSend={(t) => useAxo.getState().send(selected, t)}
                 onStop={() => useAxo.getState().interrupt(selected)}
+                onUpload={(files) => useAxo.getState().upload(selected, files)}
               />
             </View>
           </>
