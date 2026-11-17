@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, BackHandler, Dimensions, Easing, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Agent, Team } from '@axo/protocol';
-import { feedKey, useAxo, type NodeView, type Selection } from '../lib/store.ts';
+import { usePreview, useAxo, type NodeView, type Selection } from '../lib/store.ts';
 import { timeAgo } from '../lib/feed.ts';
 import { C } from '../theme.ts';
 import { ConnDot, StatusDot, useTick } from './ui.tsx';
@@ -83,7 +83,7 @@ function NodeSection({ node, onPicked }: { node: NodeView; onPicked: () => void 
 }
 
 function AgentRow({ nodeKey, agent, onPicked }: { nodeKey: string; agent: Agent; onPicked: () => void }) {
-  const preview = useAxo((s) => s.previews[feedKey(nodeKey, agent.id)]);
+  const preview = usePreview(nodeKey, agent);
   const active = useAxo((s) => s.selected?.nodeKey === nodeKey && s.selected.agentId === agent.id);
   const select = useAxo((s) => s.select);
   const sel: Selection = { nodeKey, agentId: agent.id };

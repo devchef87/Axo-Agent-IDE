@@ -241,7 +241,7 @@ export const useAxo = create<AxoState>((set, get) => {
         const c = clients.get(key);
         for (const a of n.agents) {
           const fk = feedKey(key, a.id);
-          if (get().previews[fk]) continue;
+          if (a.preview !== undefined || get().previews[fk]) continue; // nodes with Agent.preview send it in state
           c?.get<FeedPage>(`/agents/${a.id}/feed?limit=12`).then((page) => {
             for (let i = page.items.length - 1; i >= 0; i--) {
               const p = previewOf(page.items[i]);
@@ -265,6 +265,22 @@ export const useAxo = create<AxoState>((set, get) => {
     },
   };
 });
+
+/** Drawer line for an agent: the node's Agent.preview, or what this phone saw last, whichever is newer. */
+export function usePreview(nodeKey: string, agent: Agent): Preview | null {
+  const local = useAxo((s) => s.previews[feedKey(nodeKey, agent.id)]);
+  const remote = agent.preview ? { text: agent.preview.text, ts: agent.preview.ts, author: agent.preview.author ?? undefined } : null;
+  if (!local) return remote;
+  if (!remote) return local;
+  return remote.ts >= local.ts ? remote : local;
+}
+
+/** URL for a tool-result image (device tokens may read these; <Image> can't send headers, so ?token=). */
+export function imageUrl(nodeKey: string, agentId: string, imageId: string): string | null {
+  const c = clients.get(nodeKey);
+  if (!c) return null;
+  return `${c.node.url}/api/agents/${agentId}/images/${encodeURIComponent(imageId)}?token=${encodeURIComponent(c.node.token)}`;
+}
 
 export function useAgent(sel: Selection | null): Agent | null {
   return useAxo((s) => (sel ? s.nodes[sel.nodeKey]?.agents.find((a) => a.id === sel.agentId) ?? null : null));

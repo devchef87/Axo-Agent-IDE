@@ -103,6 +103,7 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
               <Feed
                 feed={feed ?? { items: [], drafts: {}, hasMore: false, loaded: false, loadingOlder: false }}
                 agent={agent}
+                nodeKey={selected.nodeKey}
                 onLoadOlder={() => void useAxo.getState().loadFeed(selected.nodeKey, selected.agentId, true)}
               />
             </View>

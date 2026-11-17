@@ -1,8 +1,7 @@
 // Pairing: the desktop shows one QR code with a device token per node (docs/MOBILE.md).
-// TODO: import PairingPayload from @axo/protocol once it lands there.
+import type { PairingPayload } from '@axo/protocol';
 
-export interface PairedNode { id: string; name: string; url: string; token: string }
-export interface PairingPayload { v: 1; nodes: PairedNode[] }
+export type PairedNode = PairingPayload['nodes'][number];
 
 /**
  * Cleartext HTTP is allowed app-wide (Android's network security config can't express a CIDR),
