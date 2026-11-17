@@ -1,0 +1,11 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "paths": { "@axo/protocol": ["../protocol/src/index.ts"] }
+  },
+  "include": ["index.ts", "App.tsx", "src", "../protocol/src/index.ts"]
+}
