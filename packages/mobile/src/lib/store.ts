@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Agent, EventEnvelope, FeedItem, FeedPage, NodeState, Project, Team } from '@axo/protocol';
+import type { Agent, AttachmentsReq, AttachmentsRes, EventEnvelope, FeedItem, FeedPage, NodeState, Project, Team } from '@axo/protocol';
 import { HttpError, NodeClient, type ConnStatus } from './client.ts';
 import type { PairedNode } from './pairing.ts';
 import { loadLast, loadNodes, saveLast, saveNodes, type Selection } from './storage.ts';
@@ -263,9 +263,9 @@ export const useAxo = create<AxoState>((set, get) => {
     async upload(sel, files) {
       const big = files.find((f) => f.size != null && f.size > MAX_ATTACHMENT_BYTES);
       if (big) throw new Error(`${big.name} is over ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB.`);
-      const list = await Promise.all(files.map(async (f) => ({ name: f.name, content: await readAsStringAsync(f.uri, { encoding: 'base64' }) })));
+      const list: AttachmentsReq['files'] = await Promise.all(files.map(async (f) => ({ name: f.name, content: await readAsStringAsync(f.uri, { encoding: 'base64' }) })));
       try {
-        const res = await client(sel.nodeKey).post<{ paths: string[] }>(`/agents/${sel.agentId}/attachments`, { files: list });
+        const res = await client(sel.nodeKey).post<AttachmentsRes>(`/agents/${sel.agentId}/attachments`, { files: list } satisfies AttachmentsReq);
         return res.paths;
       } catch (e) {
         if (e instanceof HttpError && (e.status === 404 || e.status === 401)) throw new Error('This server needs an update before it can take attachments from the phone.');
