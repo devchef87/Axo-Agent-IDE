@@ -1,9 +1,9 @@
-import { memo, useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Animated, FlatList, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
+import { createContext, memo, useCallback, useContext, useMemo, useState } from 'react';
+import { ActivityIndicator, Animated, FlatList, Image, Modal, Pressable, ScrollView, Text, View, type LayoutChangeEvent } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import type { Agent, FeedItem } from '@axo/protocol';
-import type { FeedState } from '../lib/store.ts';
+import { imageUrl, type FeedState } from '../lib/store.ts';
 import { foldText, formatDuration, senderOf, toBlocks, verbOf, type Block, type ToolItem } from '../lib/feed.ts';
 import { C, mono } from '../theme.ts';
 import { Markdown } from './markdown.tsx';
@@ -13,7 +13,11 @@ import { REFRESH_REASON, usePulse, useTick } from './ui.tsx';
  * The chat. An inverted FlatList so it opens at the newest message and stays pinned there
  * as replies stream in; scrolling up pages in older history.
  */
-export function Feed({ feed, agent, onLoadOlder }: { feed: FeedState; agent: Agent; onLoadOlder: () => void }) {
+/** Resolves a tool-result image id to a URL on the agent's node. */
+const ImageUrl = createContext<(id: string) => string | null>(() => null);
+
+export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; agent: Agent; nodeKey: string; onLoadOlder: () => void }) {
+  const urlFor = useCallback((id: string) => imageUrl(nodeKey, agent.id, id), [nodeKey, agent.id]);
   const blocks = useMemo(() => toBlocks(feed.items, feed.drafts), [feed.items, feed.drafts]);
   const data = useMemo(() => blocks.slice().reverse(), [blocks]);
   const working = agent.status === 'working' || agent.status === 'starting';
@@ -35,6 +39,7 @@ export function Feed({ feed, agent, onLoadOlder }: { feed: FeedState; agent: Age
     );
   }
   return (
+    <ImageUrl.Provider value={urlFor}>
     <FlatList
       inverted
       data={data}
@@ -51,6 +56,7 @@ export function Feed({ feed, agent, onLoadOlder }: { feed: FeedState; agent: Age
       maxToRenderPerBatch={8}
       windowSize={9}
     />
+    </ImageUrl.Provider>
   );
 }
 
@@ -163,12 +169,40 @@ function ToolGroup({ items, live }: { items: ToolItem[]; live: boolean }) {
           </>
         )}
       </Pressable>
+      {/* Images stay visible even when the group is collapsed. */}
+      <ImageStrip images={items.flatMap((t) => t.images ?? [])} />
       {open && (
         <View style={{ marginLeft: 4, paddingLeft: 10, borderLeftWidth: 1, borderLeftColor: C.borderSubtle }}>
           {items.map((t) => <ToolRow key={t.id} item={t} />)}
         </View>
       )}
     </View>
+  );
+}
+
+/** Thumbnails of images a tool returned (screenshots etc.); tap for full size. */
+function ImageStrip({ images }: { images: { id: string }[] }) {
+  const urlFor = useContext(ImageUrl);
+  const [open, setOpen] = useState<string | null>(null);
+  if (!images.length) return null;
+  const openUrl = open ? urlFor(open) : null;
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4, paddingLeft: 16 }}>
+      {images.map((img) => {
+        const uri = urlFor(img.id);
+        if (!uri) return null;
+        return (
+          <Pressable key={img.id} onPress={() => setOpen(img.id)} accessibilityLabel="Open image">
+            <Image source={{ uri }} resizeMode="cover" style={{ width: 132, height: 92, borderRadius: 6, borderWidth: 1, borderColor: C.borderSubtle, backgroundColor: C.inset }} />
+          </Pressable>
+        );
+      })}
+      <Modal visible={!!openUrl} transparent animationType="fade" onRequestClose={() => setOpen(null)}>
+        <Pressable onPress={() => setOpen(null)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center' }}>
+          {openUrl && <Image source={{ uri: openUrl }} resizeMode="contain" style={{ width: '100%', height: '85%' }} />}
+        </Pressable>
+      </Modal>
+    </ScrollView>
   );
 }
 
