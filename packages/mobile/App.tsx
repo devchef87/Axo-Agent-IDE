@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AppState, BackHandler, Keyboard, Pressable, Text, View } from 'react-native';
+import { AppState, BackHandler, Keyboard, Pressable, View } from 'react-native';
+import { Text } from './src/components/text.tsx';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardProvider, KeyboardStickyView, useKeyboardState } from 'react-native-keyboard-controller';
@@ -9,7 +10,8 @@ import { Composer } from './src/components/composer.tsx';
 import { Drawer } from './src/components/drawer.tsx';
 import { PairScreen } from './src/components/pair-screen.tsx';
 import { STATUS_LABEL, StatusDot } from './src/components/ui.tsx';
-import { C } from './src/theme.ts';
+import { C, HAIR } from './src/theme.ts';
+import { Feather } from '@expo/vector-icons';
 
 export default function App() {
   return (
@@ -68,16 +70,16 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <View style={{ paddingTop: insets.top, backgroundColor: C.panel, borderBottomWidth: 1, borderBottomColor: C.borderSubtle }}>
+      <View style={{ paddingTop: insets.top, backgroundColor: C.panel, borderBottomWidth: HAIR, borderBottomColor: C.border }}>
         <View style={{ height: 54, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6 }}>
           <Pressable onPress={() => { Keyboard.dismiss(); setDrawer(true); }} hitSlop={8} accessibilityLabel="Open menu"
             style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? C.hover : undefined })}>
-            <View style={{ gap: 4 }}>{[18, 18, 12].map((w, i) => <View key={i} style={{ width: w, height: 2, borderRadius: 1, backgroundColor: C.secondary }} />)}</View>
+            <Feather name="menu" size={21} color={C.secondary} />
           </Pressable>
           {agent ? (
             <View style={{ flex: 1, marginLeft: 6 }}>
-              <Text style={{ color: C.primary, fontSize: 17, fontWeight: '600' }} numberOfLines={1}>{agent.name}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ color: C.primary, fontSize: 16.5, fontWeight: '500' }} numberOfLines={1}>{agent.name}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 1 }}>
                 <StatusDot status={agent.status} size={6} />
                 <Text style={{ color: C.dim, fontSize: 12.5 }} numberOfLines={1}>
                   {offline ? `${node?.name} · ${node?.status === 'connecting' ? 'reconnecting…' : 'offline'}` : `${STATUS_LABEL[agent.status]} · ${node?.name}`}
@@ -85,7 +87,7 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
               </View>
             </View>
           ) : (
-            <Text style={{ flex: 1, marginLeft: 6, color: C.primary, fontSize: 17, fontWeight: '600' }}>Axo</Text>
+            <Text style={{ flex: 1, marginLeft: 6, color: C.primary, fontSize: 16.5, fontWeight: '700' }}>Axo</Text>
           )}
         </View>
       </View>
@@ -94,7 +96,7 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
         {agent && selected ? (
           <>
             {agent.status === 'error' && agent.lastError && (
-              <View style={{ backgroundColor: 'rgba(255,161,151,0.1)', paddingHorizontal: 16, paddingVertical: 8 }}>
+              <View style={{ backgroundColor: 'rgba(242,139,130,0.1)', paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: HAIR, borderBottomColor: 'rgba(242,139,130,0.35)' }}>
                 <Text style={{ color: C.danger, fontSize: 13 }} numberOfLines={3}>{agent.lastError}</Text>
               </View>
             )}
@@ -124,7 +126,7 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
           </>
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-            <Text style={{ color: C.muted, fontSize: 15, textAlign: 'center' }}>
+            <Text style={{ color: C.faint, fontSize: 15, textAlign: 'center' }}>
               {selected && node?.status !== 'online' ? `Waiting for ${node?.name ?? 'the server'}…` : 'Open the menu and pick an agent.'}
             </Text>
           </View>
