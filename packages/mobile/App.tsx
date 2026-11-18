@@ -18,7 +18,7 @@ export default function App() {
     <SafeAreaProvider>
       <KeyboardProvider>
         <StatusBar style="light" />
-        <View style={{ flex: 1, backgroundColor: C.panel }}>
+        <View style={{ flex: 1, backgroundColor: C.bg }}>
           <Root />
         </View>
       </KeyboardProvider>
@@ -70,7 +70,7 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <View style={{ paddingTop: insets.top, backgroundColor: C.panel, borderBottomWidth: HAIR, borderBottomColor: C.border }}>
+      <View style={{ paddingTop: insets.top, backgroundColor: C.bg, borderBottomWidth: HAIR, borderBottomColor: C.borderSubtle }}>
         <View style={{ height: 58, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6 }}>
           <Pressable onPress={() => { Keyboard.dismiss(); setDrawer(true); }} hitSlop={8} accessibilityLabel="Open menu"
             style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? C.hover : undefined })}>
