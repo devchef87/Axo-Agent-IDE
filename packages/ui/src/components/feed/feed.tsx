@@ -9,6 +9,7 @@ import { cn, formatDuration, REFRESH_REASON } from '../ui.tsx';
 import { Collapsible } from './collapsible.tsx';
 import { FeedContext, useFeedContext } from './feed-context.ts';
 import { formatAgo } from '../../lib/agent-form.ts';
+import { splitSections } from '../../lib/sections.ts';
 
 type ToolItem = Extract<FeedItem, { kind: 'tool' }>;
 type Block =
@@ -73,7 +74,7 @@ export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; a
 
 const BlockView = memo(function BlockView({ block, live, latest }: { block: Block; live: boolean; latest: boolean }) {
   if (block.type === 'tools') return <ToolGroup items={block.items} live={live} />;
-  if (block.type === 'draft') return <AgentMessage><Prose text={block.text} /></AgentMessage>;
+  if (block.type === 'draft') return <AgentMessage><div className="md text-[13px]"><Sections text={block.text} /></div></AgentMessage>;
   const item = block.item;
   switch (item.kind) {
     case 'user': return <UserMessage item={item} />;
@@ -137,7 +138,7 @@ function FoldedProse({ text, startOpen }: { text: string; startOpen: boolean }) 
   return (
     <div className="relative">
       <div ref={ref} style={folded ? { maxHeight: FOLDED_TO, overflow: 'hidden' } : undefined} className="md text-[13px]">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+        <Sections text={text} />
       </div>
       {folded && <div className="pointer-events-none absolute inset-x-0 bottom-8 h-16 bg-gradient-to-t from-[var(--bg)] to-transparent" aria-hidden />}
       {tall && (
@@ -163,10 +164,23 @@ function AgentMessage({ ts, children }: { ts?: number; children: ReactNode }) {
           {ts && ts > 1e12 && <span className="ml-auto text-[10.5px] text-dim" title={new Date(ts).toLocaleString()}>{formatAgo(ts)}</span>}
         </div>
       )}
-      <div className="border-l border-accent/60 pl-4">{children}</div>
+      {children}
     </div>
   );
 }
+
+/** A reply's markdown with one short accent rule per section (split at headings), not one line down the whole reply. */
+const Sections = memo(function Sections({ text }: { text: string }) {
+  return (
+    <>
+      {splitSections(text).map((s, i) => (
+        <div key={i} className="md-sec border-l border-accent/60 pl-4 [&+&]:mt-4">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{s}</ReactMarkdown>
+        </div>
+      ))}
+    </>
+  );
+});
 
 export const Prose = memo(function Prose({ text }: { text: string }) {
   return (
