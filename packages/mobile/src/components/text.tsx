@@ -21,7 +21,9 @@ function withFont(style: TextProps['style'], nested: boolean): TextStyle {
   if (s.fontFamily === mono) return s;
   const { fontWeight, ...rest } = s;
   const family = familyFor(fontWeight) ?? s.fontFamily ?? (nested ? undefined : FONT.regular);
-  return family ? { ...rest, fontFamily: family } : rest;
+  // Google Sans has tall metrics; Android's extra font padding on top of them pushes text off-centre and clips inputs.
+  const base: TextStyle = nested ? rest : { includeFontPadding: false, ...rest };
+  return family ? { ...base, fontFamily: family } : base;
 }
 
 export function Text({ style, ...rest }: TextProps) {

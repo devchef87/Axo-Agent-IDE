@@ -129,7 +129,7 @@ export function Composer({ agent, disabled, onSend, onStop, onUpload }: {
           cursorColor={C.working}
           multiline
           editable={!disabled}
-          style={{ color: C.primary, fontSize: 16, lineHeight: 23, maxHeight: 168, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4, fontWeight: '500' }}
+          style={{ color: C.primary, fontSize: 16, minHeight: 46, maxHeight: 168, paddingHorizontal: 14, paddingTop: 13, paddingBottom: 6, fontWeight: '500' }}
           textAlignVertical="top"
         />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 6, paddingBottom: 6 }}>

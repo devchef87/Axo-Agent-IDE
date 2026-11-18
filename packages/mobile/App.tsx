@@ -71,17 +71,17 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ paddingTop: insets.top, backgroundColor: C.panel, borderBottomWidth: HAIR, borderBottomColor: C.border }}>
-        <View style={{ height: 54, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6 }}>
+        <View style={{ height: 58, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6 }}>
           <Pressable onPress={() => { Keyboard.dismiss(); setDrawer(true); }} hitSlop={8} accessibilityLabel="Open menu"
             style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? C.hover : undefined })}>
             <Feather name="menu" size={21} color={C.secondary} />
           </Pressable>
           {agent ? (
             <View style={{ flex: 1, marginLeft: 6 }}>
-              <Text style={{ color: C.primary, fontSize: 16.5, fontWeight: '500' }} numberOfLines={1}>{agent.name}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 1 }}>
+              <Text style={{ color: C.primary, fontSize: 16.5, lineHeight: 21, fontWeight: '500' }} numberOfLines={1}>{agent.name}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                 <StatusDot status={agent.status} size={6} />
-                <Text style={{ color: C.dim, fontSize: 12.5 }} numberOfLines={1}>
+                <Text style={{ color: C.dim, fontSize: 12.5, lineHeight: 16 }} numberOfLines={1}>
                   {offline ? `${node?.name} · ${node?.status === 'connecting' ? 'reconnecting…' : 'offline'}` : `${STATUS_LABEL[agent.status]} · ${node?.name}`}
                 </Text>
               </View>
