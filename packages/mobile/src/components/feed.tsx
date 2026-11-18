@@ -70,7 +70,7 @@ const BlockView = memo(function BlockView({ block, live, latest }: { block: Bloc
   const item = block.item;
   switch (item.kind) {
     case 'user': return <UserMessage item={item} />;
-    case 'text': return <AgentMessage ts={item.ts} copyText={item.text}><Reply text={item.text} startOpen={latest} /></AgentMessage>;
+    case 'text': return <AgentMessage ts={item.ts} copyText={item.text}><Reply text={item.text} /></AgentMessage>;
     case 'system': return <SystemLine item={item} />;
     case 'turn': return <TurnFooter item={item} />;
     case 'rotation': return <RotationDivider item={item} />;
@@ -122,7 +122,7 @@ function FoldedText({ text, color, size = 15, weight, mono: isMono }: { text: st
 
 function Toggle({ open, onPress, closed, opened = 'Show less' }: { open: boolean; onPress: () => void; closed: string; opened?: string }) {
   return (
-    <Pressable onPress={onPress} hitSlop={10} style={({ pressed }) => ({ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, paddingHorizontal: 9, height: 30, borderRadius: 4, borderWidth: 1, borderColor: C.border, backgroundColor: pressed ? C.hover : 'transparent' })}>
+    <Pressable onPress={onPress} hitSlop={10} style={({ pressed }) => ({ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, marginLeft: -6, paddingHorizontal: 6, height: 32, borderRadius: 4, backgroundColor: pressed ? C.hover : 'transparent' })}>
       <Feather name={open ? 'chevron-up' : 'chevron-down'} size={13} color={C.secondary} />
       <Text style={{ color: C.secondary, fontSize: 12.5, fontWeight: '500' }}>{open ? opened : closed}</Text>
     </Pressable>
@@ -132,10 +132,10 @@ function Toggle({ open, onPress, closed, opened = 'Show less' }: { open: boolean
 const FOLD_OVER = 520;   // px of rendered reply before it folds (desktop 440 at 14.5px; scaled to 16)
 const FOLDED_TO = 300;
 
-/** A finished reply. Long ones fold (measured on the rendered markdown); the latest starts open. */
-function Reply({ text, startOpen }: { text: string; startOpen: boolean }) {
+/** A finished reply. Long ones fold (measured on the rendered markdown), every one, the latest included. */
+function Reply({ text }: { text: string }) {
   const [tall, setTall] = useState(false);
-  const [open, setOpen] = useState(startOpen);
+  const [open, setOpen] = useState(false);
   const onLayout = (e: LayoutChangeEvent) => { if (!tall && e.nativeEvent.layout.height > FOLD_OVER) setTall(true); };
   const folded = tall && !open;
   return (
@@ -160,7 +160,7 @@ function Fade() {
   );
 }
 
-/** An agent reply: name, role and time above; the text set off by a hairline indigo rule (tool calls stay outside it). */
+/** An agent reply: name, role and time above, then the text (the desktop's indigo rule is left out on the phone). */
 function AgentMessage({ ts, copyText, children }: { ts?: number; copyText?: string; children: ReactNode }) {
   const { name, role } = useContext(Ctx);
   useTick(!!ts, 30_000);
@@ -171,7 +171,7 @@ function AgentMessage({ ts, copyText, children }: { ts?: number; copyText?: stri
         {!!role && <Text style={{ color: C.dim, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{role}</Text>}
         {!!ts && ts > 1e12 && <Text style={{ marginLeft: 'auto', color: C.dim, fontSize: 11.5 }}>{timeAgo(ts)}</Text>}
       </View>
-      <View style={{ borderLeftWidth: HAIR, borderLeftColor: 'rgba(84,70,250,0.6)', paddingLeft: 16 }}>{children}</View>
+      <View>{children}</View>
     </Pressable>
   );
 }
@@ -288,7 +288,7 @@ function SystemLine({ item }: { item: Extract<FeedItem, { kind: 'system' }> }) {
 
 function TurnFooter({ item }: { item: Extract<FeedItem, { kind: 'turn' }> }) {
   return (
-    <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, marginBottom: 12, paddingLeft: 17 }}>
+    <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, marginBottom: 12 }}>
       <Text style={{ color: C.dim, fontSize: 11.5, fontFamily: mono }}>{formatDuration(item.durationMs)}</Text>
       {item.costUsd > 0 && <Text style={{ color: C.dim, fontSize: 11.5, fontFamily: mono }}>· ${item.costUsd.toFixed(2)}</Text>}
       {item.interrupted && <Text style={{ color: C.warning, fontSize: 11.5, fontFamily: mono }}>· stopped</Text>}

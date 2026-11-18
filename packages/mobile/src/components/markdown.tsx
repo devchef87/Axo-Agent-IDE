@@ -73,7 +73,7 @@ function blocks(tokens: Token[], base: TextStyle, key: string, tight = false): R
           <ScrollView key={k} horizontal showsHorizontalScrollIndicator={false}
             style={{ marginTop: mt, borderRadius: 3, backgroundColor: C.inset, borderWidth: HAIR, borderColor: C.border }}
             contentContainerStyle={{ paddingHorizontal: em(0.9), paddingVertical: em(0.7) }}>
-            <Text style={{ fontFamily: mono, fontSize: em(0.82), lineHeight: Math.round(em(0.82) * 1.5), color: C.primary }}>{c.text}</Text>
+            <Text style={{ fontFamily: mono, fontSize: em(0.82), lineHeight: Math.round(em(0.82) * 1.5), color: C.body }}>{c.text}</Text>
           </ScrollView>
         ));
         break;
@@ -157,7 +157,8 @@ function inlines(tokens: Token[] | undefined, base: TextStyle, key: string): Rea
       case 'em': return <Text key={k} style={{ fontStyle: 'italic', fontWeight: base.fontWeight }}>{inlines((t as Tokens.Em).tokens, base, k)}</Text>;
       case 'del': return <Text key={k} style={{ textDecorationLine: 'line-through', fontWeight: base.fontWeight }}>{inlines((t as Tokens.Del).tokens, base, k)}</Text>;
       case 'codespan':
-        return <Text key={k} style={{ fontFamily: mono, fontSize: Math.round((base.fontSize ?? SIZE) * 0.84 * 10) / 10, color: C.primary, backgroundColor: C.control, letterSpacing: 0 }}>{` ${decode((t as Tokens.Codespan).text)} `}</Text>;
+        // Desktop .md code: indigo text on 12% indigo.
+        return <Text key={k} style={{ fontFamily: mono, fontSize: Math.round((base.fontSize ?? SIZE) * 0.85 * 10) / 10, color: C.accentText, backgroundColor: 'rgba(84,70,250,0.12)', letterSpacing: 0 }}>{` ${decode((t as Tokens.Codespan).text)} `}</Text>;
       case 'link': {
         const l = t as Tokens.Link;
         return (
