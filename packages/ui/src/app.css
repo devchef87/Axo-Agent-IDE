@@ -16,19 +16,19 @@
  */
 
 /*
- * Dark: near-black body (#131314), a lighter sidebar (#1E1F20), inputs on #282A2C, white text and
- * one mint accent (#37DAA3) for buttons, focus, selection, reply rules and the working pulse. Mint is
- * bright, so text on a mint fill is near-black. Light: clean neutrals with a black accent.
+ * Dark: charcoal body (#1F2126), sidebar #1E1F20, inputs on #282A2C, white text and one indigo accent
+ * (#5446FA) for fills (buttons, reply rules, selection). Indigo is dark, so where it must read on its own
+ * (small text, status dots) the lighter --accent-text / --working are used instead. Light: clean neutrals with a black accent.
  * Other colour is reserved for danger, warning, diff lines and syntax.
  */
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #131314;            /* main body (chat, editor) */
+  --bg: #1F2126;            /* main body (chat, editor) */
   --panel: #1E1F20;         /* sidebar, title bar, status bar */
-  --elevated: #242527;      /* modals, menus */
+  --elevated: #272a30;      /* modals, menus */
   --inset: #282A2C;         /* inputs, composer, code blocks, tool output */
-  --terminal: #0d0d0e;      /* terminal panel: a shade under the body */
+  --terminal: #18191d;      /* terminal panel: a shade under the body */
   --hover: #2a2b2e;
   --control: #333537;       /* buttons, badges, your message bubble */
   --control-hover: #3c3f41;
@@ -43,15 +43,15 @@
   --text-faint: #a8abae;
   --text-dim: #8e9196;      /* secondary metadata (roles): quiet on purpose */
   --dot-soft: #3a3c3f;      /* barely-there status dot: asleep agents, servers you're not in */
-  --accent: #37DAA3;
-  --accent-hover: #5ce3b5;
-  --accent-fg: #0b0b0b;
-  --accent-text: #37DAA3;   /* mint reads as text too (≥7.9:1 on every surface) */
+  --accent: #5446FA;
+  --accent-hover: #4636e8;
+  --accent-fg: #ffffff;
+  --accent-text: #9d96ff;   /* indigo as small text (selected agent, links): ≥5.5:1 */
   --success: #81c995;       /* diff additions */
   --warning: #fdd663;
   --danger: #f28b82;
   --info: #c4c7c5;
-  --working: #37DAA3;
+  --working: #8f87ff;       /* status dots/spinners: indigo light enough to read on dark */
   --rotating: #c4c7c5;
   --innerchat: #e3e3e3;
   /* syntax: soft pastels that read on near-black */

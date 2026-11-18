@@ -163,7 +163,7 @@ function AgentMessage({ ts, children }: { ts?: number; children: ReactNode }) {
           {ts && ts > 1e12 && <span className="ml-auto text-[10.5px] text-dim" title={new Date(ts).toLocaleString()}>{formatAgo(ts)}</span>}
         </div>
       )}
-      <div className="border-l-2 border-accent/70 pl-4">{children}</div>
+      <div className="border-l border-accent/60 pl-4">{children}</div>
     </div>
   );
 }
