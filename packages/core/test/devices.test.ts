@@ -32,7 +32,7 @@ describe('mobile devices', () => {
     return { agentId: a.body.id as string, device: d.body };
   }
 
-  it('a device token can read, message and stop agents, create teams and agents, and nothing else', async () => {
+  it('a device token can read, message and stop agents, create and delete teams and agents, and nothing else', async () => {
     const { agentId, device } = await withAgent();
     const tok = device.token;
     for (const path of ['/version', '/state', '/events?since=0', `/agents/${agentId}/feed`]) {
@@ -62,10 +62,16 @@ describe('mobile devices', () => {
     assert.equal(made.status, 200, JSON.stringify(made.body));
     assert.equal(made.body.teamId, team.body.id);
     await t.waitFor(() => t.feed(made.body.id).some((i) => i.kind === 'user' && i.text === 'hello from the phone' && i.author === 'user'));
-    for (const [method, path] of [['GET', '/devices'], ['POST', '/devices'], ['GET', '/terminals'], ['POST', '/terminals'], ['DELETE', `/agents/${agentId}`],
-      ['POST', '/projects'], ['DELETE', `/teams/${team.body.id}`], ['PATCH', `/agents/${agentId}`], ['GET', '/innerchat/outbox'], ['PUT', '/settings/tailscale'], ['GET', `/agents/${agentId}/state`]]) {
+    for (const [method, path] of [['GET', '/devices'], ['POST', '/devices'], ['GET', '/terminals'], ['POST', '/terminals'], ['DELETE', `/projects/${projectId}`],
+      ['POST', '/projects'], ['POST', `/teams/${team.body.id}/merge`], ['PATCH', `/teams/${team.body.id}`], ['PATCH', `/agents/${agentId}`], ['GET', '/innerchat/outbox'], ['PUT', '/settings/tailscale'], ['GET', `/agents/${agentId}/state`]]) {
       assert.equal((await call(t, path, { method, body: method === 'GET' ? undefined : '{}' }, tok)).status, 401, `${method} ${path}`);
     }
+    // delete an agent, then archive (delete) the team from the phone
+    assert.equal((await call(t, `/agents/${made.body.id}`, { method: 'DELETE' }, tok)).status, 200);
+    assert.ok(!(await call(t, '/state', {}, tok)).body.agents.some((a: any) => a.id === made.body.id), 'agent gone');
+    const arch = await call(t, `/teams/${team.body.id}/archive`, { method: 'POST', body: JSON.stringify({ removeWorktree: true }) }, tok);
+    assert.equal(arch.status, 200, JSON.stringify(arch.body));
+    assert.ok(arch.body.archivedAt, 'team archived');
     // the list never exposes tokens
     const list = (await call(t, '/devices')).body;
     assert.equal(list.length, 1);
