@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { AlertTriangle, ChevronDown, ChevronUp, Info, OctagonAlert } from 'lucide-react';
@@ -7,7 +7,8 @@ import type { FeedState } from '../../stores/store.ts';
 import { ToolGroup, useTick } from './tool-group.tsx';
 import { cn, formatDuration, REFRESH_REASON } from '../ui.tsx';
 import { Collapsible } from './collapsible.tsx';
-import { FeedContext } from './feed-context.ts';
+import { FeedContext, useFeedContext } from './feed-context.ts';
+import { formatAgo } from '../../lib/agent-form.ts';
 
 type ToolItem = Extract<FeedItem, { kind: 'tool' }>;
 type Block =
@@ -49,7 +50,7 @@ export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; a
     if (el.scrollTop < 40 && feed.hasMore) onLoadOlder();
   };
 
-  const ctx = useMemo(() => ({ nodeKey, agentId: agent.id }), [nodeKey, agent.id]);
+  const ctx = useMemo(() => ({ nodeKey, agentId: agent.id, agentName: agent.name, role: agent.role }), [nodeKey, agent.id, agent.name, agent.role]);
   return (
     <FeedContext.Provider value={ctx}>
     <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto">
@@ -72,11 +73,11 @@ export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; a
 
 const BlockView = memo(function BlockView({ block, live, latest }: { block: Block; live: boolean; latest: boolean }) {
   if (block.type === 'tools') return <ToolGroup items={block.items} live={live} />;
-  if (block.type === 'draft') return <Prose text={block.text} />;
+  if (block.type === 'draft') return <AgentMessage><Prose text={block.text} /></AgentMessage>;
   const item = block.item;
   switch (item.kind) {
     case 'user': return <UserMessage item={item} />;
-    case 'text': return <FoldedProse text={item.text} startOpen={latest} />;
+    case 'text': return <AgentMessage ts={item.ts}><FoldedProse text={item.text} startOpen={latest} /></AgentMessage>;
     case 'system': return <SystemLine item={item} />;
     case 'turn': return <TurnFooter item={item} />;
     case 'rotation': return <RotationDivider item={item} />;
@@ -89,7 +90,7 @@ function UserMessage({ item }: { item: Extract<FeedItem, { kind: 'user' }> }) {
     // Yours: a bubble on the right, so the conversation doesn't read as one wall of text.
     return (
       <div className="animate-fade-in mb-3 mt-6 flex justify-end first:mt-0">
-        <div className="max-w-[min(70%,720px)] whitespace-pre-wrap break-words rounded-[8px] rounded-br-[3px] bg-control px-3.5 py-2 text-[13px] leading-relaxed text-primary">
+        <div className="max-w-[min(70%,720px)] whitespace-pre-wrap break-words rounded-[8px] rounded-br-[3px] bg-control px-3.5 py-2 text-[14px] font-medium leading-relaxed tracking-[0.01em] text-primary">
           <Collapsible as="div" text={item.text} />
         </div>
       </div>
@@ -135,13 +136,13 @@ function FoldedProse({ text, startOpen }: { text: string; startOpen: boolean }) 
   };
   return (
     <div className="relative">
-      <div ref={ref} style={folded ? { maxHeight: FOLDED_TO, overflow: 'hidden' } : undefined} className="md my-2 text-[13px]">
+      <div ref={ref} style={folded ? { maxHeight: FOLDED_TO, overflow: 'hidden' } : undefined} className="md text-[14.5px]">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
       </div>
-      {folded && <div className="pointer-events-none absolute inset-x-0 bottom-7 h-16 bg-gradient-to-t from-[var(--bg)] to-transparent" aria-hidden />}
+      {folded && <div className="pointer-events-none absolute inset-x-0 bottom-8 h-16 bg-gradient-to-t from-[var(--bg)] to-transparent" aria-hidden />}
       {tall && (
         <button onClick={toggle} aria-expanded={open}
-          className="mb-1 flex h-6 items-center gap-1 rounded-[4px] border border-border px-2 text-2xs text-secondary hover:bg-hover hover:text-primary cursor-pointer">
+          className="mt-2 flex h-6 items-center gap-1 rounded-[4px] border border-border px-2 text-2xs text-secondary hover:bg-hover hover:text-primary cursor-pointer">
           {open ? <><ChevronUp size={11} /> Show less</> : <><ChevronDown size={11} /> Show more</>}
         </button>
       )}
@@ -149,9 +150,27 @@ function FoldedProse({ text, startOpen }: { text: string; startOpen: boolean }) 
   );
 }
 
+/** An agent reply: name and role above, the text set off by an accent rule (tool calls stay outside it). */
+function AgentMessage({ ts, children }: { ts?: number; children: ReactNode }) {
+  const ctx = useFeedContext();
+  useTick(!!ts, 30_000); // keep "2m ago" current
+  return (
+    <div className="mb-3 mt-5 first:mt-0">
+      {ctx && (
+        <div className="mb-1.5 flex items-baseline gap-2">
+          <span className="text-[12px] font-medium text-primary">{ctx.agentName}</span>
+          {ctx.role && <span className="text-[11px] text-dim">{ctx.role}</span>}
+          {ts && ts > 1e12 && <span className="ml-auto text-[10.5px] text-dim" title={new Date(ts).toLocaleString()}>{formatAgo(ts)}</span>}
+        </div>
+      )}
+      <div className="border-l border-accent/60 pl-4">{children}</div>
+    </div>
+  );
+}
+
 export const Prose = memo(function Prose({ text }: { text: string }) {
   return (
-    <div className="md my-2 text-[13px]">
+    <div className="md text-[14.5px]">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
     </div>
   );

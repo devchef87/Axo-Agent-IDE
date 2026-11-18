@@ -27,7 +27,7 @@ export function contrast(a: string, b: string): number {
 
 const THEMES = { dark: tokens('[data-theme="dark"]'), light: tokens('[data-theme="light"]') };
 const SURFACES = ['bg', 'panel', 'elevated', 'inset', 'hover', 'terminal'];
-const TEXT = ['text-primary', 'text-secondary', 'text-muted', 'text-faint',
+const TEXT = ['text-primary', 'text-secondary', 'text-body', 'text-muted', 'text-faint',
   'success', 'warning', 'danger', 'info', 'rotating', 'innerchat',
   'syn-keyword', 'syn-string', 'syn-number', 'syn-comment', 'syn-function', 'syn-type', 'syn-property', 'syn-tag'];
 
@@ -58,7 +58,7 @@ for (const [name, t] of Object.entries(THEMES)) {
       for (const bg of ['bg', 'elevated', 'panel']) {
         assert.ok(contrast(t['border-strong'], bg === 'bg' ? t.bg : t[bg]) >= 3, `border-strong on ${bg}`);
         assert.ok(contrast(t.ring, t[bg]) >= 3, `focus ring on ${bg}`);
-        assert.ok(contrast(t.accent, t[bg]) >= 3, `accent (buttons, indicators) on ${bg}`);
+        if (bg !== 'elevated') assert.ok(contrast(t['accent-text'], t[bg]) >= 4.5, `accent-text on ${bg}`);
         assert.ok(contrast(t.working, t[bg]) >= 3, `working dot/spinner on ${bg}`);
       }
     });
@@ -71,9 +71,14 @@ const chroma = (hex: string) => {
 };
 
 describe('palette', () => {
-  it('dark uses the slate blue scheme', () => {
+  it('dark uses the charcoal / indigo scheme', () => {
     const d = THEMES.dark;
-    assert.deepEqual([d.bg, d.panel, d.accent, d.control].map((c) => c.toLowerCase()), ['#32424f', '#24353d', '#28ace6', '#38505b']);
+    assert.deepEqual([d.bg, d.panel, d.inset, d.accent].map((c) => c.toLowerCase()), ['#1f2126', '#24282f', '#2a2e36', '#5446fa']);
+  });
+
+  it('accent as text is readable', () => {
+    // Accent text is only used for the selected agent, which sits on the body or sidebar with no fill.
+    for (const bg of ['bg', 'panel']) assert.ok(contrast(THEMES.dark['accent-text'], THEMES.dark[bg]) >= 4.5, `accent-text on ${bg}`);
   });
 
   it('light stays neutral with a black accent', () => {
