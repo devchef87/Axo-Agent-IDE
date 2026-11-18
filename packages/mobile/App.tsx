@@ -9,6 +9,7 @@ import { Feed } from './src/components/feed.tsx';
 import { Composer } from './src/components/composer.tsx';
 import { Drawer } from './src/components/drawer.tsx';
 import { PairScreen } from './src/components/pair-screen.tsx';
+import { CreateSheet, type CreateTarget } from './src/components/create.tsx';
 import { STATUS_LABEL, StatusDot } from './src/components/ui.tsx';
 import { C, HAIR } from './src/theme.ts';
 import { Feather } from '@expo/vector-icons';
@@ -57,6 +58,7 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
   const feed = useAxo((s) => (selected ? s.feeds[feedKey(selected.nodeKey, selected.agentId)] : undefined));
   const [drawer, setDrawer] = useState(!selected);
   const [composerH, setComposerH] = useState(72);
+  const [create, setCreate] = useState<CreateTarget | null>(null);
   // Keyboard tracked natively (react-native-keyboard-controller): Android edge-to-edge never resizes the window.
   const kbHeight = useKeyboardState((k) => (k.isVisible ? k.height : 0));
   // Restored selection: load its feed once the store is up.
@@ -133,7 +135,8 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
         )}
       </View>
 
-      <Drawer open={drawer} onClose={closeDrawer} onPair={openSettings} />
+      <Drawer open={drawer} onClose={closeDrawer} onPair={openSettings} onCreate={(t) => { setDrawer(false); setCreate(t); }} />
+      <CreateSheet target={create} onClose={() => setCreate(null)} onCreatedAgent={(sel) => useAxo.getState().select(sel)} />
     </View>
   );
 }

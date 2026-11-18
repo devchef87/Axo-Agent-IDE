@@ -4,8 +4,8 @@ A lightweight chat app, like the Claude app: a chat screen, and a drawer to pick
 That's all v1 is. You read agents' progress in the chat (watches wake them; their reports land there) and
 send them messages and tasks.
 
-**In v1:** drawer (server → team → agent, status dots), agent chat (live), send a message, Stop a working agent.
-**Not in v1:** creating agents/teams, push notifications, files/editor, terminal, server setup, iOS.
+**In v1:** drawer (server → team → agent, status dots), agent chat (live), send a message (with attachments), Stop a working agent, create a team or an agent.
+**Not in v1:** push notifications, files/editor, terminal, server setup, iOS.
 
 ## How the phone reaches agents
 

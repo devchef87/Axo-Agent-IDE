@@ -31,7 +31,7 @@ describe('mobile devices', () => {
     return { agentId: a.body.id as string, device: d.body };
   }
 
-  it('a device token can read, message and stop agents, and nothing else', async () => {
+  it('a device token can read, message and stop agents, create teams and agents, and nothing else', async () => {
     const { agentId, device } = await withAgent();
     const tok = device.token;
     for (const path of ['/version', '/state', '/events?since=0', `/agents/${agentId}/feed`]) {
@@ -53,8 +53,16 @@ describe('mobile devices', () => {
     assert.equal(readFileSync(p, 'utf8'), 'jpegbytes');
     assert.equal(readFileSync(join(wd, '.axo/uploads/.gitignore'), 'utf8'), '*\n');
     assert.equal((await call(t, `/agents/${agentId}/attachments`, { method: 'POST', body: '{"files":[]}' }, tok)).status, 400);
+    // new team + new agent from the phone
+    const projectId = (await call(t, '/state', {}, tok)).body.projects[0].id;
+    const team = await call(t, '/teams', { method: 'POST', body: JSON.stringify({ projectId, name: 'phone-team', mode: 'direct' }) }, tok);
+    assert.equal(team.status, 200, JSON.stringify(team.body));
+    const made = await call(t, '/agents', { method: 'POST', body: JSON.stringify({ projectId, teamId: team.body.id, name: 'from-phone', role: 'fullstack', task: 'hello from the phone' }) }, tok);
+    assert.equal(made.status, 200, JSON.stringify(made.body));
+    assert.equal(made.body.teamId, team.body.id);
+    await t.waitFor(() => t.feed(made.body.id).some((i) => i.kind === 'user' && i.text === 'hello from the phone' && i.author === 'user'));
     for (const [method, path] of [['GET', '/devices'], ['POST', '/devices'], ['GET', '/terminals'], ['POST', '/terminals'], ['DELETE', `/agents/${agentId}`],
-      ['POST', '/agents'], ['PATCH', `/agents/${agentId}`], ['GET', '/innerchat/outbox'], ['PUT', '/settings/tailscale'], ['GET', `/agents/${agentId}/state`]]) {
+      ['POST', '/projects'], ['DELETE', `/teams/${team.body.id}`], ['PATCH', `/agents/${agentId}`], ['GET', '/innerchat/outbox'], ['PUT', '/settings/tailscale'], ['GET', `/agents/${agentId}/state`]]) {
       assert.equal((await call(t, path, { method, body: method === 'GET' ? undefined : '{}' }, tok)).status, 401, `${method} ${path}`);
     }
     // the list never exposes tokens

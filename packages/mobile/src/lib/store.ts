@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Agent, AttachmentsReq, AttachmentsRes, EventEnvelope, FeedItem, FeedPage, NodeState, Project, Team } from '@axo/protocol';
+import type { Agent, AttachmentsReq, AttachmentsRes, CreateAgentReq, CreateTeamReq, EventEnvelope, FeedItem, FeedPage, NodeState, Project, Team } from '@axo/protocol';
 import { HttpError, NodeClient, type ConnStatus } from './client.ts';
 import type { PairedNode } from './pairing.ts';
 import { loadLast, loadNodes, saveLast, saveNodes, type Selection } from './storage.ts';
@@ -47,6 +47,8 @@ interface AxoState {
   loadPreviews(): void;
   send(sel: Selection, text: string): Promise<void>;
   upload(sel: Selection, files: Attachment[]): Promise<string[]>;
+  createTeam(nodeKey: string, req: CreateTeamReq): Promise<Team>;
+  createAgent(nodeKey: string, req: CreateAgentReq): Promise<Agent>;
   interrupt(sel: Selection): Promise<void>;
   wake(): void;
 }
@@ -57,6 +59,16 @@ const PAGE = 80;
 
 const clients = new Map<string, NodeClient>();
 const previewsLoaded = new Set<string>(); // nodeKeys whose previews were fetched since connecting
+
+/** POST that creates something; an old node (before phones could create) answers 401. */
+async function postCreate<T>(nodeKey: string, path: string, body: unknown): Promise<T> {
+  try {
+    return await client(nodeKey).post<T>(path, body);
+  } catch (e) {
+    if (e instanceof HttpError && e.status === 401) throw new Error('This server needs an update before the phone can create teams and agents.');
+    throw e;
+  }
+}
 
 export function client(nodeKey: string): NodeClient {
   const c = clients.get(nodeKey);
@@ -272,6 +284,18 @@ export const useAxo = create<AxoState>((set, get) => {
         if (e instanceof HttpError && (e.status === 404 || e.status === 401)) throw new Error('This server needs an update before it can take attachments from the phone.');
         throw e;
       }
+    },
+
+    async createTeam(nodeKey, req) {
+      const team = await postCreate<Team>(nodeKey, '/teams', req);
+      patchNode(nodeKey, (n) => ({ teams: upsert(n.teams, team) })); // the WS upsert follows; show it now
+      return team;
+    },
+
+    async createAgent(nodeKey, req) {
+      const agent = await postCreate<Agent>(nodeKey, '/agents', req);
+      patchNode(nodeKey, (n) => ({ agents: upsert(n.agents, agent) }));
+      return agent;
     },
 
     async interrupt(sel) {
