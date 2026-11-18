@@ -4,7 +4,7 @@ A lightweight chat app, like the Claude app: a chat screen, and a drawer to pick
 That's all v1 is. You read agents' progress in the chat (watches wake them; their reports land there) and
 send them messages and tasks.
 
-**In v1:** drawer (server → team → agent, status dots), agent chat (live), send a message (with attachments), Stop a working agent, create a team or an agent.
+**In v1:** drawer (server → team → agent, status dots), agent chat (live), send a message (with attachments), Stop a working agent, create or delete a team or an agent.
 **Not in v1:** push notifications, files/editor, terminal, server setup, iOS.
 
 ## How the phone reaches agents
@@ -38,8 +38,9 @@ A device token may call **only**:
 - `POST /api/agents/:id/interrupt` (Stop)
 - `POST /api/agents/:id/attachments {files}` → `{paths}` (saved under the agent's `.axo/uploads/`)
 - `POST /api/teams`, `POST /api/agents` (same bodies as the desktop's New team / New agent; no paths)
+- `DELETE /api/agents/:id` (delete an agent), `POST /api/teams/:id/archive {removeWorktree?}` (delete a team: stops its agents and hides it; the branch is kept)
 
-Everything else (files, terminals, deletes, settings, innerchat admin) returns 401 for a device token.
+Everything else (files, terminals, other deletes, settings, innerchat admin) returns 401 for a device token.
 Types live in `packages/protocol` (`Device`, `PairingPayload`).
 
 ## Pairing

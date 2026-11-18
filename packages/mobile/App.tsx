@@ -10,6 +10,7 @@ import { Composer } from './src/components/composer.tsx';
 import { Drawer } from './src/components/drawer.tsx';
 import { PairScreen } from './src/components/pair-screen.tsx';
 import { CreateSheet, type CreateTarget } from './src/components/create.tsx';
+import { confirmDeleteAgent } from './src/components/actions.ts';
 import { STATUS_LABEL, StatusDot } from './src/components/ui.tsx';
 import { C, HAIR } from './src/theme.ts';
 import { Feather } from '@expo/vector-icons';
@@ -90,6 +91,12 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
             </View>
           ) : (
             <Text style={{ flex: 1, marginLeft: 6, color: C.primary, fontSize: 16.5, fontWeight: '700' }}>Axo</Text>
+          )}
+          {agent && selected && !offline && (
+            <Pressable onPress={() => confirmDeleteAgent(selected.nodeKey, agent)} hitSlop={8} accessibilityLabel={`Delete ${agent.name}`}
+              style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? C.hover : undefined })}>
+              <Feather name="trash-2" size={18} color={C.dim} />
+            </Pressable>
           )}
         </View>
       </View>

@@ -49,6 +49,8 @@ interface AxoState {
   upload(sel: Selection, files: Attachment[]): Promise<string[]>;
   createTeam(nodeKey: string, req: CreateTeamReq): Promise<Team>;
   createAgent(nodeKey: string, req: CreateAgentReq): Promise<Agent>;
+  deleteAgent(nodeKey: string, agentId: string): Promise<void>;
+  deleteTeam(nodeKey: string, teamId: string, removeWorktree: boolean): Promise<void>;
   interrupt(sel: Selection): Promise<void>;
   wake(): void;
 }
@@ -60,15 +62,16 @@ const PAGE = 80;
 const clients = new Map<string, NodeClient>();
 const previewsLoaded = new Set<string>(); // nodeKeys whose previews were fetched since connecting
 
-/** POST that creates something; an old node (before phones could create) answers 401. */
-async function postCreate<T>(nodeKey: string, path: string, body: unknown): Promise<T> {
+/** A call an older node refuses to phones (401): say so instead of 'unauthorized'. */
+async function guarded<T>(fn: () => Promise<T>): Promise<T> {
   try {
-    return await client(nodeKey).post<T>(path, body);
+    return await fn();
   } catch (e) {
-    if (e instanceof HttpError && e.status === 401) throw new Error('This server needs an update before the phone can create teams and agents.');
+    if (e instanceof HttpError && e.status === 401) throw new Error('This server needs an update before the phone can do that.');
     throw e;
   }
 }
+const postCreate = <T,>(nodeKey: string, path: string, body: unknown) => guarded(() => client(nodeKey).post<T>(path, body));
 
 export function client(nodeKey: string): NodeClient {
   const c = clients.get(nodeKey);
@@ -296,6 +299,22 @@ export const useAxo = create<AxoState>((set, get) => {
       const agent = await postCreate<Agent>(nodeKey, '/agents', req);
       patchNode(nodeKey, (n) => ({ agents: upsert(n.agents, agent) }));
       return agent;
+    },
+
+    async deleteAgent(nodeKey, agentId) {
+      await guarded(() => client(nodeKey).api(`/agents/${agentId}`, { method: 'DELETE' }));
+      patchNode(nodeKey, (n) => ({ agents: n.agents.filter((a) => a.id !== agentId) }));
+      const sel = get().selected;
+      if (sel?.nodeKey === nodeKey && sel.agentId === agentId) get().select(null);
+    },
+
+    /** "Delete team" archives it: its agents are stopped and hidden, the git branch is kept. */
+    async deleteTeam(nodeKey, teamId, removeWorktree) {
+      const team = await guarded(() => client(nodeKey).post<Team>(`/teams/${teamId}/archive`, { removeWorktree }));
+      patchNode(nodeKey, (n) => ({ teams: upsert(n.teams, team) }));
+      const sel = get().selected;
+      const a = sel?.nodeKey === nodeKey ? get().nodes[nodeKey]?.agents.find((x) => x.id === sel.agentId) : undefined;
+      if (a?.teamId === teamId) get().select(null);
     },
 
     async interrupt(sel) {

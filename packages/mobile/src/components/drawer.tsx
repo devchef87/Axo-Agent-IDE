@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, BackHandler, Dimensions, Easing, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Animated, BackHandler, Dimensions, Easing, Pressable, ScrollView, View } from 'react-native';
 import { Text } from './text.tsx';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Agent, Team } from '@axo/protocol';
 import { usePreview, useAxo, type NodeView, type Selection } from '../lib/store.ts';
+import { confirmDeleteAgent, confirmDeleteTeam } from './actions.ts';
 import { timeAgo } from '../lib/feed.ts';
 import { C, HAIR } from '../theme.ts';
 import { Feather } from '@expo/vector-icons';
@@ -21,6 +22,9 @@ export function Drawer({ open, onClose, onPair, onCreate }: { open: boolean; onC
   const loadPreviews = useAxo((s) => s.loadPreviews);
   const selected = useAxo((s) => s.selected);
   const [menu, setMenu] = useState(false);
+  // Servers and teams start collapsed every time the app opens; tap a header to open it.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const toggle = (k: string) => setExpanded((e) => ({ ...e, [k]: !e[k] }));
   useTick(open, 30_000);
   // New things default to where you are: the open agent's project and team.
   const here = (): Omit<CreateTarget, 'kind'> => {
@@ -49,67 +53,108 @@ export function Drawer({ open, onClose, onPair, onCreate }: { open: boolean; onC
       <Animated.View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: WIDTH, backgroundColor: C.panel, transform: [{ translateX: x }], paddingTop: insets.top }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, height: 54 }}>
           <Text style={{ flex: 1, color: C.primary, fontSize: 18, fontWeight: '700' }}>Axo</Text>
-          <Pressable onPress={() => setMenu(true)} hitSlop={6} accessibilityLabel="New agent or team"
-            style={({ pressed }) => ({ width: 44, height: 44, marginRight: -10, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? C.hover : undefined })}>
-            <Feather name="plus" size={21} color={C.secondary} />
+          <Pressable onPress={() => setMenu(!menu)} hitSlop={6} accessibilityLabel="New agent or team" accessibilityState={{ expanded: menu }}
+            style={({ pressed }) => ({ width: 44, height: 44, marginRight: -10, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed || menu ? C.hover : undefined })}>
+            <Feather name={menu ? 'x' : 'plus'} size={21} color={C.secondary} />
           </Pressable>
         </View>
+        {menu && (
+          <View style={{ borderBottomWidth: HAIR, borderBottomColor: C.border, paddingBottom: 6 }}>
+            <MenuRow icon="user-plus" label="New agent" hint="In a team, with an optional first task"
+              onPress={() => { setMenu(false); onCreate({ kind: 'agent', ...here() }); }} />
+            <MenuRow icon="users" label="New team" hint="Its own branch and goal"
+              onPress={() => { setMenu(false); const h = here(); onCreate({ kind: 'team', nodeKey: h.nodeKey, projectId: h.projectId }); }} />
+          </View>
+        )}
         <ScrollView contentContainerStyle={{ paddingBottom: 16 }}>
-          {nodeOrder.map((k) => nodes[k] && <NodeSection key={k} node={nodes[k]} onPicked={onClose} onCreate={onCreate} />)}
+          {nodeOrder.map((k) => nodes[k] && <NodeSection key={k} node={nodes[k]} onPicked={onClose} onCreate={onCreate} expanded={expanded} toggle={toggle} />)}
         </ScrollView>
         <Pressable onPress={onPair} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingTop: 15, paddingBottom: 15 + insets.bottom, borderTopWidth: HAIR, borderTopColor: C.border, backgroundColor: pressed ? C.hover : undefined })}>
           <Feather name="server" size={15} color={C.faint} />
           <Text style={{ color: C.faint, fontSize: 14, fontWeight: '500' }}>Servers & pairing</Text>
         </Pressable>
       </Animated.View>
-      <NewMenu open={menu} onClose={() => setMenu(false)}
-        onAgent={() => { setMenu(false); onCreate({ kind: 'agent', ...here() }); }}
-        onTeam={() => { setMenu(false); const h = here(); onCreate({ kind: 'team', nodeKey: h.nodeKey, projectId: h.projectId }); }} />
     </View>
   );
 }
 
-function NodeSection({ node, onPicked, onCreate }: { node: NodeView; onPicked: () => void; onCreate: (t: CreateTarget) => void }) {
+function NodeSection({ node, onPicked, onCreate, expanded, toggle }: {
+  node: NodeView; onPicked: () => void; onCreate: (t: CreateTarget) => void; expanded: Record<string, boolean>; toggle: (k: string) => void;
+}) {
   const offline = node.status !== 'online';
   const current = useAxo((s) => s.selected?.nodeKey === node.key);
-  const teams = node.teams.filter((t) => !t.archivedAt);
+  const open = !!expanded[`n:${node.key}`];
+  const teams = node.teams.filter((t) => !t.archivedAt).sort((a, b) => a.createdAt - b.createdAt);
   const projectName = (t: Team) => node.projects.find((p) => p.id === t.projectId)?.name;
   const byTeam = (t: Team) => node.agents.filter((a) => a.teamId === t.id).sort((a, b) => a.createdAt - b.createdAt);
+  const visible = node.agents.filter((a) => teams.some((t) => t.id === a.teamId));
   const showProject = new Set(teams.map((t) => t.projectId)).size > 1;
+  const status = node.status === 'unauthorized' ? 'unpaired' : node.status === 'connecting' ? 'connecting…' : offline ? 'offline' : null;
+
+  const teamActions = (t: Team) => {
+    const agents = byTeam(t).length;
+    Alert.alert(t.name, undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete team', style: 'destructive', onPress: () => confirmDeleteTeam(node.key, t, agents) },
+      { text: 'New agent here', onPress: () => onCreate({ kind: 'agent', nodeKey: node.key, projectId: t.projectId, teamId: t.id }) },
+    ]);
+  };
+
   return (
-    <View style={{ marginTop: 6, opacity: offline && !node.agents.length ? 0.55 : 1 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 6 }}>
+    <View style={{ marginTop: 2 }}>
+      <Pressable onPress={() => toggle(`n:${node.key}`)} accessibilityRole="button" accessibilityState={{ expanded: open }}
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 46, paddingHorizontal: 18, backgroundColor: pressed ? C.hover : undefined })}>
+        <Feather name={open ? 'chevron-down' : 'chevron-right'} size={15} color={C.dim} style={{ marginLeft: -3 }} />
         <ConnDot status={node.status} current={current} />
         <Text style={{ flex: 1, color: C.dim, fontSize: 11, fontWeight: '600', letterSpacing: 0.66, textTransform: 'uppercase' }} numberOfLines={1}>{node.name}</Text>
-        {offline && <Text style={{ color: node.status === 'connecting' ? C.warning : C.danger, fontSize: 11.5 }}>{node.status === 'unauthorized' ? 'unpaired' : node.status === 'connecting' ? 'connecting…' : 'offline'}</Text>}
-      </View>
-      {node.status === 'unauthorized' && <Text style={{ color: C.dim, fontSize: 12.5, lineHeight: 18, paddingHorizontal: 18, paddingBottom: 6 }}>This phone's token was revoked. Pair again from the desktop.</Text>}
-      {teams.map((t) => {
+        {status ? <Text style={{ color: node.status === 'connecting' ? C.warning : C.danger, fontSize: 11.5 }}>{status}</Text>
+          : !open && <Summary agents={visible} />}
+      </Pressable>
+      {open && node.status === 'unauthorized' && <Text style={{ color: C.dim, fontSize: 12.5, lineHeight: 18, paddingHorizontal: 18, paddingBottom: 6 }}>This phone's token was revoked. Pair again from the desktop.</Text>}
+      {open && teams.map((t) => {
         const agents = byTeam(t);
-        if (!agents.length) return null;
+        const tOpen = !!expanded[`t:${t.id}`];
         return (
           <View key={t.id} style={{ opacity: offline ? 0.55 : 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 18, paddingRight: 8, paddingTop: 4 }}>
+            <Pressable onPress={() => toggle(`t:${t.id}`)} onLongPress={offline ? undefined : () => teamActions(t)} delayLongPress={350}
+              accessibilityRole="button" accessibilityState={{ expanded: tOpen }} accessibilityHint="Long-press for team actions"
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingLeft: 30, paddingRight: 8, backgroundColor: pressed ? C.hover : undefined })}>
+              <Feather name={tOpen ? 'chevron-down' : 'chevron-right'} size={14} color={C.dim} />
               <Text style={{ flex: 1, color: C.body, fontSize: 13.5, fontWeight: '500' }} numberOfLines={1}>
                 {showProject ? `${projectName(t)} · ${t.name}` : t.name}
               </Text>
+              {!tOpen && <Summary agents={agents} />}
               {!offline && (
                 <Pressable onPress={() => onCreate({ kind: 'agent', nodeKey: node.key, projectId: t.projectId, teamId: t.id })} hitSlop={4} accessibilityLabel={`New agent in ${t.name}`}
-                  style={({ pressed }) => ({ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? C.hover : undefined })}>
+                  style={({ pressed }) => ({ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? C.control : undefined })}>
                   <Feather name="plus" size={16} color={C.dim} />
                 </Pressable>
               )}
-            </View>
-            {agents.map((a) => <AgentRow key={a.id} nodeKey={node.key} agent={a} onPicked={onPicked} />)}
+            </Pressable>
+            {tOpen && agents.map((a) => <AgentRow key={a.id} nodeKey={node.key} agent={a} onPicked={onPicked} canEdit={!offline} />)}
+            {tOpen && !agents.length && <Text style={{ color: C.dim, fontSize: 13, paddingLeft: 52, paddingVertical: 8 }}>No agents in this team yet.</Text>}
           </View>
         );
       })}
-      {node.status === 'online' && !node.agents.length && <Text style={{ color: C.dim, fontSize: 13, paddingHorizontal: 18, paddingVertical: 6 }}>No agents yet.</Text>}
+      {open && node.status === 'online' && !teams.length && <Text style={{ color: C.dim, fontSize: 13, paddingLeft: 42, paddingVertical: 8 }}>No teams yet.</Text>}
     </View>
   );
 }
 
-function AgentRow({ nodeKey, agent, onPicked }: { nodeKey: string; agent: Agent; onPicked: () => void }) {
+/** Right side of a collapsed header: how many agents, and a pulsing dot if any is working. */
+function Summary({ agents }: { agents: Agent[] }) {
+  if (!agents.length) return null;
+  const working = agents.find((a) => a.status === 'working' || a.status === 'starting' || a.status === 'rotating');
+  const error = agents.find((a) => a.status === 'error');
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      {(working || error) && <StatusDot status={error ? 'error' : working!.status} />}
+      <Text style={{ color: C.dim, fontSize: 12 }}>{agents.length}</Text>
+    </View>
+  );
+}
+
+function AgentRow({ nodeKey, agent, onPicked, canEdit }: { nodeKey: string; agent: Agent; onPicked: () => void; canEdit: boolean }) {
   const preview = usePreview(nodeKey, agent);
   const active = useAxo((s) => s.selected?.nodeKey === nodeKey && s.selected.agentId === agent.id);
   const select = useAxo((s) => s.select);
@@ -118,7 +163,13 @@ function AgentRow({ nodeKey, agent, onPicked }: { nodeKey: string; agent: Agent;
   return (
     <Pressable
       onPress={() => { select(sel); onPicked(); }}
-      style={({ pressed }) => ({ flexDirection: 'row', gap: 11, minHeight: 54, alignItems: 'center', paddingHorizontal: 18, paddingVertical: 8, backgroundColor: pressed ? C.hover : undefined })}
+      onLongPress={canEdit ? () => Alert.alert(agent.name, agent.role, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete agent', style: 'destructive', onPress: () => confirmDeleteAgent(nodeKey, agent) },
+      ]) : undefined}
+      delayLongPress={350}
+      accessibilityHint="Long-press to delete"
+      style={({ pressed }) => ({ flexDirection: 'row', gap: 11, minHeight: 54, alignItems: 'center', paddingLeft: 52, paddingRight: 18, paddingVertical: 8, backgroundColor: pressed ? C.hover : undefined })}
     >
       <View style={{ alignSelf: 'flex-start', paddingTop: 8 }}><StatusDot status={agent.status} /></View>
       <View style={{ flex: 1 }}>
@@ -134,27 +185,14 @@ function AgentRow({ nodeKey, agent, onPicked }: { nodeKey: string; agent: Agent;
   );
 }
 
-/** "+" in the drawer header: a small sheet with the two things you can create. */
-function NewMenu({ open, onClose, onAgent, onTeam }: { open: boolean; onClose: () => void; onAgent: () => void; onTeam: () => void }) {
-  const insets = useSafeAreaInsets();
-  const row = (icon: 'user-plus' | 'users', label: string, hint: string, onPress: () => void) => (
-    <Pressable onPress={onPress} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 14, backgroundColor: pressed ? C.hover : undefined })}>
-      <Feather name={icon} size={19} color={C.secondary} />
+function MenuRow({ icon, label, hint, onPress }: { icon: 'user-plus' | 'users'; label: string; hint: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18, paddingVertical: 11, backgroundColor: pressed ? C.hover : undefined })}>
+      <Feather name={icon} size={18} color={C.secondary} />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: C.primary, fontSize: 16, fontWeight: '500' }}>{label}</Text>
-        <Text style={{ color: C.dim, fontSize: 13, marginTop: 2 }}>{hint}</Text>
+        <Text style={{ color: C.primary, fontSize: 15.5, fontWeight: '500' }}>{label}</Text>
+        <Text style={{ color: C.dim, fontSize: 12.5, marginTop: 1 }}>{hint}</Text>
       </View>
     </Pressable>
-  );
-  return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: C.overlay, justifyContent: 'flex-end' }}>
-        <Pressable onPress={() => {}} style={{ backgroundColor: C.elevated, borderTopLeftRadius: 10, borderTopRightRadius: 10, paddingTop: 8, paddingBottom: 8 + insets.bottom }}>
-          <View style={{ alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: C.control, marginBottom: 6 }} />
-          {row('user-plus', 'New agent', 'Start an agent in a team, with an optional first task', onAgent)}
-          {row('users', 'New team', 'A group of agents with its own branch and goal', onTeam)}
-        </Pressable>
-      </Pressable>
-    </Modal>
   );
 }
