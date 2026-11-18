@@ -1,14 +1,5 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter";
-/* Latin + Latin Extended only; other scripts fall back to Inter / system fonts. */
-@import "@fontsource/google-sans/latin-400.css";
-@import "@fontsource/google-sans/latin-ext-400.css";
-@import "@fontsource/google-sans/latin-500.css";
-@import "@fontsource/google-sans/latin-ext-500.css";
-@import "@fontsource/google-sans/latin-600.css";
-@import "@fontsource/google-sans/latin-ext-600.css";
-@import "@fontsource/google-sans/latin-700.css";
-@import "@fontsource/google-sans/latin-ext-700.css";
 
 /*
  * Axo theme. Semantic tokens per theme, mapped into Tailwind below (bg-panel, text-muted, …).
@@ -38,7 +29,7 @@
   --ring: #7d8186;          /* focus: neutral, ≥3:1 */
   --text-primary: #ffffff;
   --text-secondary: #e3e3e3;  /* off-white: normal UI text */
-  --text-body: #c4c7c5;     /* long-form reply text: softer than white to avoid glare (~11:1) */
+  --text-body: #e3e3e3;     /* reply text */
   --text-muted: #c4c7c5;
   --text-faint: #a8abae;
   --text-dim: #8e9196;      /* secondary metadata (roles): quiet on purpose */
@@ -123,7 +114,7 @@
   --color-black: #000;
   --color-white: #fff;
 
-  --font-sans: 'Google Sans', 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Small radii everywhere; nothing pill-shaped except dots. */
@@ -225,12 +216,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex="-1
 
 /* Markdown (assistant prose) */
 /* Reading: text blocks hold a ~80-character measure; code blocks and tables may use the full width. */
-.md { line-height: 1.7; letter-spacing: 0.01em; font-weight: 500; color: var(--text-body); word-wrap: break-word; }
+.md { line-height: 1.625; color: var(--text-body); word-wrap: break-word; } /* Groove: Inter 13px / 400 / leading-relaxed */
 .md p, .md ul, .md ol, .md h1, .md h2, .md h3, .md h4, .md blockquote, .md hr { max-width: 760px; }
 .md > :first-child { margin-top: 0; }
 .md > :last-child { margin-bottom: 0; }
 .md p { margin: 0.75em 0; }
-.md h1, .md h2, .md h3, .md h4 { color: var(--text-primary); font-weight: 700; margin: 1.5em 0 0.5em; line-height: 1.3; letter-spacing: -0.005em; }
+.md h1, .md h2, .md h3, .md h4 { color: var(--text-primary); font-weight: 600; margin: 1.5em 0 0.5em; line-height: 1.3; letter-spacing: -0.005em; }
 .md h1 { font-size: 1.35em; } .md h2 { font-size: 1.2em; } .md h3 { font-size: 1.08em; } .md h4 { font-size: 1em; }
 .md ul, .md ol { margin: 0.6em 0; padding-left: 1.4em; }
 .md ul { list-style: disc; } .md ol { list-style: decimal; }
@@ -239,8 +230,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex="-1
 .md li::marker { color: var(--text-dim); }
 .md a { color: var(--text-primary); text-decoration: underline; text-decoration-color: color-mix(in oklab, var(--text-primary) 40%, transparent); text-underline-offset: 2px; }
 .md a:hover { text-decoration-color: var(--text-primary); }
-.md strong { color: var(--text-primary); font-weight: 700; }
-.md code { font-family: var(--font-mono); font-weight: 400; letter-spacing: 0; font-size: 0.84em; background: var(--control); padding: 0.1em 0.35em; border-radius: 2px; color: var(--text-primary); }
+.md strong { color: var(--text-primary); font-weight: 600; }
+.md code { font-family: var(--font-mono); font-size: 0.86em; background: var(--control); padding: 0.1em 0.35em; border-radius: 2px; color: var(--text-primary); }
 .md pre { background: var(--inset); border: 1px solid var(--border-subtle); border-radius: 3px; padding: 0.7em 0.9em; overflow-x: auto; margin: 0.9em 0; }
 .md pre code { background: none; padding: 0; font-size: 0.82em; line-height: 1.5; color: var(--text-primary); }
 .md blockquote { border-left: 2px solid var(--border); padding-left: 0.8em; color: var(--text-body); margin: 0.75em 0; }
