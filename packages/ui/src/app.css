@@ -46,12 +46,12 @@
   --accent: #5446FA;
   --accent-hover: #4636e8;
   --accent-fg: #ffffff;
-  --accent-text: #9d96ff;   /* indigo as small text (selected agent, links): ≥5.5:1 */
+  --accent-text: #8a80ff;   /* indigo as small text (selected agent): ≥4.5:1 on body and sidebar */
   --success: #81c995;       /* diff additions */
   --warning: #fdd663;
   --danger: #f28b82;
   --info: #c4c7c5;
-  --working: #8f87ff;       /* status dots/spinners: indigo light enough to read on dark */
+  --working: #7c72ff;       /* status dots/spinners: ≥3:1 on every surface */
   --rotating: #c4c7c5;
   --innerchat: #e3e3e3;
   /* syntax: soft pastels that read on near-black */
@@ -225,12 +225,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex="-1
 
 /* Markdown (assistant prose) */
 /* Reading: text blocks hold a ~80-character measure; code blocks and tables may use the full width. */
-.md { line-height: 1.65; color: var(--text-body); word-wrap: break-word; }
+.md { line-height: 1.7; letter-spacing: 0.01em; font-weight: 500; color: var(--text-body); word-wrap: break-word; }
 .md p, .md ul, .md ol, .md h1, .md h2, .md h3, .md h4, .md blockquote, .md hr { max-width: 760px; }
 .md > :first-child { margin-top: 0; }
 .md > :last-child { margin-bottom: 0; }
 .md p { margin: 0.75em 0; }
-.md h1, .md h2, .md h3, .md h4 { color: var(--text-primary); font-weight: 600; margin: 1.5em 0 0.5em; line-height: 1.3; letter-spacing: -0.005em; }
+.md h1, .md h2, .md h3, .md h4 { color: var(--text-primary); font-weight: 700; margin: 1.5em 0 0.5em; line-height: 1.3; letter-spacing: -0.005em; }
 .md h1 { font-size: 1.35em; } .md h2 { font-size: 1.2em; } .md h3 { font-size: 1.08em; } .md h4 { font-size: 1em; }
 .md ul, .md ol { margin: 0.6em 0; padding-left: 1.4em; }
 .md ul { list-style: disc; } .md ol { list-style: decimal; }
@@ -239,8 +239,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex="-1
 .md li::marker { color: var(--text-dim); }
 .md a { color: var(--text-primary); text-decoration: underline; text-decoration-color: color-mix(in oklab, var(--text-primary) 40%, transparent); text-underline-offset: 2px; }
 .md a:hover { text-decoration-color: var(--text-primary); }
-.md strong { color: var(--text-primary); font-weight: 600; }
-.md code { font-family: var(--font-mono); font-size: 0.86em; background: var(--control); padding: 0.1em 0.35em; border-radius: 2px; color: var(--text-primary); }
+.md strong { color: var(--text-primary); font-weight: 700; }
+.md code { font-family: var(--font-mono); font-weight: 400; letter-spacing: 0; font-size: 0.84em; background: var(--control); padding: 0.1em 0.35em; border-radius: 2px; color: var(--text-primary); }
 .md pre { background: var(--inset); border: 1px solid var(--border-subtle); border-radius: 3px; padding: 0.7em 0.9em; overflow-x: auto; margin: 0.9em 0; }
 .md pre code { background: none; padding: 0; font-size: 0.82em; line-height: 1.5; color: var(--text-primary); }
 .md blockquote { border-left: 2px solid var(--border); padding-left: 0.8em; color: var(--text-body); margin: 0.75em 0; }

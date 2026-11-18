@@ -90,7 +90,7 @@ function UserMessage({ item }: { item: Extract<FeedItem, { kind: 'user' }> }) {
     // Yours: a bubble on the right, so the conversation doesn't read as one wall of text.
     return (
       <div className="animate-fade-in mb-3 mt-6 flex justify-end first:mt-0">
-        <div className="max-w-[min(70%,720px)] whitespace-pre-wrap break-words rounded-[8px] rounded-br-[3px] bg-control px-3.5 py-2 text-[13px] leading-relaxed text-primary">
+        <div className="max-w-[min(70%,720px)] whitespace-pre-wrap break-words rounded-[8px] rounded-br-[3px] bg-control px-3.5 py-2 text-[14px] font-medium leading-relaxed tracking-[0.01em] text-primary">
           <Collapsible as="div" text={item.text} />
         </div>
       </div>
@@ -136,7 +136,7 @@ function FoldedProse({ text, startOpen }: { text: string; startOpen: boolean }) 
   };
   return (
     <div className="relative">
-      <div ref={ref} style={folded ? { maxHeight: FOLDED_TO, overflow: 'hidden' } : undefined} className="md text-[13.5px]">
+      <div ref={ref} style={folded ? { maxHeight: FOLDED_TO, overflow: 'hidden' } : undefined} className="md text-[14.5px]">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
       </div>
       {folded && <div className="pointer-events-none absolute inset-x-0 bottom-8 h-16 bg-gradient-to-t from-[var(--bg)] to-transparent" aria-hidden />}
@@ -170,7 +170,7 @@ function AgentMessage({ ts, children }: { ts?: number; children: ReactNode }) {
 
 export const Prose = memo(function Prose({ text }: { text: string }) {
   return (
-    <div className="md text-[13.5px]">
+    <div className="md text-[14.5px]">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
     </div>
   );
