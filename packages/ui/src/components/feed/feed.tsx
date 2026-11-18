@@ -135,7 +135,7 @@ function FoldedProse({ text, startOpen }: { text: string; startOpen: boolean }) 
   };
   return (
     <div className="relative">
-      <div ref={ref} style={folded ? { maxHeight: FOLDED_TO, overflow: 'hidden' } : undefined} className="md my-2 text-[13px]">
+      <div ref={ref} style={folded ? { maxHeight: FOLDED_TO, overflow: 'hidden' } : undefined} className="md my-2 text-[13.5px]">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
       </div>
       {folded && <div className="pointer-events-none absolute inset-x-0 bottom-7 h-16 bg-gradient-to-t from-[var(--bg)] to-transparent" aria-hidden />}
@@ -151,7 +151,7 @@ function FoldedProse({ text, startOpen }: { text: string; startOpen: boolean }) 
 
 export const Prose = memo(function Prose({ text }: { text: string }) {
   return (
-    <div className="md my-2 text-[13px]">
+    <div className="md my-2 text-[13.5px]">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
     </div>
   );
