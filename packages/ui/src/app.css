@@ -16,7 +16,7 @@
  */
 
 /*
- * Dark: charcoal body (#1F2126), sidebar #1E1F20, inputs on #282A2C, white text and one indigo accent
+ * Dark: charcoal body (#1F2126), sidebar #24282F, inputs on #282A2C, white text and one indigo accent
  * (#5446FA) for fills (buttons, reply rules, selection). Indigo is dark, so where it must read on its own
  * (small text, status dots) the lighter --accent-text / --working are used instead. Light: clean neutrals with a black accent.
  * Other colour is reserved for danger, warning, diff lines and syntax.
@@ -25,11 +25,11 @@
 [data-theme="dark"] {
   color-scheme: dark;
   --bg: #1F2126;            /* main body (chat, editor) */
-  --panel: #1E1F20;         /* sidebar, title bar, status bar */
+  --panel: #24282F;         /* sidebar, title bar, status bar */
   --elevated: #272a30;      /* modals, menus */
   --inset: #282A2C;         /* inputs, composer, code blocks, tool output */
   --terminal: #18191d;      /* terminal panel: a shade under the body */
-  --hover: #2a2b2e;
+  --hover: #2e333b;
   --control: #333537;       /* buttons, badges, your message bubble */
   --control-hover: #3c3f41;
   --border: #2e3033;
@@ -42,7 +42,7 @@
   --text-muted: #c4c7c5;
   --text-faint: #a8abae;
   --text-dim: #8e9196;      /* secondary metadata (roles): quiet on purpose */
-  --dot-soft: #3a3c3f;      /* barely-there status dot: asleep agents, servers you're not in */
+  --dot-soft: #3d424b;      /* barely-there status dot: asleep agents, servers you're not in */
   --accent: #5446FA;
   --accent-hover: #4636e8;
   --accent-fg: #ffffff;
