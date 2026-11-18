@@ -16,6 +16,8 @@ const dir = process.env.FAKE_CLAUDE_DIR;
 const args = process.argv.slice(2);
 const flag = (n) => { const i = args.indexOf(n); return i === -1 ? null : args[i + 1]; };
 const { AXO_AGENT_ID, AXO_TOKEN, AXO_NODE_URL, PATH } = process.env;
+// Optional-flag probes aren't spawns; behave like an older claude that doesn't know the flag.
+if (args.includes('--thinking-display')) { process.stderr.write("error: unknown option '--thinking-display'\n"); process.exit(1); }
 appendFileSync(join(dir, 'spawns.log'), JSON.stringify({ args, pid: process.pid, cwd: process.cwd(), env: { AXO_AGENT_ID, AXO_TOKEN, AXO_NODE_URL, PATH } }) + '\n');
 
 // Headless one-shot mode (journalist): `-p --output-format json` without stream input.

@@ -16,7 +16,7 @@ export interface TurnUsage {
 export type Action =
   | { type: 'session'; sessionId: string; model: string | null }
   | { type: 'feed'; item: FeedItem }
-  | { type: 'text-delta'; itemId: string; text: string }
+  | { type: 'text-delta'; itemId: string; text: string; thinking?: true }
   | { type: 'tool-result'; toolUseId: string; isError: boolean; content: string; ts: number; images?: ResultImage[] }
   | { type: 'context'; tokens: number }
   | { type: 'compact'; trigger: string | null; preTokens: number | null }
@@ -68,6 +68,15 @@ export function parseLine(line: string, ctx: ParseContext, now = Date.now()): Ac
       if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta' && ctx.streamMsgId) {
         return [{ type: 'text-delta', itemId: `t-${ctx.streamMsgId}-${ev.index}`, text: ev.delta.text }];
       }
+      // Reasoning streams too, so the feed shows the agent thinking instead of a silent wait.
+      if (ev.type === 'content_block_delta' && ev.delta?.type === 'thinking_delta' && ev.delta.thinking && ctx.streamMsgId) {
+        return [{ type: 'text-delta', itemId: `th-${ctx.streamMsgId}-${ev.index}`, text: ev.delta.thinking, thinking: true }];
+      }
+      // Show a tool call as soon as it starts; the full assistant message fills in its input later (same id).
+      const cb = ev.content_block;
+      if (ev.type === 'content_block_start' && cb?.type === 'tool_use' && cb.id) {
+        return [{ type: 'feed', item: { kind: 'tool', id: cb.id, ts: now, tool: cb.name ?? 'tool', summary: '', input: {}, status: 'running' } }];
+      }
       return [];
     }
 
@@ -79,6 +88,8 @@ export function parseLine(line: string, ctx: ParseContext, now = Date.now()): Ac
         const idx = ctx.nextBlock(msgId);
         if (block.type === 'text' && block.text?.trim()) {
           out.push({ type: 'feed', item: { kind: 'text', id: `t-${msgId}-${idx}`, ts: now, text: block.text } });
+        } else if (block.type === 'thinking' && block.thinking?.trim()) {
+          out.push({ type: 'feed', item: { kind: 'thinking', id: `th-${msgId}-${idx}`, ts: now, text: block.thinking } });
         } else if (block.type === 'tool_use') {
           const input = clampInput(block.input ?? {});
           out.push({ type: 'feed', item: {

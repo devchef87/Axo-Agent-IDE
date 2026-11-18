@@ -134,6 +134,7 @@ export const useAxo = create<AxoState>((set, get) => {
         break;
       }
       case 'agent:text-delta': {
+        if (ev.thinking) break; // reasoning stream: not shown on mobile (yet), and must not render as reply text
         const fk = feedKey(key, ev.agentId);
         if (!get().feeds[fk]?.loaded) break;
         patchFeed(fk, (f) => {

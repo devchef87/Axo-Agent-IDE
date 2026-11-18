@@ -1,7 +1,7 @@
 import { memo, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { AlertTriangle, ChevronDown, ChevronUp, Info, OctagonAlert } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, ChevronUp, Info, OctagonAlert } from 'lucide-react';
 import type { Agent, FeedItem } from '@axo/protocol';
 import type { FeedState } from '../../stores/store.ts';
 import { ToolGroup, useTick } from './tool-group.tsx';
@@ -9,12 +9,13 @@ import { cn, formatDuration, REFRESH_REASON } from '../ui.tsx';
 import { Collapsible } from './collapsible.tsx';
 import { FeedContext, useFeedContext } from './feed-context.ts';
 import { formatAgo } from '../../lib/agent-form.ts';
+import { splitSections } from '../../lib/sections.ts';
 
 type ToolItem = Extract<FeedItem, { kind: 'tool' }>;
 type Block =
   | { type: 'item'; item: FeedItem }
   | { type: 'tools'; id: string; items: ToolItem[] }
-  | { type: 'draft'; id: string; text: string };
+  | { type: 'draft'; id: string; text: string; thinking: boolean };
 
 function toBlocks(items: FeedItem[], drafts: Record<string, string>): Block[] {
   const out: Block[] = [];
@@ -27,7 +28,7 @@ function toBlocks(items: FeedItem[], drafts: Record<string, string>): Block[] {
       out.push({ type: 'item', item });
     }
   }
-  for (const [id, text] of Object.entries(drafts)) out.push({ type: 'draft', id, text });
+  for (const [id, text] of Object.entries(drafts)) out.push({ type: 'draft', id, text, thinking: id.startsWith('th-') });
   return out;
 }
 
@@ -73,11 +74,14 @@ export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; a
 
 const BlockView = memo(function BlockView({ block, live, latest }: { block: Block; live: boolean; latest: boolean }) {
   if (block.type === 'tools') return <ToolGroup items={block.items} live={live} />;
-  if (block.type === 'draft') return <AgentMessage><Prose text={block.text} /></AgentMessage>;
+  if (block.type === 'draft') return block.thinking
+    ? <Thinking text={block.text} live />
+    : <AgentMessage><div className="md text-[13px]"><Sections text={block.text} /></div></AgentMessage>;
   const item = block.item;
   switch (item.kind) {
     case 'user': return <UserMessage item={item} />;
     case 'text': return <AgentMessage ts={item.ts}><FoldedProse text={item.text} startOpen={latest} /></AgentMessage>;
+    case 'thinking': return <Thinking text={item.text} live={false} />;
     case 'system': return <SystemLine item={item} />;
     case 'turn': return <TurnFooter item={item} />;
     case 'rotation': return <RotationDivider item={item} />;
@@ -90,7 +94,7 @@ function UserMessage({ item }: { item: Extract<FeedItem, { kind: 'user' }> }) {
     // Yours: a bubble on the right, so the conversation doesn't read as one wall of text.
     return (
       <div className="animate-fade-in mb-3 mt-6 flex justify-end first:mt-0">
-        <div className="max-w-[min(70%,720px)] whitespace-pre-wrap break-words rounded-[8px] rounded-br-[3px] bg-control px-3.5 py-2 text-[14px] font-medium leading-relaxed tracking-[0.01em] text-primary">
+        <div className="max-w-[min(70%,720px)] whitespace-pre-wrap break-words rounded-[8px] rounded-br-[3px] bg-control px-3.5 py-2 text-[13px] leading-relaxed text-primary">
           <Collapsible as="div" text={item.text} />
         </div>
       </div>
@@ -136,8 +140,8 @@ function FoldedProse({ text, startOpen }: { text: string; startOpen: boolean }) 
   };
   return (
     <div className="relative">
-      <div ref={ref} style={folded ? { maxHeight: FOLDED_TO, overflow: 'hidden' } : undefined} className="md text-[14.5px]">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+      <div ref={ref} style={folded ? { maxHeight: FOLDED_TO, overflow: 'hidden' } : undefined} className="md text-[13px]">
+        <Sections text={text} />
       </div>
       {folded && <div className="pointer-events-none absolute inset-x-0 bottom-8 h-16 bg-gradient-to-t from-[var(--bg)] to-transparent" aria-hidden />}
       {tall && (
@@ -146,6 +150,39 @@ function FoldedProse({ text, startOpen }: { text: string; startOpen: boolean }) 
           {open ? <><ChevronUp size={11} /> Show less</> : <><ChevronDown size={11} /> Show more</>}
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * The agent's reasoning. While it streams: a live "Thinking" line with the latest few lines of
+ * thought, so a long think isn't a silent wait. Once done: a quiet, folded "Thought" row that opens
+ * to the full text. Always dimmer and smaller than replies, and outside the reply rule.
+ */
+function Thinking({ text, live }: { text: string; live: boolean }) {
+  const [open, setOpen] = useState(false);
+  const words = text.trim().split(/\s+/).length;
+  if (live) {
+    const tail = text.trim().split('\n').filter(Boolean).slice(-4).join('\n');
+    return (
+      <div className="my-2 max-w-[760px] text-[12px] text-dim">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="flex gap-1">
+            {[0, 1, 2].map((i) => <span key={i} className="h-1 w-1 rounded-full bg-working animate-pulse-dot" style={{ animationDelay: `${i * 0.2}s` }} />)}
+          </span>
+          Thinking
+        </div>
+        <div className="line-clamp-4 whitespace-pre-wrap border-l border-border pl-4 italic leading-relaxed">{tail}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="my-1.5 max-w-[760px] text-[12px] text-dim">
+      <button onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-1.5 rounded px-1 -mx-1 hover:bg-hover hover:text-faint cursor-pointer">
+        {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+        Thought <span className="text-dim/70">· {words} words</span>
+      </button>
+      {open && <div className="mt-1 whitespace-pre-wrap border-l border-border pl-4 italic leading-relaxed">{text.trim()}</div>}
     </div>
   );
 }
@@ -163,14 +200,27 @@ function AgentMessage({ ts, children }: { ts?: number; children: ReactNode }) {
           {ts && ts > 1e12 && <span className="ml-auto text-[10.5px] text-dim" title={new Date(ts).toLocaleString()}>{formatAgo(ts)}</span>}
         </div>
       )}
-      <div className="border-l border-accent/60 pl-4">{children}</div>
+      {children}
     </div>
   );
 }
 
+/** A reply's markdown with one short accent rule per section (split at headings), not one line down the whole reply. */
+const Sections = memo(function Sections({ text }: { text: string }) {
+  return (
+    <>
+      {splitSections(text).map((s, i) => (
+        <div key={i} className="md-sec border-l border-accent/60 py-1 pl-5 [&+&]:mt-3">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{s}</ReactMarkdown>
+        </div>
+      ))}
+    </>
+  );
+});
+
 export const Prose = memo(function Prose({ text }: { text: string }) {
   return (
-    <div className="md text-[14.5px]">
+    <div className="md text-[13px]">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
     </div>
   );
