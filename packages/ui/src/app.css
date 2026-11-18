@@ -16,7 +16,7 @@
  */
 
 /*
- * Dark: charcoal body (#1F2126), sidebar #24282F, inputs on #282A2C, white text and one indigo accent
+ * Dark: charcoal body (#1F2126), sidebar #24282F, inputs on #2A2E36 (one cool blue-grey family), white text and one indigo accent
  * (#5446FA) for fills (buttons, reply rules, selection). Indigo is dark, so where it must read on its own
  * (small text, status dots) the lighter --accent-text / --working are used instead. Light: clean neutrals with a black accent.
  * Other colour is reserved for danger, warning, diff lines and syntax.
@@ -26,14 +26,14 @@
   color-scheme: dark;
   --bg: #1F2126;            /* main body (chat, editor) */
   --panel: #24282F;         /* sidebar, title bar, status bar */
-  --elevated: #272a30;      /* modals, menus */
-  --inset: #282A2C;         /* inputs, composer, code blocks, tool output */
-  --terminal: #18191d;      /* terminal panel: a shade under the body */
+  --elevated: #292d35;      /* modals, menus */
+  --inset: #2A2E36;         /* inputs, composer, code blocks, tool output */
+  --terminal: #1a1c21;      /* terminal panel: a shade under the body */
   --hover: #2e333b;
-  --control: #333537;       /* buttons, badges, your message bubble */
-  --control-hover: #3c3f41;
-  --border: #2e3033;
-  --border-subtle: #232426;
+  --control: #343944;       /* buttons, badges, your message bubble */
+  --control-hover: #3d4350;
+  --border: #323743;
+  --border-subtle: #2a2e36;
   --border-strong: #7d8186; /* hover outlines, dividers that must read (≥3:1) */
   --ring: #7d8186;          /* focus: neutral, ≥3:1 */
   --text-primary: #ffffff;
@@ -63,8 +63,8 @@
   --syn-type: #9fe0d6;
   --syn-property: #e3d5a6;
   --syn-tag: #f2b2a6;
-  --scrollbar: #3c3f41;
-  --scrollbar-hover: #5f6368;
+  --scrollbar: #3a3f4a;
+  --scrollbar-hover: #545b68;
   --overlay: rgb(0 0 0 / 0.6);
   --shadow: 0 8px 28px rgb(0 0 0 / 0.5), 0 1px 3px rgb(0 0 0 / 0.4);
 }

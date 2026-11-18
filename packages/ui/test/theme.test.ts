@@ -73,7 +73,7 @@ const chroma = (hex: string) => {
 describe('palette', () => {
   it('dark uses the charcoal / indigo scheme', () => {
     const d = THEMES.dark;
-    assert.deepEqual([d.bg, d.panel, d.inset, d.accent].map((c) => c.toLowerCase()), ['#1f2126', '#24282f', '#282a2c', '#5446fa']);
+    assert.deepEqual([d.bg, d.panel, d.inset, d.accent].map((c) => c.toLowerCase()), ['#1f2126', '#24282f', '#2a2e36', '#5446fa']);
   });
 
   it('accent as text is readable', () => {
