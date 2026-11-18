@@ -1,5 +1,14 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter";
+/* Latin + Latin Extended only; other scripts fall back to Inter / system fonts. */
+@import "@fontsource/google-sans/latin-400.css";
+@import "@fontsource/google-sans/latin-ext-400.css";
+@import "@fontsource/google-sans/latin-500.css";
+@import "@fontsource/google-sans/latin-ext-500.css";
+@import "@fontsource/google-sans/latin-600.css";
+@import "@fontsource/google-sans/latin-ext-600.css";
+@import "@fontsource/google-sans/latin-700.css";
+@import "@fontsource/google-sans/latin-ext-700.css";
 
 /*
  * Axo theme. Semantic tokens per theme, mapped into Tailwind below (bg-panel, text-muted, …).
@@ -7,54 +16,55 @@
  */
 
 /*
- * Dark: slate blue surfaces with one blue accent (#28ACE6) for buttons, focus, selection and the
- * working pulse. Light: clean neutrals with a black accent. Text greys are lighter than the base
- * slate grey (#70818A, kept for scrollbars) so every text colour passes AA on every surface.
+ * Dark: near-black body (#131314), a lighter sidebar (#1E1F20), inputs on #282A2C, white text and
+ * one teal accent (#03897B) for buttons, focus, selection and the working pulse. Teal as small text
+ * uses the lighter --accent-text so it stays readable. Light: clean neutrals with a black accent.
  * Other colour is reserved for danger, warning, diff lines and syntax.
  */
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #32424F;            /* main body (chat, editor) */
-  --panel: #24353D;         /* sidebar, title bar, status bar, composer */
-  --elevated: #2a3a45;      /* modals, menus */
-  --inset: #24353D;         /* inputs, code blocks, tool output */
-  --terminal: #1c2a31;      /* terminal panel: a shade under the sidebar */
-  --hover: #3a4b58;
-  --control: #38505B;       /* buttons, badges, tracks */
-  --control-hover: #405965;
-  --border: #38505B;
-  --border-subtle: #2d3d48;
-  --border-strong: #7d929c; /* hover outlines, dividers that must read (≥3:1) */
-  --ring: #8fa2ac;          /* focus: neutral, ≥3:1 */
-  --text-primary: #f4f7f8;
-  --text-secondary: #d6dde1;  /* off-white: body and normal UI text */
-  --text-muted: #b8c5cb;
-  --text-faint: #b0bec5;
-  --text-dim: #8a9ba4;      /* secondary metadata (roles): quiet on purpose, ≥4.4:1 on the sidebar */
-  --accent: #28ACE6;
-  --accent-hover: #4cc0f0;
-  --accent-fg: #0d1b22;
-  --success: #7fd69a;       /* diff additions */
-  --warning: #f0c36a;
-  --danger: #ffa197;
-  --info: #b8c5cb;
-  --working: #28ACE6;
-  --rotating: #b8c5cb;
-  --innerchat: #e2e8eb;
-  /* syntax: soft pastels that read on slate */
+  --bg: #131314;            /* main body (chat, editor) */
+  --panel: #1E1F20;         /* sidebar, title bar, status bar */
+  --elevated: #242527;      /* modals, menus */
+  --inset: #282A2C;         /* inputs, composer, code blocks, tool output */
+  --terminal: #0d0d0e;      /* terminal panel: a shade under the body */
+  --hover: #2a2b2e;
+  --control: #333537;       /* buttons, badges, your message bubble */
+  --control-hover: #3c3f41;
+  --border: #2e3033;
+  --border-subtle: #232426;
+  --border-strong: #7d8186; /* hover outlines, dividers that must read (≥3:1) */
+  --ring: #7d8186;          /* focus: neutral, ≥3:1 */
+  --text-primary: #ffffff;
+  --text-secondary: #e3e3e3;  /* off-white: body and normal UI text */
+  --text-muted: #c4c7c5;
+  --text-faint: #a8abae;
+  --text-dim: #8e9196;      /* secondary metadata (roles): quiet on purpose */
+  --accent: #03897B;
+  --accent-hover: #02796c;
+  --accent-fg: #ffffff;
+  --accent-text: #1fb3a1;   /* teal as small text (selected agent, links) */
+  --success: #81c995;       /* diff additions */
+  --warning: #fdd663;
+  --danger: #f28b82;
+  --info: #c4c7c5;
+  --working: #03897B;
+  --rotating: #c4c7c5;
+  --innerchat: #e3e3e3;
+  /* syntax: soft pastels that read on near-black */
   --syn-keyword: #d4c2f0;
   --syn-string: #b5dca9;
   --syn-number: #f0c49a;
-  --syn-comment: #b0bec5;
+  --syn-comment: #a8abae;
   --syn-function: #9fd2f5;
   --syn-type: #9fe0d6;
   --syn-property: #e3d5a6;
   --syn-tag: #f2b2a6;
-  --scrollbar: #4a5f6b;
-  --scrollbar-hover: #70818A;
-  --overlay: rgb(10 20 26 / 0.55);
-  --shadow: 0 8px 28px rgb(8 16 22 / 0.45), 0 1px 3px rgb(8 16 22 / 0.35);
+  --scrollbar: #3c3f41;
+  --scrollbar-hover: #5f6368;
+  --overlay: rgb(0 0 0 / 0.6);
+  --shadow: 0 8px 28px rgb(0 0 0 / 0.5), 0 1px 3px rgb(0 0 0 / 0.4);
 }
 
 [data-theme="light"] {
@@ -79,6 +89,7 @@
   --accent: #0a0a0a;
   --accent-hover: #000000;
   --accent-fg: #ffffff;
+  --accent-text: #0a0a0a;
   --success: #1d6b3c;
   --warning: #855600;
   --danger: #b3302a;
@@ -108,7 +119,7 @@
   --color-black: #000;
   --color-white: #fff;
 
-  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: 'Google Sans', 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Small radii everywhere; nothing pill-shaped except dots. */
@@ -147,6 +158,7 @@
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-fg: var(--accent-fg);
+  --color-accent-text: var(--accent-text);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);

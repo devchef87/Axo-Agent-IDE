@@ -222,7 +222,7 @@ function Composer({ agent, sel, autoFocus }: { agent: Agent; sel: Selection; aut
         onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragOver(true); } }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => { if (!e.dataTransfer.files.length) return; e.preventDefault(); setDragOver(false); attach([...e.dataTransfer.files]); }}
-        className={cn('relative rounded-[4px] border bg-panel transition-colors', dragOver ? 'border-accent' : 'border-border focus-within:border-control-hover')}
+        className={cn('relative rounded-[4px] border bg-inset transition-colors', dragOver ? 'border-accent' : 'border-border focus-within:border-control-hover')}
       >
         <div
           role="separator"
