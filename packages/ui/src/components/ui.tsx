@@ -69,7 +69,7 @@ export function ConnDot({ status, tone }: { status: ConnStatus; tone?: 'active' 
     <span
       title={status}
       className={cn('inline-block h-1.5 w-1.5 shrink-0 rounded-full',
-        status === 'online' ? (tone === 'soft' ? 'bg-dot-soft' : tone === 'active' ? 'bg-accent' : 'bg-muted') : status === 'connecting' ? 'bg-warning animate-pulse-dot' : 'bg-danger')}
+        status === 'online' ? (tone === 'soft' ? 'bg-dot-soft' : tone === 'active' ? 'bg-working' : 'bg-muted') : status === 'connecting' ? 'bg-warning animate-pulse-dot' : 'bg-danger')}
     />
   );
 }

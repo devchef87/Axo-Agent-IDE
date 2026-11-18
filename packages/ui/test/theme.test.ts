@@ -58,7 +58,7 @@ for (const [name, t] of Object.entries(THEMES)) {
       for (const bg of ['bg', 'elevated', 'panel']) {
         assert.ok(contrast(t['border-strong'], bg === 'bg' ? t.bg : t[bg]) >= 3, `border-strong on ${bg}`);
         assert.ok(contrast(t.ring, t[bg]) >= 3, `focus ring on ${bg}`);
-        assert.ok(contrast(t.accent, t[bg]) >= 3, `accent (buttons, indicators) on ${bg}`);
+        assert.ok(contrast(t['accent-text'], t[bg]) >= 4.5, `accent-text on ${bg}`);
         assert.ok(contrast(t.working, t[bg]) >= 3, `working dot/spinner on ${bg}`);
       }
     });
@@ -71,9 +71,9 @@ const chroma = (hex: string) => {
 };
 
 describe('palette', () => {
-  it('dark uses the near-black / mint scheme', () => {
+  it('dark uses the charcoal / indigo scheme', () => {
     const d = THEMES.dark;
-    assert.deepEqual([d.bg, d.panel, d.inset, d.accent].map((c) => c.toLowerCase()), ['#131314', '#1e1f20', '#282a2c', '#37daa3']);
+    assert.deepEqual([d.bg, d.panel, d.inset, d.accent].map((c) => c.toLowerCase()), ['#1f2126', '#1e1f20', '#282a2c', '#5446fa']);
   });
 
   it('accent as text is readable', () => {

@@ -197,7 +197,7 @@ function NodeStatus({ nodeKey }: { nodeKey: string }) {
     <span className="flex shrink-0 items-center gap-1.5"
       title={[node.error ?? node.status, node.version ? `v${node.version}` : null,
         today ? `today: ${formatTokens(totalTokens(today))} tokens, ${formatUsd(today.costUsd)}, ${today.turns} turns` : null].filter(Boolean).join(' · ')}>
-      <ConnDot status={node.status} /> <span className={node.status === 'online' ? 'text-secondary' : undefined}>{node.name}</span>
+      <ConnDot status={node.status} tone="soft" /> <span className="text-[9.5px] text-dim">{node.name}</span>
     </span>
   );
 }
