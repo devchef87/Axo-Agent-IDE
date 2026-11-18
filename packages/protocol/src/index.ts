@@ -70,6 +70,7 @@ interface FeedBase { id: string; ts: number }
 export type FeedItem =
   | (FeedBase & { kind: 'user'; text: string; author: string })        // author: 'user' | agent name | 'watch' | 'axo'
   | (FeedBase & { kind: 'text'; text: string })                        // assistant prose
+  | (FeedBase & { kind: 'thinking'; text: string })                    // assistant reasoning (summarized thinking), shown dimmed and folded
   | (FeedBase & {
       kind: 'tool';
       tool: string;
@@ -104,7 +105,7 @@ export type NodeEvent =
   | { type: 'agent:upsert'; agent: Agent }
   | { type: 'agent:removed'; agentId: string }
   | { type: 'agent:feed'; agentId: string; item: FeedItem } // upsert by item.id
-  | { type: 'agent:text-delta'; agentId: string; itemId: string; text: string }
+  | { type: 'agent:text-delta'; agentId: string; itemId: string; text: string; thinking?: true } // thinking: a streaming reasoning block
   | { type: 'rate-limit'; info: Record<string, unknown> }
   // ── journalist + rotation (Phase 3) ──
   | { type: 'journalist:updated'; projectId: string; agentId: string | null; doc: 'state' | 'map' | 'decisions' }

@@ -165,8 +165,8 @@ export const useAxo = create<AxoState>((set, get) => {
         if (!get().feeds[fk]?.loaded) break; // not viewing; will load on open
         patchFeed(fk, (f) => {
           const drafts = { ...f.drafts };
-          if (ev.item.kind === 'text') {
-            // Final text supersedes streamed drafts for the same message.
+          if (ev.item.kind === 'text' || ev.item.kind === 'thinking') {
+            // Final text/thinking supersedes streamed drafts for the same message (t-… / th-… ids).
             const msg = ev.item.id.replace(/-\d+$/, '');
             for (const d of Object.keys(drafts)) if (d.startsWith(msg)) delete drafts[d];
           }
