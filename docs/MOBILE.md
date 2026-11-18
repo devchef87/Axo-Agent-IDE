@@ -33,8 +33,11 @@ A device token may call **only**:
 - `GET /api/version`, `GET /api/state` (projects, teams, agents)
 - `GET /api/events?since=&epoch=` (catch-up) and `WS /ws?token=` (live `EventEnvelope`s: `agent:upsert`, `agent:feed`, …)
 - `GET /api/agents/:id/feed?before=&limit=` (history paging)
+- `GET /api/agents/:id/images/:imageId` (tool-result images)
 - `POST /api/agents/:id/message {text}` (author is recorded as `user`)
 - `POST /api/agents/:id/interrupt` (Stop)
+- `POST /api/agents/:id/attachments {files}` → `{paths}` (saved under the agent's `.axo/uploads/`)
+- `POST /api/teams`, `POST /api/agents` (same bodies as the desktop's New team / New agent; no paths)
 
 Everything else (files, terminals, deletes, settings, innerchat admin) returns 401 for a device token.
 Types live in `packages/protocol` (`Device`, `PairingPayload`).

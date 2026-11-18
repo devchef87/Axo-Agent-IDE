@@ -4,6 +4,7 @@ import { createServer } from 'node:net';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { WebSocket } from 'ws';
+import { execFileSync } from 'node:child_process';
 import { makeNode, call, type TestNode } from './helpers.ts';
 import { agentToken } from '../src/util/agent-token.ts';
 import { TailscaleListener } from '../src/devices/devices.ts';
@@ -70,6 +71,18 @@ describe('mobile devices', () => {
     assert.equal(list.length, 1);
     assert.equal(list[0].token, undefined);
     assert.ok(list[0].lastSeenAt);
+  });
+
+  it('a team base ref from a phone can never be read as a git option', async () => {
+    t = await makeNode();
+    const g = (...a: string[]) => execFileSync('git', a, { cwd: t.project, stdio: 'ignore' });
+    g('init', '-q'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init');
+    const p = await call(t, '/projects', { method: 'POST', body: JSON.stringify({ path: t.project }) });
+    const tok = (await call(t, '/devices', { method: 'POST', body: JSON.stringify({ name: 'Pixel' }) })).body.token;
+    for (const base of ['--upload-pack=touch /tmp/pwned', '-b', 'main main']) {
+      const r = await call(t, '/teams', { method: 'POST', body: JSON.stringify({ projectId: p.body.id, name: `x${base.length}`, mode: 'worktree', base }) }, tok);
+      assert.equal(r.status, 400, base);
+    }
   });
 
   it('streams events over /ws, and revoking closes the socket and kills the token', async () => {

@@ -271,6 +271,8 @@ export class Teams {
 
   /** `git worktree add <project>/.axo/worktrees/<slug> -b axo/<slug> <base>`, picking a free slug. */
   private addWorktree(project: Project, slug: string, base: string): { branch: string; path: string } {
+    // base comes from the request (desktop or phone): never let it be read as a git option
+    if (!base || base.startsWith('-') || /[\s\0]/.test(base)) throw new HttpError(400, `invalid base ref: ${base}`);
     if (!gitOk(project.path, ['rev-parse', '--verify', '--quiet', `${base}^{commit}`])) {
       throw new HttpError(400, `base ref not found: ${base} (does the repo have a commit yet?)`);
     }
