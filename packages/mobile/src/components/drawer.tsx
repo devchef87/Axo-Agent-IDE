@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, BackHandler, Dimensions, Easing, Pressable, ScrollView, View } from 'react-native';
+import { Animated, BackHandler, Dimensions, Easing, Pressable, ScrollView, View } from 'react-native';
 import { Text } from './text.tsx';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Agent, Team } from '@axo/protocol';
 import { usePreview, useAxo, type NodeView, type Selection } from '../lib/store.ts';
 import { confirmDeleteAgent, confirmDeleteTeam } from './actions.ts';
+import { showSheet } from './dialog.tsx';
 import { timeAgo } from '../lib/feed.ts';
 import { C, HAIR } from '../theme.ts';
 import { Feather } from '@expo/vector-icons';
@@ -93,11 +94,10 @@ function NodeSection({ node, onPicked, onCreate, expanded, toggle }: {
 
   const teamActions = (t: Team) => {
     const agents = byTeam(t).length;
-    Alert.alert(t.name, undefined, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete team', style: 'destructive', onPress: () => confirmDeleteTeam(node.key, t, agents) },
-      { text: 'New agent here', onPress: () => onCreate({ kind: 'agent', nodeKey: node.key, projectId: t.projectId, teamId: t.id }) },
-    ]);
+    showSheet([
+      { label: 'New agent here', icon: 'user-plus', onPress: () => onCreate({ kind: 'agent', nodeKey: node.key, projectId: t.projectId, teamId: t.id }) },
+      { label: 'Delete team', icon: 'trash-2', destructive: true, onPress: () => confirmDeleteTeam(node.key, t, agents) },
+    ], t.name, agents === 1 ? '1 agent' : `${agents} agents`);
   };
 
   return (
@@ -163,10 +163,9 @@ function AgentRow({ nodeKey, agent, onPicked, canEdit }: { nodeKey: string; agen
   return (
     <Pressable
       onPress={() => { select(sel); onPicked(); }}
-      onLongPress={canEdit ? () => Alert.alert(agent.name, agent.role, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete agent', style: 'destructive', onPress: () => confirmDeleteAgent(nodeKey, agent) },
-      ]) : undefined}
+      onLongPress={canEdit ? () => showSheet([
+        { label: 'Delete agent', icon: 'trash-2', destructive: true, onPress: () => confirmDeleteAgent(nodeKey, agent) },
+      ], agent.name, agent.role) : undefined}
       delayLongPress={350}
       accessibilityHint="Long-press to delete"
       style={({ pressed }) => ({ flexDirection: 'row', gap: 11, minHeight: 54, alignItems: 'center', paddingLeft: 52, paddingRight: 18, paddingVertical: 8, backgroundColor: pressed ? C.hover : undefined })}

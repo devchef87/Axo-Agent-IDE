@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { Text, TextInput } from './text.tsx';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -8,6 +8,7 @@ import { parsePairing } from '../lib/pairing.ts';
 import { useAxo } from '../lib/store.ts';
 import { C, HAIR } from '../theme.ts';
 import { ConnDot } from './ui.tsx';
+import { showDialog } from './dialog.tsx';
 
 /** Scan the desktop's "Pair phone" QR (or paste its text). Re-pairing replaces the server list. */
 export function PairScreen({ onDone }: { onDone?: () => void }) {
@@ -105,7 +106,7 @@ export function PairScreen({ onDone }: { onDone?: () => void }) {
         {error && <Text style={{ color: C.danger, fontSize: 14, lineHeight: 20 }}>{error}</Text>}
         {onDone && paired.length > 0 && <Button label="Done" onPress={onDone} />}
         {paired.length > 0 && (
-          <Pressable onPress={() => Alert.alert('Forget all servers?', 'This phone will stop connecting until you pair again.', [
+          <Pressable onPress={() => showDialog('Forget all servers?', 'This phone will stop connecting until you pair again.', [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Forget', style: 'destructive', onPress: () => void unpair() },
           ])} style={{ paddingVertical: 14, alignItems: 'center' }}>

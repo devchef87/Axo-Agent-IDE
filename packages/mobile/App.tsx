@@ -11,6 +11,7 @@ import { Drawer } from './src/components/drawer.tsx';
 import { PairScreen } from './src/components/pair-screen.tsx';
 import { CreateSheet, type CreateTarget } from './src/components/create.tsx';
 import { confirmDeleteAgent } from './src/components/actions.ts';
+import { DialogHost } from './src/components/dialog.tsx';
 import { STATUS_LABEL, StatusDot } from './src/components/ui.tsx';
 import { C, HAIR } from './src/theme.ts';
 import { Feather } from '@expo/vector-icons';
@@ -23,6 +24,7 @@ export default function App() {
         <View style={{ flex: 1, backgroundColor: C.bg }}>
           <Root />
         </View>
+        <DialogHost />
       </KeyboardProvider>
     </SafeAreaProvider>
   );
