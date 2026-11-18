@@ -1,7 +1,7 @@
 import { memo, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { AlertTriangle, ChevronDown, ChevronUp, Info, OctagonAlert } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, ChevronUp, Info, OctagonAlert } from 'lucide-react';
 import type { Agent, FeedItem } from '@axo/protocol';
 import type { FeedState } from '../../stores/store.ts';
 import { ToolGroup, useTick } from './tool-group.tsx';
@@ -15,7 +15,7 @@ type ToolItem = Extract<FeedItem, { kind: 'tool' }>;
 type Block =
   | { type: 'item'; item: FeedItem }
   | { type: 'tools'; id: string; items: ToolItem[] }
-  | { type: 'draft'; id: string; text: string };
+  | { type: 'draft'; id: string; text: string; thinking: boolean };
 
 function toBlocks(items: FeedItem[], drafts: Record<string, string>): Block[] {
   const out: Block[] = [];
@@ -28,7 +28,7 @@ function toBlocks(items: FeedItem[], drafts: Record<string, string>): Block[] {
       out.push({ type: 'item', item });
     }
   }
-  for (const [id, text] of Object.entries(drafts)) out.push({ type: 'draft', id, text });
+  for (const [id, text] of Object.entries(drafts)) out.push({ type: 'draft', id, text, thinking: id.startsWith('th-') });
   return out;
 }
 
@@ -74,11 +74,14 @@ export function Feed({ feed, agent, nodeKey, onLoadOlder }: { feed: FeedState; a
 
 const BlockView = memo(function BlockView({ block, live, latest }: { block: Block; live: boolean; latest: boolean }) {
   if (block.type === 'tools') return <ToolGroup items={block.items} live={live} />;
-  if (block.type === 'draft') return <AgentMessage><div className="md text-[13px]"><Sections text={block.text} /></div></AgentMessage>;
+  if (block.type === 'draft') return block.thinking
+    ? <Thinking text={block.text} live />
+    : <AgentMessage><div className="md text-[13px]"><Sections text={block.text} /></div></AgentMessage>;
   const item = block.item;
   switch (item.kind) {
     case 'user': return <UserMessage item={item} />;
     case 'text': return <AgentMessage ts={item.ts}><FoldedProse text={item.text} startOpen={latest} /></AgentMessage>;
+    case 'thinking': return <Thinking text={item.text} live={false} />;
     case 'system': return <SystemLine item={item} />;
     case 'turn': return <TurnFooter item={item} />;
     case 'rotation': return <RotationDivider item={item} />;
@@ -147,6 +150,39 @@ function FoldedProse({ text, startOpen }: { text: string; startOpen: boolean }) 
           {open ? <><ChevronUp size={11} /> Show less</> : <><ChevronDown size={11} /> Show more</>}
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * The agent's reasoning. While it streams: a live "Thinking" line with the latest few lines of
+ * thought, so a long think isn't a silent wait. Once done: a quiet, folded "Thought" row that opens
+ * to the full text. Always dimmer and smaller than replies, and outside the reply rule.
+ */
+function Thinking({ text, live }: { text: string; live: boolean }) {
+  const [open, setOpen] = useState(false);
+  const words = text.trim().split(/\s+/).length;
+  if (live) {
+    const tail = text.trim().split('\n').filter(Boolean).slice(-4).join('\n');
+    return (
+      <div className="my-2 max-w-[760px] text-[12px] text-dim">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="flex gap-1">
+            {[0, 1, 2].map((i) => <span key={i} className="h-1 w-1 rounded-full bg-working animate-pulse-dot" style={{ animationDelay: `${i * 0.2}s` }} />)}
+          </span>
+          Thinking
+        </div>
+        <div className="line-clamp-4 whitespace-pre-wrap border-l border-border pl-3 italic leading-relaxed">{tail}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="my-1.5 max-w-[760px] text-[12px] text-dim">
+      <button onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-1.5 rounded px-1 -mx-1 hover:bg-hover hover:text-faint cursor-pointer">
+        {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+        Thought <span className="text-dim/70">· {words} words</span>
+      </button>
+      {open && <div className="mt-1 whitespace-pre-wrap border-l border-border pl-3 italic leading-relaxed">{text.trim()}</div>}
     </div>
   );
 }

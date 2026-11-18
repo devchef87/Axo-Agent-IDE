@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import type { Agent, CreateAgentReq, FeedItem, UpdateAgentReq } from '@axo/protocol';
 import type { Store } from '../store/db.ts';
@@ -116,6 +116,7 @@ export class AgentRuntime extends EventEmitter {
     this.bus = bus;
     this.cfg = cfg;
     this.projects = projects;
+    claudeSupports(cfg.claudeBin, '--thinking-display', 'summarized'); // warm the probe before the first spawn
     this.images = new ImageStore(cfg.home);
     this.opts = { interruptGraceMs: 8000, crashWindowMs: 120_000, crashLimit: 3, ...opts };
     for (const a of store.listAgents()) this.agents.set(a.id, a);
@@ -359,6 +360,9 @@ export class AgentRuntime extends EventEmitter {
       '--model', a.model,
     ];
     if (a.effort) args.push('--effort', a.effort);
+    // Ask for summarized reasoning so the feed can show the agent thinking. -p stream-json omits it by
+    // default; older claude builds reject the flag, so only pass it once a probe says it's accepted.
+    if (claudeSupports(this.cfg.claudeBin, '--thinking-display', 'summarized')) args.push('--thinking-display', 'summarized');
 
     const env = claudeEnv(this.cfg);
     env.AXO_AGENT_ID = a.id;
@@ -490,13 +494,13 @@ export class AgentRuntime extends EventEmitter {
         break;
 
       case 'feed':
-        if (act.item.kind === 'tool') live.toolStarts.set(act.item.id, act.item.ts);
+        if (act.item.kind === 'tool' && !live.toolStarts.has(act.item.id)) live.toolStarts.set(act.item.id, act.item.ts);
         if (act.item.kind === 'text') live.turnText.push(act.item.text);
         this.addFeed(a, act.item);
         break;
 
       case 'text-delta':
-        this.bus.publish({ type: 'agent:text-delta', agentId: a.id, itemId: act.itemId, text: act.text });
+        this.bus.publish({ type: 'agent:text-delta', agentId: a.id, itemId: act.itemId, text: act.text, ...(act.thinking ? { thinking: true as const } : {}) });
         break;
 
       case 'tool-result': {
@@ -727,4 +731,23 @@ function isClaudePid(pid: number): boolean {
   } catch {
     return false;
   }
+}
+
+const flagSupport = new Map<string, boolean | 'probing'>();
+/**
+ * Whether this claude binary accepts an optional flag (e.g. the hidden --thinking-display). claude
+ * rejects unknown options, so we probe once in the background: `-p` stream mode with empty stdin starts
+ * and exits 0 without calling the model when the flag is known, and fails fast with "unknown option"
+ * when it isn't. Returns false until the probe finishes.
+ */
+export function claudeSupports(bin: string, flag: string, value: string): boolean {
+  const key = `${bin}\0${flag}`;
+  const known = flagSupport.get(key);
+  if (known === undefined) {
+    flagSupport.set(key, 'probing');
+    const child = execFile(bin, ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', flag, value],
+      { timeout: 20_000 }, (err) => flagSupport.set(key, !err));
+    child.stdin?.end();
+  }
+  return known === true;
 }
