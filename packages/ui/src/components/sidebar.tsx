@@ -74,7 +74,7 @@ function NodeSection({ node }: { node: NodeView }) {
           className="label !text-[9.5px] !text-dim flex min-w-0 flex-1 items-center gap-2 rounded-sm outline-none hover:!text-secondary focus-visible:bg-hover cursor-pointer"
           onClick={() => setOpen(!open)}
           title={node.projects.map((p) => p.path).join('\n') || node.name}>
-          <ConnDot status={node.status} />
+          <ConnDot status={node.status} tone={sel?.nodeKey === node.key ? 'active' : 'soft'} />
           <span className="truncate">{node.name}</span>
           {!open && <ChevronRight size={10} />}
         </button>
@@ -268,7 +268,7 @@ function AgentRow({ nodeKey, agent }: { nodeKey: string; agent: Agent }) {
         aria-current={focused ? 'true' : undefined}
         className={cn(
           'relative flex w-full items-center gap-2 rounded-[5px] py-[5px] pr-2 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent cursor-pointer', indent,
-          // Selected: teal name, no fill. Open in another pane: white. Otherwise off-white.
+          // Selected: accent name, no fill. Open in another pane: white. Otherwise off-white.
           focused ? 'text-accent-text' : visible ? 'text-primary hover:bg-hover' : 'text-secondary hover:bg-hover hover:text-primary',
         )}
       >

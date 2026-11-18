@@ -39,9 +39,9 @@ const STATUS_COLOR: Record<AgentStatus, string> = {
   working: 'bg-working',
   starting: 'bg-working',
   rotating: 'bg-rotating',
-  idle: 'bg-muted',
-  asleep: 'border border-faint',  // hollow: no process
-  stopped: 'border border-faint',
+  idle: 'bg-dim',
+  asleep: 'bg-dot-soft',  // no process: barely there
+  stopped: 'bg-dot-soft',
   error: 'bg-danger',
 };
 export const STATUS_LABEL: Record<AgentStatus, string> = {
@@ -60,12 +60,16 @@ export function StatusDot({ status, className }: { status: AgentStatus; classNam
   return <span className={cn('inline-block h-1.5 w-1.5 shrink-0 rounded-full', STATUS_COLOR[status], live && 'animate-pulse-dot', className)} />;
 }
 
-export function ConnDot({ status }: { status: ConnStatus }) {
+/**
+ * Connection dot. In the sidebar, `tone` marks the server you're working in ('active', accent) and the
+ * rest ('soft', barely there). Connecting and errors always show.
+ */
+export function ConnDot({ status, tone }: { status: ConnStatus; tone?: 'active' | 'soft' }) {
   return (
     <span
       title={status}
       className={cn('inline-block h-1.5 w-1.5 shrink-0 rounded-full',
-        status === 'online' ? 'bg-muted' : status === 'connecting' ? 'bg-warning animate-pulse-dot' : 'bg-danger')}
+        status === 'online' ? (tone === 'soft' ? 'bg-dot-soft' : tone === 'active' ? 'bg-accent' : 'bg-muted') : status === 'connecting' ? 'bg-warning animate-pulse-dot' : 'bg-danger')}
     />
   );
 }

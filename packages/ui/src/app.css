@@ -17,8 +17,8 @@
 
 /*
  * Dark: near-black body (#131314), a lighter sidebar (#1E1F20), inputs on #282A2C, white text and
- * one teal accent (#03897B) for buttons, focus, selection and the working pulse. Teal as small text
- * uses the lighter --accent-text so it stays readable. Light: clean neutrals with a black accent.
+ * one mint accent (#37DAA3) for buttons, focus, selection, reply rules and the working pulse. Mint is
+ * bright, so text on a mint fill is near-black. Light: clean neutrals with a black accent.
  * Other colour is reserved for danger, warning, diff lines and syntax.
  */
 :root,
@@ -42,15 +42,16 @@
   --text-muted: #c4c7c5;
   --text-faint: #a8abae;
   --text-dim: #8e9196;      /* secondary metadata (roles): quiet on purpose */
-  --accent: #03897B;
-  --accent-hover: #02796c;
-  --accent-fg: #ffffff;
-  --accent-text: #1fb3a1;   /* teal as small text (selected agent, links) */
+  --dot-soft: #3a3c3f;      /* barely-there status dot: asleep agents, servers you're not in */
+  --accent: #37DAA3;
+  --accent-hover: #5ce3b5;
+  --accent-fg: #0b0b0b;
+  --accent-text: #37DAA3;   /* mint reads as text too (≥7.9:1 on every surface) */
   --success: #81c995;       /* diff additions */
   --warning: #fdd663;
   --danger: #f28b82;
   --info: #c4c7c5;
-  --working: #03897B;
+  --working: #37DAA3;
   --rotating: #c4c7c5;
   --innerchat: #e3e3e3;
   /* syntax: soft pastels that read on near-black */
@@ -88,6 +89,7 @@
   --text-muted: #555555;
   --text-faint: #636363;
   --text-dim: #6b6b6b;
+  --dot-soft: #d9d9d9;
   --accent: #0a0a0a;
   --accent-hover: #000000;
   --accent-fg: #ffffff;
@@ -149,6 +151,7 @@
   --color-control-hover: var(--control-hover);
   --color-terminal: var(--terminal);
   --color-dim: var(--text-dim);
+  --color-dot-soft: var(--dot-soft);
   --color-border: var(--border);
   --color-border-subtle: var(--border-subtle);
   --color-border-strong: var(--border-strong);
