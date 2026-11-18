@@ -48,7 +48,7 @@ export function Sidebar() {
 }
 
 function NodeSection({ node }: { node: NodeView }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false); // servers start collapsed; open the ones you need
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const setUi = useAxo((s) => s.setUi);
   const client = useAxo((s) => s.client);
