@@ -172,7 +172,7 @@ function Thinking({ text, live }: { text: string; live: boolean }) {
           </span>
           Thinking
         </div>
-        <div className="line-clamp-4 whitespace-pre-wrap border-l border-border pl-3 italic leading-relaxed">{tail}</div>
+        <div className="line-clamp-4 whitespace-pre-wrap border-l border-border pl-4 italic leading-relaxed">{tail}</div>
       </div>
     );
   }
@@ -182,7 +182,7 @@ function Thinking({ text, live }: { text: string; live: boolean }) {
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
         Thought <span className="text-dim/70">· {words} words</span>
       </button>
-      {open && <div className="mt-1 whitespace-pre-wrap border-l border-border pl-3 italic leading-relaxed">{text.trim()}</div>}
+      {open && <div className="mt-1 whitespace-pre-wrap border-l border-border pl-4 italic leading-relaxed">{text.trim()}</div>}
     </div>
   );
 }
@@ -210,7 +210,7 @@ const Sections = memo(function Sections({ text }: { text: string }) {
   return (
     <>
       {splitSections(text).map((s, i) => (
-        <div key={i} className="md-sec border-l border-accent/60 pl-4 [&+&]:mt-4">
+        <div key={i} className="md-sec border-l border-accent/60 py-1 pl-5 [&+&]:mt-3">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{s}</ReactMarkdown>
         </div>
       ))}
