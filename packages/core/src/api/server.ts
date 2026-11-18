@@ -26,8 +26,9 @@ export class TextResponse {
 /** Routes an agent token may call. Everything else needs the node token. */
 const AGENT_ROUTES = /^\/(version|me|knock|innerchat\/.+|watches(\/.*)?|agents\/([a-z0-9]+)\/refresh)$/;
 
-/** What a paired phone may do (docs/MOBILE.md): read, message an agent, stop it. Nothing else. */
+/** What a paired phone may do (docs/MOBILE.md): read, message an agent, stop it, create teams and agents. Nothing else. */
 const DEVICE_ROUTES: [string, RegExp][] = [
+  ['POST', /^\/(teams|agents)$/],
   ['GET', /^\/(version|state|events)$/],
   ['GET', /^\/agents\/[a-z0-9]+\/(feed|images\/[^/]+)$/],
   ['POST', /^\/agents\/[a-z0-9]+\/(message|interrupt|attachments)$/],

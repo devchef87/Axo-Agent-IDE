@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { Text, TextInput } from './text.tsx';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { parsePairing } from '../lib/pairing.ts';
 import { useAxo } from '../lib/store.ts';
-import { C } from '../theme.ts';
+import { C, HAIR } from '../theme.ts';
 import { ConnDot } from './ui.tsx';
 
 /** Scan the desktop's "Pair phone" QR (or paste its text). Re-pairing replaces the server list. */
@@ -70,9 +71,9 @@ export function PairScreen({ onDone }: { onDone?: () => void }) {
   }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.panel }} contentContainerStyle={{ padding: 24, paddingTop: 24 + insets.top, paddingBottom: 24 + insets.bottom }} keyboardShouldPersistTaps="handled">
-      <Text style={{ color: C.primary, fontSize: 26, fontWeight: '600', marginBottom: 8 }}>{paired.length ? 'Servers' : 'Pair with Axo'}</Text>
-      <Text style={{ color: C.muted, fontSize: 15, lineHeight: 22, marginBottom: 24 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 24, paddingTop: 24 + insets.top, paddingBottom: 24 + insets.bottom }} keyboardShouldPersistTaps="handled">
+      <Text style={{ color: C.primary, fontSize: 26, fontWeight: '700', marginBottom: 10 }}>{paired.length ? 'Servers' : 'Pair with Axo'}</Text>
+      <Text style={{ color: C.body, fontSize: 15.5, lineHeight: 25, fontWeight: '500', marginBottom: 24 }}>
         {paired.length
           ? 'This phone talks to these servers over Tailscale. Pair again to replace the list.'
           : 'On your computer, open Axo → Settings → Pair phone, then scan the code. The phone connects straight to your servers over Tailscale, so keep Tailscale on here too.'}
@@ -81,10 +82,10 @@ export function PairScreen({ onDone }: { onDone?: () => void }) {
       {paired.map((p) => {
         const n = nodes[p.id];
         return (
-          <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.borderSubtle }}>
-            {n && <ConnDot status={n.status} />}
+          <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: HAIR, borderBottomColor: C.border }}>
+            {n && <ConnDot status={n.status} current={n.status === 'online'} />}
             <View style={{ flex: 1 }}>
-              <Text style={{ color: C.primary, fontSize: 15 }}>{p.name}</Text>
+              <Text style={{ color: C.primary, fontSize: 15, fontWeight: '500' }}>{p.name}</Text>
               <Text style={{ color: C.dim, fontSize: 12.5 }}>{p.url}{n?.status && n.status !== 'online' ? ` · ${n.status === 'unauthorized' ? 'revoked' : n.error ?? n.status}` : ''}</Text>
             </View>
           </View>
@@ -97,7 +98,7 @@ export function PairScreen({ onDone }: { onDone?: () => void }) {
         {paste && (
           <View style={{ gap: 10 }}>
             <TextInput value={pasted} onChangeText={setPasted} multiline placeholder='{"v":1,"nodes":[…]}' placeholderTextColor={C.dim} autoCapitalize="none" autoCorrect={false}
-              style={{ minHeight: 100, color: C.primary, fontFamily: 'monospace', fontSize: 13, backgroundColor: C.bg, borderRadius: 8, borderWidth: 1, borderColor: C.border, padding: 10, textAlignVertical: 'top' }} />
+              style={{ minHeight: 100, color: C.primary, fontFamily: 'monospace', fontSize: 13, backgroundColor: C.inset, borderRadius: 4, borderWidth: 1, borderColor: C.border, padding: 10, textAlignVertical: 'top' }} />
             <Button label="Pair" primary onPress={() => void accept(pasted)} disabled={!pasted.trim()} />
           </View>
         )}
@@ -120,10 +121,10 @@ function Button({ label, onPress, primary, disabled }: { label: string; onPress:
   return (
     <Pressable onPress={onPress} disabled={disabled}
       style={({ pressed }) => ({
-        height: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.5 : 1,
-        backgroundColor: primary ? (pressed ? '#4cc0f0' : C.accent) : pressed ? C.hover : C.control,
+        height: 48, borderRadius: 4, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.5 : 1,
+        backgroundColor: primary ? (pressed ? C.accentHover : C.accent) : pressed ? C.controlHover : C.control,
       })}>
-      <Text style={{ color: primary ? C.accentFg : C.primary, fontSize: 16, fontWeight: '600' }}>{label}</Text>
+      <Text style={{ color: primary ? C.accentFg : C.secondary, fontSize: 15.5, fontWeight: '500' }}>{label}</Text>
     </Pressable>
   );
 }

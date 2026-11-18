@@ -6,12 +6,12 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#24353D",
+    "backgroundColor": "#1F2126",
     "android": {
       "package": "ai.axomlabs.axo",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#24353D",
+        "backgroundColor": "#24282F",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
@@ -50,7 +50,7 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 160,
           "resizeMode": "contain",
-          "backgroundColor": "#24353D"
+          "backgroundColor": "#1F2126"
         }
       ],
       [
@@ -59,6 +59,16 @@
           "photosPermission": "Axo attaches photos you choose to messages.",
           "cameraPermission": "Axo uses the camera to take photos to send to your agents.",
           "microphonePermission": "Axo records audio when you film a video to send to an agent."
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/GoogleSans-Regular.ttf",
+            "./assets/fonts/GoogleSans-Medium.ttf",
+            "./assets/fonts/GoogleSans-Bold.ttf"
+          ]
         }
       ]
     ]

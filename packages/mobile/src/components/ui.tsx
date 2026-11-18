@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Text, View, type TextProps } from 'react-native';
+import { Animated, Easing, View, type TextProps } from 'react-native';
+import { Text } from './text.tsx';
 import type { AgentStatus } from '@axo/protocol';
 import type { ConnStatus } from '../lib/client.ts';
-import { C } from '../theme.ts';
+import { C, HAIR } from '../theme.ts';
 
 export const STATUS_LABEL: Record<AgentStatus, string> = {
   working: 'working', starting: 'starting', rotating: 'refreshing', idle: 'idle',
@@ -23,8 +24,8 @@ export function usePulse(active: boolean, delay = 0): Animated.Value {
     if (!active) { v.setValue(1); return; }
     const loop = Animated.loop(Animated.sequence([
       Animated.delay(delay),
-      Animated.timing(v, { toValue: 0.3, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      Animated.timing(v, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(v, { toValue: 0.35, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(v, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
     ]));
     loop.start();
     return () => loop.stop();
@@ -32,25 +33,22 @@ export function usePulse(active: boolean, delay = 0): Animated.Value {
   return v;
 }
 
-export function StatusDot({ status, size = 7 }: { status: AgentStatus; size?: number }) {
+/** Agent status: working pulses indigo, idle grey, asleep/stopped barely there, error red. Solid dots only. */
+export function StatusDot({ status, size = 6 }: { status: AgentStatus; size?: number }) {
   const live = isLive(status);
   const opacity = usePulse(live);
-  const hollow = status === 'asleep' || status === 'stopped';
-  const color = status === 'error' ? C.danger : status === 'rotating' ? C.muted : live ? C.working : C.muted;
-  return (
-    <Animated.View
-      style={{
-        width: size, height: size, borderRadius: size / 2, opacity,
-        backgroundColor: hollow ? 'transparent' : color,
-        borderWidth: hollow ? 1 : 0, borderColor: C.dim,
-      }}
-    />
-  );
+  const color = status === 'error' ? C.danger
+    : status === 'rotating' ? C.muted
+    : live ? C.working
+    : status === 'idle' ? C.dim
+    : C.dotSoft;
+  return <Animated.View style={{ width: size, height: size, borderRadius: size / 2, opacity, backgroundColor: color }} />;
 }
 
-export function ConnDot({ status }: { status: ConnStatus }) {
+/** Server: indigo for the one you're working in, soft for the others, amber pulsing while connecting, red offline. */
+export function ConnDot({ status, current = false }: { status: ConnStatus; current?: boolean }) {
   const opacity = usePulse(status === 'connecting');
-  const color = status === 'online' ? C.success : status === 'connecting' ? C.warning : C.danger;
+  const color = status === 'online' ? (current ? C.working : C.dotSoft) : status === 'connecting' ? C.warning : C.danger;
   return <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color, opacity }} />;
 }
 
@@ -70,5 +68,5 @@ export function useTick(active: boolean, ms = 1000): number {
 }
 
 export function Divider() {
-  return <View style={{ height: 1, backgroundColor: C.borderSubtle }} />;
+  return <View style={{ height: HAIR, backgroundColor: C.border }} />;
 }

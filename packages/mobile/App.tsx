@@ -1,22 +1,28 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AppState, BackHandler, Keyboard, KeyboardAvoidingView, Pressable, Text, View } from 'react-native';
+import { AppState, BackHandler, Keyboard, Pressable, View } from 'react-native';
+import { Text } from './src/components/text.tsx';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardProvider, KeyboardStickyView, useKeyboardState } from 'react-native-keyboard-controller';
 import { feedKey, useAgent, useAxo } from './src/lib/store.ts';
 import { Feed } from './src/components/feed.tsx';
 import { Composer } from './src/components/composer.tsx';
 import { Drawer } from './src/components/drawer.tsx';
 import { PairScreen } from './src/components/pair-screen.tsx';
+import { CreateSheet, type CreateTarget } from './src/components/create.tsx';
 import { STATUS_LABEL, StatusDot } from './src/components/ui.tsx';
-import { C } from './src/theme.ts';
+import { C, HAIR } from './src/theme.ts';
+import { Feather } from '@expo/vector-icons';
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
-      <View style={{ flex: 1, backgroundColor: C.panel }}>
-        <Root />
-      </View>
+      <KeyboardProvider>
+        <StatusBar style="light" />
+        <View style={{ flex: 1, backgroundColor: C.bg }}>
+          <Root />
+        </View>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }
@@ -51,14 +57,10 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
   const node = useAxo((s) => (selected ? s.nodes[selected.nodeKey] : undefined));
   const feed = useAxo((s) => (selected ? s.feeds[feedKey(selected.nodeKey, selected.agentId)] : undefined));
   const [drawer, setDrawer] = useState(!selected);
-  const [kb, setKb] = useState(false);
   const [composerH, setComposerH] = useState(72);
-
-  useEffect(() => {
-    const a = Keyboard.addListener('keyboardDidShow', () => setKb(true));
-    const b = Keyboard.addListener('keyboardDidHide', () => setKb(false));
-    return () => { a.remove(); b.remove(); };
-  }, []);
+  const [create, setCreate] = useState<CreateTarget | null>(null);
+  // Keyboard tracked natively (react-native-keyboard-controller): Android edge-to-edge never resizes the window.
+  const kbHeight = useKeyboardState((k) => (k.isVisible ? k.height : 0));
   // Restored selection: load its feed once the store is up.
   useEffect(() => {
     if (selected && !feed) useAxo.getState().select(selected);
@@ -70,33 +72,33 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <View style={{ paddingTop: insets.top, backgroundColor: C.panel, borderBottomWidth: 1, borderBottomColor: C.borderSubtle }}>
-        <View style={{ height: 54, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6 }}>
+      <View style={{ paddingTop: insets.top, backgroundColor: C.bg, borderBottomWidth: HAIR, borderBottomColor: C.borderSubtle }}>
+        <View style={{ height: 58, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6 }}>
           <Pressable onPress={() => { Keyboard.dismiss(); setDrawer(true); }} hitSlop={8} accessibilityLabel="Open menu"
             style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? C.hover : undefined })}>
-            <View style={{ gap: 4 }}>{[18, 18, 12].map((w, i) => <View key={i} style={{ width: w, height: 2, borderRadius: 1, backgroundColor: C.secondary }} />)}</View>
+            <Feather name="menu" size={21} color={C.secondary} />
           </Pressable>
           {agent ? (
             <View style={{ flex: 1, marginLeft: 6 }}>
-              <Text style={{ color: C.primary, fontSize: 17, fontWeight: '600' }} numberOfLines={1}>{agent.name}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ color: C.primary, fontSize: 16.5, lineHeight: 21, fontWeight: '500' }} numberOfLines={1}>{agent.name}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                 <StatusDot status={agent.status} size={6} />
-                <Text style={{ color: C.dim, fontSize: 12.5 }} numberOfLines={1}>
+                <Text style={{ color: C.dim, fontSize: 12.5, lineHeight: 16 }} numberOfLines={1}>
                   {offline ? `${node?.name} · ${node?.status === 'connecting' ? 'reconnecting…' : 'offline'}` : `${STATUS_LABEL[agent.status]} · ${node?.name}`}
                 </Text>
               </View>
             </View>
           ) : (
-            <Text style={{ flex: 1, marginLeft: 6, color: C.primary, fontSize: 17, fontWeight: '600' }}>Axo</Text>
+            <Text style={{ flex: 1, marginLeft: 6, color: C.primary, fontSize: 16.5, fontWeight: '700' }}>Axo</Text>
           )}
         </View>
       </View>
 
-      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
         {agent && selected ? (
           <>
             {agent.status === 'error' && agent.lastError && (
-              <View style={{ backgroundColor: 'rgba(255,161,151,0.1)', paddingHorizontal: 16, paddingVertical: 8 }}>
+              <View style={{ backgroundColor: 'rgba(242,139,130,0.1)', paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: HAIR, borderBottomColor: 'rgba(242,139,130,0.35)' }}>
                 <Text style={{ color: C.danger, fontSize: 13 }} numberOfLines={3}>{agent.lastError}</Text>
               </View>
             )}
@@ -105,13 +107,16 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
                 feed={feed ?? { items: [], drafts: {}, hasMore: false, loaded: false, loadingOlder: false }}
                 agent={agent}
                 nodeKey={selected.nodeKey}
-                bottomInset={composerH}
+                bottomInset={composerH + Math.max(0, kbHeight - insets.bottom)}
                 onLoadOlder={() => void useAxo.getState().loadFeed(selected.nodeKey, selected.agentId, true)}
               />
             </View>
             {/* Floating composer: overlays the chat, which scrolls underneath it. */}
-            <View pointerEvents="box-none" onLayout={(e) => setComposerH(e.nativeEvent.layout.height)}
-              style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: kb ? 0 : insets.bottom }}>
+            {/* Sticks to the top of the keyboard; with it closed, sits off the bottom edge. Opened offset drops
+                the nav-bar padding, which the keyboard already covers. */}
+            <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom + 4 }} pointerEvents="box-none"
+              onLayout={(e) => setComposerH(e.nativeEvent.layout.height)}
+              style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: insets.bottom + 10 }}>
               <Composer
                 agent={agent}
                 disabled={offline}
@@ -119,18 +124,20 @@ function ChatScreen({ onSettings }: { onSettings: () => void }) {
                 onStop={() => useAxo.getState().interrupt(selected)}
                 onUpload={(files) => useAxo.getState().upload(selected, files)}
               />
-            </View>
+            </KeyboardStickyView>
           </>
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-            <Text style={{ color: C.muted, fontSize: 15, textAlign: 'center' }}>
+            <Text style={{ color: C.faint, fontSize: 15, textAlign: 'center' }}>
               {selected && node?.status !== 'online' ? `Waiting for ${node?.name ?? 'the server'}…` : 'Open the menu and pick an agent.'}
             </Text>
           </View>
         )}
-      </KeyboardAvoidingView>
+      </View>
 
-      <Drawer open={drawer} onClose={closeDrawer} onPair={openSettings} />
+      <Drawer open={drawer} onClose={closeDrawer} onPair={openSettings} onCreate={(t) => { setDrawer(false); setCreate(t); }} />
+      <CreateSheet target={create} onClose={() => setCreate(null)} onCreatedAgent={(sel) => useAxo.getState().select(sel)} />
     </View>
   );
 }
+
