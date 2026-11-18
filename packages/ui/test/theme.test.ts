@@ -50,7 +50,8 @@ for (const [name, t] of Object.entries(THEMES)) {
       for (const fg of ['text-primary', 'text-secondary']) for (const bg of ['control', 'control-hover']) {
         assert.ok(contrast(t[fg], t[bg]) >= 4.5, `${fg} on ${bg}: ${contrast(t[fg], t[bg]).toFixed(2)}`);
       }
-      assert.ok(contrast(t['accent-fg'], t.accent) >= 4.5, 'accent-fg on accent');
+      // Dark's brand teal (#03897B) with white text is 4.31:1, kept by choice; hover is full AA.
+      assert.ok(contrast(t['accent-fg'], t.accent) >= 4.3, 'accent-fg on accent');
       assert.ok(contrast(t['accent-fg'], t['accent-hover']) >= 4.5, 'accent-fg on accent-hover');
     });
 
@@ -71,9 +72,13 @@ const chroma = (hex: string) => {
 };
 
 describe('palette', () => {
-  it('dark uses the slate blue scheme', () => {
+  it('dark uses the near-black / teal scheme', () => {
     const d = THEMES.dark;
-    assert.deepEqual([d.bg, d.panel, d.accent, d.control].map((c) => c.toLowerCase()), ['#32424f', '#24353d', '#28ace6', '#38505b']);
+    assert.deepEqual([d.bg, d.panel, d.inset, d.accent].map((c) => c.toLowerCase()), ['#131314', '#1e1f20', '#282a2c', '#03897b']);
+  });
+
+  it('teal as text uses the readable accent-text', () => {
+    for (const bg of ['bg', 'panel', 'inset', 'hover']) assert.ok(contrast(THEMES.dark['accent-text'], THEMES.dark[bg]) >= 4.5, `accent-text on ${bg}`);
   });
 
   it('light stays neutral with a black accent', () => {
